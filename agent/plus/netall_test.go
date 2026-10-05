@@ -282,3 +282,140 @@ func TestCollectNetAllKeysInterfacesByVerbatimName(t *testing.T) {
 	}
 	assert.Len(t, collectNetAll(root), len(names))
 }
+
+// TestCollectNetAllCoversExactlyWhatUpstreamFilters is the falsifiable half of the
+// collector's rationale. Upstream enumerates every interface and then keeps a
+// name whitelist (skipNetworkInterface, agent/network.go:247) that drops the
+// lo/docker/br-/veth/bond/cali prefixes plus any interface whose rx or tx reads
+// zero. This test pins the six prefixes as data, so inheriting upstream's filter
+// here is a test failure rather than a silent divergence, and adds lowpan0 --
+// which upstream drops only because HasPrefix("lowpan0", "lo") is true.
+//
+// The counts asserted here are the fixture's, not the host's: the real host
+// splits 26-by-prefix / 1-by-idle / 1-survivor, which is recorded in netall.go's
+// rationale rather than pinned here because container churn changes it hourly.
+func TestCollectNetAllCoversExactlyWhatUpstreamFilters(t *testing.T) {
+	root := t.TempDir()
+	// One interface per prefix upstream drops, each carrying real traffic so a
+	// zero-traffic rule could not be what keeps them in the result.
+	for _, name := range []string{"lo", "lowpan0", "docker0", "br-3afba6b18fd3", "veth1255f81", "bond0", "cali0"} {
+		writeNetIface(t, root, name, "126", "61484")
+	}
+	// The category that is NOT a name rule: an idle physical NIC. Upstream drops
+	// this one for reading zero, which is why "upstream reports one interface" is
+	// a fact about this host rather than a property of upstream.
+	writeNetIface(t, root, "enp0s31f6", "0", "0")
+	// And a busy physical NIC, the one upstream would keep.
+	writeNetIface(t, root, "wlp0s20f3", "3373750863", "856981582")
+
+	got := collectNetAll(root)
+	require.Len(t, got, 9, "no interface may be dropped for a name upstream also drops")
+	for name, s := range got {
+		require.NotNil(t, s, "interface %q must be reported", name)
+	}
+	for _, name := range []string{"lo", "lowpan0", "docker0", "br-3afba6b18fd3", "veth1255f81", "bond0", "cali0", "enp0s31f6", "wlp0s20f3"} {
+		assert.Contains(t, got, name, "interface %q must survive", name)
+	}
+	// Blanking the counters would pass the containment assertions above, so the
+	// traffic that keeps each interface eligible has to survive too.
+	assert.Equal(t, uint64(3373750863), got["wlp0s20f3"].RxBytes)
+	assert.Equal(t, uint64(856981582), got["wlp0s20f3"].TxBytes)
+	assert.Equal(t, uint64(126), got["veth1255f81"].RxBytes)
+	assert.Equal(t, uint64(0), got["enp0s31f6"].RxBytes, "an idle NIC is reported, not dropped")
+}
+
+// TestCollectNetAllReportsCumulativeCountersVerbatim pins the "cumulative
+// snapshot, not a rate" half of the collector contract. Values are the host's
+// real lo readings, which exceed 2^31 so a 32-bit accumulator or a /1024 or
+// /1000 rescale would all show, and they do not divide evenly so a truncated
+// rate cannot coincidentally match.
+func TestCollectNetAllReportsCumulativeCountersVerbatim(t *testing.T) {
+	root := t.TempDir()
+	iface := writeNetIface(t, root, "lo", "4003869867", "4003869988")
+	writeFile(t, filepath.Join(iface, "statistics", "rx_packets"), "5038409\n")
+	writeFile(t, filepath.Join(iface, "statistics", "tx_packets"), "5038412\n")
+
+	got := collectNetAll(root)
+	require.Len(t, got, 1)
+	s := got["lo"]
+	require.NotNil(t, s)
+	assert.Equal(t, uint64(4003869867), s.RxBytes, "rx_bytes is the raw sysfs counter, not a rate or a delta")
+	assert.Equal(t, uint64(4003869988), s.TxBytes, "tx_bytes is the raw sysfs counter, not a rate or a delta")
+	assert.Equal(t, uint64(5038409), s.RxPackets, "rx_packets is the raw sysfs counter")
+	assert.Equal(t, uint64(5038412), s.TxPackets, "tx_packets is the raw sysfs counter")
+}
+
+// TestCollectNetAllSurfacesCounterReset guards the other half of the contract:
+// a reset must be visible as a decrease, because that decrease is the only
+// signal a consumer has to detect the reset and refuse to difference across it.
+//
+// The sequence is the one observed in production, not a construction: this host
+// rebooted between two audits and lo's rx_bytes went from 4,003,869,867 back to
+// zero. The assertions pin that the collector reports the zero rather than
+// clamping, carrying forward or wrapping, and that the interface survives it --
+// dropping the entry would hide the reset behind a missing key.
+func TestCollectNetAllSurfacesCounterReset(t *testing.T) {
+	root := t.TempDir()
+	writeNetIface(t, root, "lo", "4003869867", "4003869988")
+
+	before := collectNetAll(root)
+	require.Len(t, before, 1)
+	require.Equal(t, uint64(4003869867), before["lo"].RxBytes)
+
+	// Interface bounces (or the container is recreated): the kernel zeroes the
+	// counters while the name stays put.
+	iface := netIfacePath(root, "lo")
+	writeFile(t, filepath.Join(iface, "statistics", "rx_bytes"), "0\n")
+	writeFile(t, filepath.Join(iface, "statistics", "tx_bytes"), "0\n")
+	writeFile(t, filepath.Join(iface, "statistics", "rx_packets"), "0\n")
+	writeFile(t, filepath.Join(iface, "statistics", "tx_packets"), "0\n")
+
+	after := collectNetAll(root)
+	require.Len(t, after, 1, "a reset must not remove the interface; the consumer needs the zero")
+	require.NotNil(t, after["lo"])
+	assert.Equal(t, uint64(0), after["lo"].RxBytes, "the reset is reported verbatim, not clamped or carried forward")
+	assert.Equal(t, uint64(0), after["lo"].TxBytes, "the reset is reported verbatim, not clamped or carried forward")
+	assert.Less(t, after["lo"].RxBytes, before["lo"].RxBytes,
+		"the decrease is the only reset signal a consumer gets, so it must survive collection")
+
+	// On the wire a reset shows as bytes pinned at 0 while the packet counters
+	// vanish under omitempty. Both halves matter: a consumer cannot read the
+	// reset off a missing packet key, and cannot read it off a missing byte key
+	// either, because bytes have no omitempty and are therefore always present.
+	b, err := json.Marshal(after)
+	require.NoError(t, err)
+	assert.Contains(t, string(b), `"rx_bytes":0`, "rx_bytes has no omitempty, so zero must still be on the wire")
+	assert.NotContains(t, string(b), `"rx_packets"`, "rx_packets has omitempty, so a zero packet count vanishes")
+}
+
+// TestCollectNetAllIsStatelessAcrossCalls is the guard on the choice to keep this
+// collector a stateless snapshot rather than have it difference counters itself.
+// Calling it twice over an unchanged tree must return identical values, and a
+// later call over grown counters must return the new raw values -- not a delta
+// against the previous call, and not the previous call's numbers.
+//
+// This is what makes the documented contract falsifiable: any future in-Go delta
+// or baseline implementation turns the first assertion red, so switching to that
+// design has to be a deliberate edit here rather than an accident.
+func TestCollectNetAllIsStatelessAcrossCalls(t *testing.T) {
+	root := t.TempDir()
+	writeNetIface(t, root, "veth1255f81", "126", "61484")
+
+	first := collectNetAll(root)
+	second := collectNetAll(root)
+	require.Len(t, first, 1)
+	require.Len(t, second, 1)
+	assert.Equal(t, first, second, "two calls over an unchanged tree must agree exactly")
+
+	// The kernel grows the counters between cycles. A collector holding a
+	// baseline would emit 0 here; one carrying state forward would emit 126.
+	iface := netIfacePath(root, "veth1255f81")
+	writeFile(t, filepath.Join(iface, "statistics", "rx_bytes"), "8762\n")
+	writeFile(t, filepath.Join(iface, "statistics", "tx_bytes"), "117771\n")
+
+	third := collectNetAll(root)
+	require.Len(t, third, 1)
+	require.NotNil(t, third["veth1255f81"])
+	assert.Equal(t, uint64(8762), third["veth1255f81"].RxBytes, "the new raw value, not a delta against the previous call")
+	assert.Equal(t, uint64(117771), third["veth1255f81"].TxBytes, "the new raw value, not a delta against the previous call")
+}

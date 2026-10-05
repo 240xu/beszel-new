@@ -5,41 +5,36 @@ import (
 	"strconv"
 )
 
-// collectNetAll reports byte, packet, MTU and link state for every network
-// interface the kernel exposes, including the veth pairs and docker bridges that
-// upstream beszel never looks at.
+// collectNetAll reports counters and link state for every network interface the
+// kernel exposes. root is the sysfs mount point, so interfaces live at
+// <root>/class/net/<iface> and Collect passes "/sys".
 //
-// The reason to enumerate is container visibility. Upstream reports the primary
-// interface alone, so the one interface the dashboard charts hides most of the
-// traffic: on this host 21 of the 28 interfaces are veth pairs, and a veth pair
-// is a container's link to the host, which makes its counters the closest thing
-// to per-container network accounting the kernel offers.
+// Rationale: upstream filters out exactly the interfaces container traffic
+// arrives on. It enumerates all 28 here (psutilNet.IOCounters(true), agent/
+// network.go:85) but caches the survivors as a process-lifetime whitelist
+// (initializeNetIoStats :93, enforced :167) after skipNetworkInterface (:247)
+// drops the lo/docker/br-/veth/bond/cali prefixes (:260) and any interface whose
+// rx or tx reads zero (:266). One survives: wlp0s20f3, with 26 dropped by prefix
+// and enp0s31f6 for being idle -- so "upstream reports one interface" is this
+// host, not upstream (two active NICs would give two). Container links are
+// always dropped by name, and one idle at agent startup stays dropped until
+// :133 or :233 rebuilds the whitelist.
 //
-// Membership is decided by the two byte counters alone. rx_bytes and tx_bytes are
-// the payload; packets, operstate, MTU and speed are attributes a driver may
-// decline to implement. An interface whose byte counters cannot both be read is
-// dropped rather than reported as zeros, because a zero-filled entry is
-// indistinguishable from an idle interface -- and docker0 and enp0s31f6 really do
-// idle at zero, so "unknown" has to stay distinguishable from "idle".
+// Contract: Rx/TxBytes and Rx/TxPackets are CUMULATIVE, not rates, and this is a
+// stateless snapshot -- it never differences, scales or smooths, so two calls
+// over an unchanged tree agree exactly. Consumers must take their own delta and
+// MUST guard it: the counters zero on an interface bounce or a container
+// recreate, and an unguarded uint64 cur-prev wraps to ~1.8e19. Upstream guards
+// the same hazard by comparison alone (agent/network.go:184), so reuse that
+// rule -- cur < prev means a reset.
 //
-// root is the sysfs mount point, so the interfaces live at
-// <root>/class/net/<iface>, not at <root>/net/<iface> or <root>/class/<iface>.
-// In production Collect passes ProdRoot ("/sys"), so a glob joined to any other
-// depth matches nothing here and the collector reports no traffic at all while
-// still looking healthy.
+// Membership is decided by the two byte counters alone; packets, operstate, MTU
+// and speed are attributes a driver may decline, and unreadable counters drop
+// the interface rather than zero-fill it -- docker0 and enp0s31f6 idle at zero,
+// so "unknown" must stay distinct from "idle".
 //
-// Interface names are map keys verbatim. They carry hyphens ("veth1255f81",
-// "br-3afba6b18fd3") and may carry a dot for VLANs ("eth0.100"); neither is a
-// path separator, so Base recovers the name with no filtering or rewriting.
-//
-// Speed is in Mbit/s, and 0 means unknown. That is the convention collectCpufreq
-// already established for an unreadable scaling bound: one decidable fill value
-// instead of a parallel validity vector. The kernel answers -1 for an interface
-// with no link rate -- docker0 and enp0s31f6 both report -1 -- and -1 is not a
-// rate, so passing it through would publish a negative speed that no consumer can
-// divide by. A missing or empty speed file leaves the same 0. Paired with the
-// omitempty on the tag, unknown means the field is absent from the payload rather
-// than present and wrong.
+// Speed is Mbit/s, 0 meaning unknown (collectCpufreq's fill); the kernel's -1
+// sentinel is normalised and omitempty then drops the key.
 func collectNetAll(root string) map[string]*NetIfaceStats {
 	matches, err := filepath.Glob(filepath.Join(root, "class", "net", "*"))
 	if err != nil || len(matches) == 0 {

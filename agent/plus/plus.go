@@ -36,7 +36,7 @@ type NetIfaceStats struct {
 	RxPackets uint64 `json:"rx_packets,omitempty"`
 	TxPackets uint64 `json:"tx_packets,omitempty"`
 	OperState string `json:"oper_state,omitempty"`
-	SpeedMbps int    `json:"speed_mbps,omitempty"`
+	SpeedMBit int    `json:"speed_mbit,omitempty"`
 	MTU       int    `json:"mtu,omitempty"`
 }
 

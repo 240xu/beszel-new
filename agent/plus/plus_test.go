@@ -104,7 +104,7 @@ func populatedStats() Stats {
 		DPTF:    &DPTFStats{Zones: map[string]float64{"x86_pkg_temp": 43, "SEN1": 38}},
 		Cpufreq: &CpufreqStats{FreqMHz: []uint32{2800}, MinMHz: []uint32{800}, MaxMHz: []uint32{4200}, Governor: "powersave"},
 		NetAll: map[string]*NetIfaceStats{
-			"wlp0s20f3": {RxBytes: 1 << 30, TxBytes: 1 << 29, RxPackets: 10, TxPackets: 20, OperState: "up", SpeedMbps: 866, MTU: 1500},
+			"wlp0s20f3": {RxBytes: 1 << 30, TxBytes: 1 << 29, RxPackets: 10, TxPackets: 20, OperState: "up", SpeedMBit: 866, MTU: 1500},
 		},
 		Nvme: &NvmeStats{
 			Model: "WD SN770", PercentageUsed: 1, UnsafeShutdowns: 2, MediaErrors: 3,
@@ -125,7 +125,7 @@ var unitTags = []string{
 	// cpufreq
 	"freq_mhz", "min_mhz", "max_mhz",
 	// netall
-	"rx_bytes", "tx_bytes", "rx_packets", "tx_packets", "mtu",
+	"rx_bytes", "tx_bytes", "rx_packets", "tx_packets", "speed_mbit", "mtu",
 	// nvme
 	"percentage_used", "available_spare", "data_units_read", "data_units_written",
 	"power_on_hours", "power_cycles", "unsafe_shutdowns", "media_errors",
@@ -153,10 +153,10 @@ func TestStatsUseUnitSuffixes(t *testing.T) {
 // ambiguousTags are names the unit contract rejects: bare physical units and
 // the megabit/megabyte-ambiguous "_mbps".
 //
-// speed_mbps is NetIfaceStats' tag and the one known offender; the plan renames
-// it to speed_mbit in Task 5, which must not touch that struct in Task 2. The
-// fixture below therefore drops NetAll, and the assertion guards the rename: as
-// soon as Task 5 emits NetAll without renaming the tag, it fails.
+// speed_mbps was NetIfaceStats' tag and the one known offender; Task 5 renamed
+// it to speed_mbit, so the fixture below includes NetAll again and this assertion
+// guards the rename from both sides: a reverted tag reappears here, and the
+// populated fixture keeps speed_mbit covered by TestStatsUseUnitSuffixes.
 var ambiguousTags = []string{
 	"speed_mbps", "speed_mb", "speed",
 	"temp", "temperature", "temp_celsius", "degrees_celsius",
@@ -165,7 +165,6 @@ var ambiguousTags = []string{
 
 func TestStatsOmitAmbiguousUnitNames(t *testing.T) {
 	s := populatedStats()
-	s.NetAll = nil
 	b, err := json.Marshal(s)
 	require.NoError(t, err)
 	str := string(b)

@@ -15,8 +15,7 @@ package plus
 // The last three sit outside sysfs and have to go through sourcePath rather
 // than a plain join; the first four are sysfs-relative.
 
-func collectNetAll(root string) map[string]*NetIfaceStats { return nil }
-func collectNvme(root string) *NvmeStats                  { return nil }
-func collectWiFi(root string) *WiFiStats                  { return nil }
-func collectFan(root string) *FanStats                    { return nil }
-func collectFanSteps(root string) []FanSpeedStep          { return nil }
+func collectNvme(root string) *NvmeStats         { return nil }
+func collectWiFi(root string) *WiFiStats         { return nil }
+func collectFan(root string) *FanStats           { return nil }
+func collectFanSteps(root string) []FanSpeedStep { return nil }

@@ -47,6 +47,11 @@ func sectionsFor(s *plus.Stats) []section {
 			has:   func() bool { return s.Cpufreq != nil },
 			print: func() { printCpufreq(s.Cpufreq) },
 		},
+		{
+			name:  "netall",
+			has:   func() bool { return len(s.NetAll) > 0 },
+			print: func() { printNetAll(s.NetAll) },
+		},
 	}
 }
 
@@ -125,4 +130,47 @@ func intPtr(p *int) string {
 		return "nil"
 	}
 	return fmt.Sprintf("%d", *p)
+}
+
+// printNetAll prints every interface the collector reported, one line each,
+// ordered by name.
+//
+// The payload is a map keyed by interface name, so Go randomises iteration order
+// and the names are sorted here to keep two runs comparable line for line. Speed
+// prints as "unknown" instead of a number when it is 0, which is where an absent,
+// an empty and a -1 speed file all land, so a live run shows how many interfaces
+// on this host carry a real link rate at all. The two totals are the point of
+// enumerating every interface: upstream charts the primary one only, so its share
+// of the sum is the traffic a per-interface view makes visible.
+func printNetAll(n map[string]*plus.NetIfaceStats) {
+	names := make([]string, 0, len(n))
+	var sumRx, sumTx uint64
+	for k, s := range n {
+		names = append(names, k)
+		sumRx += s.RxBytes
+		sumTx += s.TxBytes
+	}
+	sort.Strings(names)
+
+	unknownSpeed := 0
+	for _, name := range names {
+		s := n[name]
+		if s.SpeedMBit == 0 {
+			unknownSpeed++
+		}
+		fmt.Printf("  %-18s rx=%-13d tx=%-12d pkts=%d/%d oper=%-8q speed=%-8s mtu=%d\n",
+			name, s.RxBytes, s.TxBytes, s.RxPackets, s.TxPackets,
+			s.OperState, speedStr(s.SpeedMBit), s.MTU)
+	}
+	fmt.Printf("  %d interface(s), %d with unknown speed, totals rx=%d tx=%d\n",
+		len(n), unknownSpeed, sumRx, sumTx)
+}
+
+// speedStr renders the link rate, naming the unknown case rather than printing a
+// bare 0 that reads like a real zero-Mbit link.
+func speedStr(mbit int) string {
+	if mbit == 0 {
+		return "unknown"
+	}
+	return fmt.Sprintf("%dM", mbit)
 }

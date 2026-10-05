@@ -108,19 +108,21 @@ func printDPTF(d *plus.DPTFStats) {
 	}
 }
 
-// printCpufreq prints the per-core vectors in full rather than a summary.
+// printCpufreq prints one line per core, labelled with the CPU number the record
+// carries -- not with its position in the slice.
 //
-// FreqMHz, MinMHz and MaxMHz are parallel slices: the same index names the same
-// logical CPU in each, and a bound that could not be read prints as 0 instead of
-// being left out, so the three lines stay indexable against each other and a
-// length mismatch shows up instead of hiding behind a count. Cores are in
-// ascending CPU number -- /sys cpu<N> for every core that reported a frequency;
-// a core that did not is dropped from all three.
+// That distinction is the whole point: a core that could not report a frequency
+// is absent, so a position-based label silently renumbers every core after it and
+// a live run would print "CPU2" for data that came from cpu3. Printing the Idx
+// makes the mapping auditable by eye, and a bound that could not be read prints
+// as 0 rather than being left out, so an unreadable bound is visible instead of
+// looking like a tight frequency range. Cores come out in ascending Idx, which is
+// /sys cpu<N> for every core that reported a frequency.
 func printCpufreq(c *plus.CpufreqStats) {
-	fmt.Printf("  %d core(s)\n", len(c.FreqMHz))
-	fmt.Printf("  cur MHz %v\n", c.FreqMHz)
-	fmt.Printf("  min MHz %v\n", c.MinMHz)
-	fmt.Printf("  max MHz %v\n", c.MaxMHz)
+	fmt.Printf("  %d core(s)\n", len(c.Cores))
+	for _, core := range c.Cores {
+		fmt.Printf("  CPU%-3d cur=%-6d min=%-6d max=%-6d\n", core.Idx, core.FreqMHz, core.MinMHz, core.MaxMHz)
+	}
 	fmt.Printf("  governor=%q epp=%q pstate=%q\n", c.Governor, c.EPP, c.PstateStatus)
 	fmt.Printf("  no_turbo=%s hwp_dynamic_boost=%s\n", intPtr(c.NoTurbo), intPtr(c.HwpBoost))
 }

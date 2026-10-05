@@ -19,17 +19,48 @@ type DPTFStats struct {
 	Zones map[string]float64 `json:"zones,omitempty"`
 }
 
-type CpufreqStats struct {
-	FreqMHz      []uint32 `json:"freq_mhz,omitempty"`
-	MinMHz       []uint32 `json:"min_mhz,omitempty"`
-	MaxMHz       []uint32 `json:"max_mhz,omitempty"`
-	Governor     string   `json:"governor,omitempty"`
-	EPP          string   `json:"epp,omitempty"`
-	NoTurbo      *int     `json:"no_turbo,omitempty"`
-	HwpBoost     *int     `json:"hwp_dynamic_boost,omitempty"`
-	PstateStatus string   `json:"pstate_status,omitempty"`
+// CpufreqCore is one logical CPU's frequency and scaling bounds.
+//
+// Idx is the CPU number from sysfs's "cpu<N>" directory, NOT this record's
+// position in Cores. A core whose scaling_cur_freq cannot be read is absent from
+// Cores entirely, so a slice position would shift every later core forward and no
+// consumer could tell which record belongs to which CPU. Consumers MUST key on
+// Idx and MUST NOT key on the slice index or cache per-core series by index.
+//
+// A 0 in MinMHz or MaxMHz means "bound unreadable", not "no bound": no real
+// scaling bound reports 0, and 0 can therefore never appear in FreqMHz. Records
+// are in ascending Idx.
+//
+// An element is a *logical* CPU, not a physical core: SMT siblings share a turbo
+// budget, so on an idle machine two siblings commonly report the same frequency.
+// Eight elements is eight sysfs directories, not eight independent measurements.
+type CpufreqCore struct {
+	Idx     int    `json:"idx"`
+	FreqMHz uint32 `json:"freq_mhz"`
+	MinMHz  uint32 `json:"min_mhz"`
+	MaxMHz  uint32 `json:"max_mhz"`
 }
 
+// CpufreqStats is the per-core frequency set plus the machine-wide tuning policy.
+// Per-core data is keyed by CpufreqCore.Idx; see that type for the index contract.
+type CpufreqStats struct {
+	Cores        []CpufreqCore `json:"cores,omitempty"`
+	Governor     string        `json:"governor,omitempty"`
+	EPP          string        `json:"epp,omitempty"`
+	NoTurbo      *int          `json:"no_turbo,omitempty"`
+	HwpBoost     *int          `json:"hwp_dynamic_boost,omitempty"`
+	PstateStatus string        `json:"pstate_status,omitempty"`
+}
+
+// NetIfaceStats is one interface's counters and link attributes.
+//
+// Rx/TxBytes are CUMULATIVE, not rates, and unlike every other field here they
+// carry no omitempty: 0 means the interface is genuinely idle, not that the read
+// failed, because an unreadable counter drops the interface instead. Rx/TxPackets
+// DO carry omitempty and disappear at 0, so an idle interface has bytes but no
+// packets -- the two fields disagree on purpose. Read the Contract paragraph of
+// collectNetAll in netall.go for the reset rule consumers must apply; this type
+// only owns the wire names.
 type NetIfaceStats struct {
 	RxBytes   uint64 `json:"rx_bytes"`
 	TxBytes   uint64 `json:"tx_bytes"`

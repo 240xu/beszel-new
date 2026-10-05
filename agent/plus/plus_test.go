@@ -101,8 +101,11 @@ func TestCollectAcceptsFixtureTreeWithEveryCollectorSource(t *testing.T) {
 // the package.
 func populatedStats() Stats {
 	return Stats{
-		DPTF:    &DPTFStats{Zones: map[string]float64{"x86_pkg_temp": 43, "SEN1": 38}},
-		Cpufreq: &CpufreqStats{FreqMHz: []uint32{2800}, MinMHz: []uint32{800}, MaxMHz: []uint32{4200}, Governor: "powersave"},
+		DPTF: &DPTFStats{Zones: map[string]float64{"x86_pkg_temp": 43, "SEN1": 38}},
+		Cpufreq: &CpufreqStats{
+			Cores:    []CpufreqCore{{Idx: 0, FreqMHz: 2800, MinMHz: 800, MaxMHz: 4200}},
+			Governor: "powersave",
+		},
 		NetAll: map[string]*NetIfaceStats{
 			"wlp0s20f3": {RxBytes: 1 << 30, TxBytes: 1 << 29, RxPackets: 10, TxPackets: 20, OperState: "up", SpeedMBit: 866, MTU: 1500},
 		},
@@ -122,7 +125,8 @@ func populatedStats() Stats {
 // so each one must be present in a fully populated payload. Pure counters are
 // included because their names carry the counted unit.
 var unitTags = []string{
-	// cpufreq
+	// cpufreq -- idx is a CPU number, not a physical quantity, so it is not
+	// listed here; TestCpufreqCoreWireShape owns it.
 	"freq_mhz", "min_mhz", "max_mhz",
 	// netall
 	"rx_bytes", "tx_bytes", "rx_packets", "tx_packets", "speed_mbit", "mtu",

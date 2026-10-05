@@ -35,6 +35,33 @@ func TestCollectDPTFConvertsMilliCelsius(t *testing.T) {
 	assert.Equal(t, map[string]float64{"x86_pkg_temp": 43.0}, collectDPTF(root))
 }
 
+// TestCollectDPTFKeepsSubDegreePrecision pins the milli-to-celsius conversion
+// against integer truncation.
+//
+// Every other fixture in this file divides evenly by 1000 (43000, 20000,
+// 44000, 46000), so a collector written as float64(milli/1000) would round
+// 41.45 C down to 41 C and keep all of them green. The NAS does not report
+// whole degrees: SEN4 and SEN1 read 41450 and 34850 in the audit capture, and
+// pluscheck prints values like 44.2 and 51.2. SEN2's -5050 is not observed
+// data, it is here to pin the negative side, where Go truncates toward zero.
+// The assertions are exact rather than delta-based so a lost millidegree is a
+// failure instead of a tolerance nobody bothers to tighten.
+func TestCollectDPTFKeepsSubDegreePrecision(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(zonePath(root, "thermal_zone5"), "type"), "SEN4\n")
+	writeFile(t, filepath.Join(zonePath(root, "thermal_zone5"), "temp"), "41450\n")
+	writeFile(t, filepath.Join(zonePath(root, "thermal_zone2"), "type"), "SEN1\n")
+	writeFile(t, filepath.Join(zonePath(root, "thermal_zone2"), "temp"), "34850\n")
+	writeFile(t, filepath.Join(zonePath(root, "thermal_zone3"), "type"), "SEN2\n")
+	writeFile(t, filepath.Join(zonePath(root, "thermal_zone3"), "temp"), "-5050\n")
+
+	assert.Equal(t, map[string]float64{
+		"SEN4": 41.45,
+		"SEN1": 34.85,
+		"SEN2": -5.05,
+	}, collectDPTF(root))
+}
+
 func TestCollectDPTFSkipsZoneWithoutTemp(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(zonePath(root, "thermal_zone0"), "type"), "B0D4\n")
@@ -53,6 +80,48 @@ func TestCollectDPTFRejectsOutOfRangeCelsius(t *testing.T) {
 	writeFile(t, filepath.Join(zonePath(root, "thermal_zone2"), "type"), "BAD\n")
 	writeFile(t, filepath.Join(zonePath(root, "thermal_zone2"), "temp"), "999999\n")
 	assert.NotContains(t, collectDPTF(root), "BAD")
+}
+
+// TestCollectDPTFRangeBounds pins both constants of the -50..150 window and
+// whether it is open or closed.
+//
+// dptf.go rejects celsius < -50 || celsius > 150, so the accepted set is
+// closed: -50.0 and 150.0 are readings and are kept, one millidegree past
+// either bound is not. No earlier fixture sat near a bound, which left the
+// window free to become -150..50 or to flip a comparison to <= / >= without
+// turning any test red -- and a bound that drifts silently starts discarding
+// real silicon, since this NAS idles in the 30s and has been seen in the high
+// 50s. The rejected rows also
+// double as truncation guards: float64(milli/1000) turns -50001 into -50.0 and
+// 150001 into 150.0, both of which the window would then admit.
+func TestCollectDPTFRangeBounds(t *testing.T) {
+	cases := []struct {
+		milli string
+		keep  bool
+		want  float64
+	}{
+		{milli: "-50001", keep: false},
+		{milli: "-50000", keep: true, want: -50.0},
+		{milli: "-274000", keep: false},
+		{milli: "20000", keep: true, want: 20.0},
+		{milli: "150000", keep: true, want: 150.0},
+		{milli: "150001", keep: false},
+		{milli: "999999", keep: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.milli+"m", func(t *testing.T) {
+			root := t.TempDir()
+			writeFile(t, filepath.Join(zonePath(root, "thermal_zone0"), "type"), "SEN1\n")
+			writeFile(t, filepath.Join(zonePath(root, "thermal_zone0"), "temp"), tc.milli+"\n")
+
+			got := collectDPTF(root)
+			if !tc.keep {
+				assert.Empty(t, got, "milli=%s must be rejected", tc.milli)
+				return
+			}
+			assert.Equal(t, map[string]float64{"SEN1": tc.want}, got)
+		})
+	}
 }
 
 // TestCollectDPTFKeepsZoneTypeWithEmbeddedSpace pins the ACPI type verbatim.
@@ -93,8 +162,22 @@ func TestCollectReadsDPTFThroughCollect(t *testing.T) {
 
 // TestCollectDPTFIgnoresUnrelatedFilesUnderClassThermal guards the glob against
 // the non-zone attributes that live beside the zone directories in sysfs.
+//
+// The decoy carries a complete, readable type and temp on purpose. An earlier
+// version of this fixture only wrote type, so a collector that widened the glob
+// to class/thermal/* picked the decoy up, found no temp, skipped it, and
+// returned an empty map anyway -- the test passed while the glob was wrong.
+// With the temp present, an over-wide glob yields a non-empty map and the
+// assertion below fails. A sibling thermal_zone alongside it keeps the
+// expectation a positive one: the decoy has to be excluded, not merely
+// unusable.
 func TestCollectDPTFIgnoresUnrelatedFilesUnderClassThermal(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "class", "thermal", "cooling_device0", "type"), "x86_pkg_temp\n")
-	assert.Empty(t, collectDPTF(root))
+	decoy := filepath.Join(root, "class", "thermal", "cooling_device0")
+	writeFile(t, filepath.Join(decoy, "type"), "x86_pkg_temp\n")
+	writeFile(t, filepath.Join(decoy, "temp"), "50000\n")
+	writeFile(t, filepath.Join(zonePath(root, "thermal_zone0"), "type"), "INT3400 Thermal\n")
+	writeFile(t, filepath.Join(zonePath(root, "thermal_zone0"), "temp"), "20000\n")
+
+	assert.Equal(t, map[string]float64{"INT3400 Thermal": 20.0}, collectDPTF(root))
 }

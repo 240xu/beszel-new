@@ -292,13 +292,29 @@ func (a *Agent) getSystemStats(cacheTimeMs uint16) system.Stats {
 	a.systemInfo.Threads = a.systemDetails.Threads
 
 	// Beszelplus metrics
-	if plusStats, err := plus.Collect("/sys"); err == nil {
-		systemStats.Plus = plusStats
-	} else {
-		slog.Error("Error collecting plus metrics", "err", err)
-	}
+	a.updatePlusStats(cacheTimeMs, &systemStats)
 
 	return systemStats
+}
+
+// updatePlusStats refreshes the Beszelplus snapshot on the default interval and
+// copies the cached snapshot into every stats record.
+//
+// Collection walks every thermal zone, cpufreq policy and netdev counter, and
+// from Task 5 onward forks smartctl, so it only refreshes on the default
+// interval; real-time requests reuse the last snapshot, same treatment as the
+// Wi-Fi block in getSystemStats. The copy-out is unconditional because the hub
+// replaces each record's stats blob wholesale rather than merging fields, so
+// gating alone would drop plus from every gated-out record.
+func (a *Agent) updatePlusStats(cacheTimeMs uint16, systemStats *system.Stats) {
+	if cacheTimeMs == defaultDataCacheTimeMs {
+		if plusStats, err := plus.Collect(plus.ProdRoot); err == nil {
+			a.systemInfo.Plus = plusStats
+		} else {
+			slog.Error("Error collecting plus metrics", "err", err)
+		}
+	}
+	systemStats.Plus = a.systemInfo.Plus
 }
 
 // cpuModelFallbackKeys are the field names to look for in /proc/cpuinfo when

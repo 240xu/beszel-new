@@ -11,6 +11,9 @@ package plus
 
 import "path/filepath"
 
+// ProdRoot is the sysfs mount point to hand to Collect in production.
+const ProdRoot = "/sys"
+
 type DPTFStats struct {
 	// Celsius keyed by thermal zone type, e.g. "B0D4", "x86_pkg_temp".
 	Zones map[string]float64 `json:"zones,omitempty"`
@@ -91,11 +94,32 @@ type Stats struct {
 	FanSteps []FanSpeedStep            `json:"fan_steps,omitempty"`
 }
 
-// Collect gathers every plus metric. root is the sysfs mount point; pass
-// "/sys" in production.
+// sourcePath resolves a collector's production absolute path against root.
+//
+// Most inputs live under sysfs, so their collectors join a relative subpath
+// onto root. These do not: the WiFi radio table is procfs, the NVMe device node
+// is /dev and the fan database is /var. Their production location is absolute,
+// so root serves only as an injection point for tests — any non-production root
+// re-roots the path under a fixture tree, and returns it verbatim for the
+// production root or an empty root. The production case has to be tested first
+// because filepath.Join would otherwise turn /proc/net/wireless into
+// /sys/proc/net/wireless under ProdRoot.
+func sourcePath(root, prodPath string) string {
+	if root == "" || root == ProdRoot {
+		return prodPath
+	}
+	return filepath.Join(root, prodPath)
+}
+
+// Collect gathers every plus metric.
+//
+// root is the sysfs mount point; pass ProdRoot in production. Every collector
+// receives that same root and joins its own sysfs subpaths, so tests can point
+// Collect at a t.TempDir() tree. Collectors whose input lives outside sysfs
+// resolve it through sourcePath instead.
 func Collect(root string) (*Stats, error) {
 	s := &Stats{}
-	if d := collectDPTF(filepath.Join(root, "class", "thermal")); len(d) > 0 {
+	if d := collectDPTF(root); len(d) > 0 {
 		s.DPTF = &DPTFStats{Zones: d}
 	}
 	if c := collectCpufreq(root); c != nil {
@@ -104,16 +128,16 @@ func Collect(root string) (*Stats, error) {
 	if n := collectNetAll(root); len(n) > 0 {
 		s.NetAll = n
 	}
-	if v := collectNvme(); v != nil {
+	if v := collectNvme(root); v != nil {
 		s.Nvme = v
 	}
-	if w := collectWiFi(); w != nil {
+	if w := collectWiFi(root); w != nil {
 		s.WiFi = w
 	}
-	if f := collectFan(); f != nil {
+	if f := collectFan(root); f != nil {
 		s.Fan = f
 	}
-	if st := collectFanSteps(); len(st) > 0 {
+	if st := collectFanSteps(root); len(st) > 0 {
 		s.FanSteps = st
 	}
 	return s, nil

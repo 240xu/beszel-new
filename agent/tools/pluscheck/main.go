@@ -105,10 +105,12 @@ func printDPTF(d *plus.DPTFStats) {
 
 // printCpufreq prints the per-core vectors in full rather than a summary.
 //
-// FreqMHz, MinMHz and MaxMHz are independent slices, one entry per logical CPU
-// that had a readable scaling_cur_freq. Printing them as parallel arrays makes a
-// length mismatch between them visible instead of hiding it behind a count, and
-// keeps the index of each core aligned with /sys cpu<N>.
+// FreqMHz, MinMHz and MaxMHz are parallel slices: the same index names the same
+// logical CPU in each, and a bound that could not be read prints as 0 instead of
+// being left out, so the three lines stay indexable against each other and a
+// length mismatch shows up instead of hiding behind a count. Cores are in
+// ascending CPU number -- /sys cpu<N> for every core that reported a frequency;
+// a core that did not is dropped from all three.
 func printCpufreq(c *plus.CpufreqStats) {
 	fmt.Printf("  %d core(s)\n", len(c.FreqMHz))
 	fmt.Printf("  cur MHz %v\n", c.FreqMHz)

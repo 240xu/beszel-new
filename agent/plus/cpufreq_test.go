@@ -4,6 +4,7 @@ package plus
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -34,18 +35,14 @@ func TestCollectCpufreqReadsEveryCore(t *testing.T) {
 	}
 	writeFile(t, filepath.Join(root, "devices", "system", "cpu", "intel_pstate", "status"), "active\n")
 	writeFile(t, filepath.Join(root, "devices", "system", "cpu", "intel_pstate", "no_turbo"), "0\n")
+	writeFile(t, filepath.Join(root, "devices", "system", "cpu", "intel_pstate", "hwp_dynamic_boost"), "1\n")
 
 	got := collectCpufreq(root)
 	require.NotNil(t, got)
 	assert.Equal(t, []uint32{2800, 2800, 2800, 2800}, got.FreqMHz)
-	// The brief's draft asserted []uint32{400} and []uint32{4100} here, one
-	// element each, while writing min/max into all four cores. That cannot hold
-	// against the brief's own implementation, which appends min/max inside the
-	// per-core loop, and it disagrees with the field types declared in plus.go,
-	// where MinMHz and MaxMHz are []uint32 parallel to FreqMHz rather than the
-	// scalar uint32 a single-value reading would need. So the assertions here
-	// state the whole vector. Same intent as the draft -- min is 400 MHz and max
-	// is 4100 MHz on every core -- just not truncated to one entry.
+	// MinMHz and MaxMHz are []uint32 parallel to FreqMHz in plus.go, not the
+	// scalar uint32 a single-value reading would need, so the whole vector is
+	// asserted; the brief's draft asserted one element each. See the report.
 	assert.Equal(t, []uint32{400, 400, 400, 400}, got.MinMHz)
 	assert.Equal(t, []uint32{4100, 4100, 4100, 4100}, got.MaxMHz)
 	assert.Equal(t, "powersave", got.Governor)
@@ -53,6 +50,46 @@ func TestCollectCpufreqReadsEveryCore(t *testing.T) {
 	assert.Equal(t, "active", got.PstateStatus)
 	require.NotNil(t, got.NoTurbo)
 	assert.Equal(t, 0, *got.NoTurbo)
+	// Asserted as 1, not 0: a collector that reported a hardcoded zero, or one
+	// that never read the file, would look the same against a fixture of "0".
+	require.NotNil(t, got.HwpBoost)
+	assert.Equal(t, 1, *got.HwpBoost)
+}
+
+// TestCollectCpufreqLeavesHwpBoostNilWhenUnreadable pins the two ways the
+// hwp_dynamic_boost read can come back empty-handed. Both leave the pointer nil
+// rather than storing a zero that a UI would render as "HWP boost off".
+func TestCollectCpufreqLeavesHwpBoostNilWhenUnreadable(t *testing.T) {
+	// no_turbo is written alongside so the intel_pstate directory exists, which
+	// is the state on any host with the driver loaded.
+	prime := func(t *testing.T, root string, hwp string) {
+		t.Helper()
+		writeFile(t, filepath.Join(corePath(root, "cpu0"), "scaling_cur_freq"), "1000000\n")
+		pstate := filepath.Join(root, "devices", "system", "cpu", "intel_pstate")
+		writeFile(t, filepath.Join(pstate, "no_turbo"), "0\n")
+		if hwp != "" {
+			writeFile(t, filepath.Join(pstate, "hwp_dynamic_boost"), hwp)
+		}
+	}
+
+	t.Run("absent", func(t *testing.T) {
+		root := t.TempDir()
+		prime(t, root, "")
+
+		got := collectCpufreq(root)
+		require.NotNil(t, got)
+		require.NotNil(t, got.NoTurbo)
+		assert.Nil(t, got.HwpBoost)
+	})
+
+	t.Run("unparsable", func(t *testing.T) {
+		root := t.TempDir()
+		prime(t, root, "enabled\n")
+
+		got := collectCpufreq(root)
+		require.NotNil(t, got)
+		assert.Nil(t, got.HwpBoost)
+	})
 }
 
 func TestCollectCpufreqSkipsCoresWithoutCpufreqDir(t *testing.T) {
@@ -63,6 +100,10 @@ func TestCollectCpufreqSkipsCoresWithoutCpufreqDir(t *testing.T) {
 	got := collectCpufreq(root)
 	require.NotNil(t, got)
 	assert.Equal(t, []uint32{800}, got.FreqMHz)
+	// Only cur_freq exists, so both bounds are unreadable: the core is kept and
+	// the missing bounds are filled, not dropped. See the alignment test below.
+	assert.Equal(t, []uint32{0}, got.MinMHz)
+	assert.Equal(t, []uint32{0}, got.MaxMHz)
 }
 
 func TestCollectCpufreqReturnsNilWhenAbsent(t *testing.T) {
@@ -76,20 +117,11 @@ func TestCollectCpufreqReturnsNilWhenAbsent(t *testing.T) {
 
 // TestCollectCpufreqTruncatesToWholeMHz pins the Hz -> MHz conversion.
 //
-// FreqMHz is []uint32, so the sub-MHz remainder is lost by construction; the
-// question is only which side of the remainder survives. Every fixture in the
-// brief divides to a value whose fraction is under 0.5: 2800016 Hz is
-// 2800.016 MHz and 800000 Hz is a whole 800, so a collector that rounded
-// instead of truncating would leave all of them green. These two do
-// discriminate, because 2970952 Hz is 2970.952 MHz and 1099830 Hz is 1099.830
-// MHz -- both round up (2971, 1100) and both truncate down (2970, 1099). They
-// are not invented: 2970952 was cpu0's scaling_cur_freq in the pre-task
-// capture and 1099830 was cpu5's during this task's own read of /sys.
-//
-// The assertions are exact so a lost or invented digit is a failure rather
-// than a tolerance nobody tightens. The dropped remainder is 952 Hz on one core
-// and 830 Hz on the other; see the report for why uint32 is the wrong shape if
-// that ever stops being acceptable.
+// Every value in the brief's fixtures has a sub-MHz fraction below 0.5, so a
+// collector that rounded instead of truncating would pass all of them. These two
+// do discriminate: 2970952 Hz is 2970.952 MHz and 1099830 Hz is 1099.830 MHz --
+// both round up and both truncate down. Both were read off this machine's
+// /sys during the task, not invented.
 func TestCollectCpufreqTruncatesToWholeMHz(t *testing.T) {
 	cases := []struct {
 		core string
@@ -172,17 +204,134 @@ func TestCollectCpufreqSkipsUnparsableCurFreq(t *testing.T) {
 	})
 }
 
+// TestCollectCpufreqOrdersCoresNumerically pins that the vectors are in
+// ascending CPU-number order.
+//
+// filepath.Glob returns lexical order, in which cpu10 sits between cpu1 and cpu2,
+// so any host with ten or more logical CPUs would report cpu10's frequency under
+// cpu2's index -- silently, with every vector still the right length. Sixteen
+// cores is the smallest fixture that distinguishes the two orders, and this
+// machine has eight, where lexical and numeric order coincide and no fixture
+// below cpu10 can tell them apart. Every value is distinct per core and per
+// vector so a reordered or shifted vector cannot pass.
+func TestCollectCpufreqOrdersCoresNumerically(t *testing.T) {
+	const cores = 16
+	root := t.TempDir()
+	for i := 0; i < cores; i++ {
+		base := corePath(root, "cpu"+fmt.Sprint(i))
+		writeFile(t, filepath.Join(base, "scaling_cur_freq"), fmt.Sprint(1000000+100000*i)+"\n")
+		writeFile(t, filepath.Join(base, "scaling_min_freq"), fmt.Sprint(100000+10000*i)+"\n")
+		writeFile(t, filepath.Join(base, "scaling_max_freq"), fmt.Sprint(9000000+10000*i)+"\n")
+	}
+	wantFreq := make([]uint32, cores)
+	wantMin := make([]uint32, cores)
+	wantMax := make([]uint32, cores)
+	for i := range wantFreq {
+		wantFreq[i] = uint32(1000 + 100*i)
+		wantMin[i] = uint32(100 + 10*i)
+		wantMax[i] = uint32(9000 + 10*i)
+	}
+
+	got := collectCpufreq(root)
+	require.NotNil(t, got)
+	assert.Equal(t, wantFreq, got.FreqMHz)
+	assert.Equal(t, wantMin, got.MinMHz)
+	assert.Equal(t, wantMax, got.MaxMHz)
+}
+
+// TestCollectCpufreqSortsUnnumberedDirectoriesLast pins the other half of the
+// ordering rule. The glob pattern cpu[0-9]* only promises a leading digit, so a
+// directory such as "cpu0thermal" matches too and has no CPU number to sort by.
+// It is kept -- dropping a matched directory would be a silent data loss -- and
+// placed after the numbered cores so it cannot displace a real one.
+func TestCollectCpufreqSortsUnnumberedDirectoriesLast(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(corePath(root, "cpu0"), "scaling_cur_freq"), "1000000\n")
+	writeFile(t, filepath.Join(corePath(root, "cpu1"), "scaling_cur_freq"), "1100000\n")
+	writeFile(t, filepath.Join(corePath(root, "cpu0thermal"), "scaling_cur_freq"), "9990000\n")
+
+	got := collectCpufreq(root)
+	require.NotNil(t, got)
+	assert.Equal(t, []uint32{1000, 1100, 9990}, got.FreqMHz)
+}
+
+// TestCollectCpufreqKeepsVectorsAligned pins the invariant that index i names the
+// same CPU in FreqMHz, MinMHz and MaxMHz.
+//
+// Appending a bound only when it parses leaves the shorter vectors shifted left,
+// which is worse than a missing value: with cpu1's min unreadable, MinMHz ends up
+// [100 300 400] and a consumer pairing index i across vectors reads cpu2's min as
+// cpu1's. Nothing reports the mistake -- the lengths differ, but the collector
+// never says so. The first and middle cases below are the two ways the shift
+// misreports a value; the third pins that a core whose frequency is unreadable
+// leaves all three vectors together rather than leaving a zero behind in one.
+func TestCollectCpufreqKeepsVectorsAligned(t *testing.T) {
+	// write builds N cores where core i reports cur 1000+1000i MHz and, unless
+	// omit[i] is set, min 100+100i and max 9000+100i.
+	base := func(t *testing.T, cores int) string {
+		t.Helper()
+		root := t.TempDir()
+		for i := 0; i < cores; i++ {
+			dir := corePath(root, "cpu"+fmt.Sprint(i))
+			writeFile(t, filepath.Join(dir, "scaling_cur_freq"), fmt.Sprint(1000000+1000000*i)+"\n")
+			writeFile(t, filepath.Join(dir, "scaling_min_freq"), fmt.Sprint(100000+100000*i)+"\n")
+			writeFile(t, filepath.Join(dir, "scaling_max_freq"), fmt.Sprint(9000000+100000*i)+"\n")
+		}
+		return root
+	}
+	aligned := func(t *testing.T, root string, wantCores int) *CpufreqStats {
+		t.Helper()
+		got := collectCpufreq(root)
+		require.NotNil(t, got)
+		require.Len(t, got.FreqMHz, wantCores)
+		assert.Len(t, got.MinMHz, wantCores, "min vector must stay parallel to freq")
+		assert.Len(t, got.MaxMHz, wantCores, "max vector must stay parallel to freq")
+		return got
+	}
+
+	t.Run("first core has no min file", func(t *testing.T) {
+		root := base(t, 2)
+		require.NoError(t, os.Remove(filepath.Join(corePath(root, "cpu0"), "scaling_min_freq")))
+
+		got := aligned(t, root, 2)
+		assert.Equal(t, []uint32{1000, 2000}, got.FreqMHz)
+		assert.Equal(t, []uint32{0, 200}, got.MinMHz, "0 marks the unreadable bound; 200 must stay on cpu1")
+		assert.Equal(t, []uint32{9000, 9100}, got.MaxMHz)
+	})
+
+	t.Run("middle core has unparsable max", func(t *testing.T) {
+		root := base(t, 3)
+		writeFile(t, filepath.Join(corePath(root, "cpu1"), "scaling_max_freq"), "unknown\n")
+
+		got := aligned(t, root, 3)
+		assert.Equal(t, []uint32{1000, 2000, 3000}, got.FreqMHz)
+		assert.Equal(t, []uint32{100, 200, 300}, got.MinMHz)
+		assert.Equal(t, []uint32{9000, 0, 9200}, got.MaxMHz, "9200 must stay on cpu2")
+	})
+
+	t.Run("core with unreadable freq leaves all three vectors", func(t *testing.T) {
+		root := base(t, 3)
+		writeFile(t, filepath.Join(corePath(root, "cpu1"), "scaling_cur_freq"), "not-a-number\n")
+
+		got := aligned(t, root, 2)
+		assert.Equal(t, []uint32{1000, 3000}, got.FreqMHz)
+		assert.Equal(t, []uint32{100, 300}, got.MinMHz, "cpu2's min follows cpu0, not cpu1")
+		assert.Equal(t, []uint32{9000, 9200}, got.MaxMHz)
+	})
+}
+
 // TestCollectCpufreqReportsAllEightLogicalCores records what the live machine
 // actually yields, because the count is a design decision rather than an
 // accident.
 //
-// This NAS is an i5-8365U: four physical cores, eight logical, two SMT
-// siblings per core. sysfs exposes a cpufreq directory for all eight logical
-// CPUs and siblings do not share one scaling_cur_freq, so cpu[0-9]* yields eight
+// This NAS is an i5-8365U: four physical cores, eight logical, two SMT siblings
+// per core. sysfs exposes a cpufreq directory for all eight logical CPUs and
+// siblings do not share one scaling_cur_freq, so cpu[0-9]* yields eight
 // elements -- which is what Beszel counts as CPUs. On an idle machine siblings
 // frequently report the same frequency, so an eight-element vector is not eight
-// independent measurements. This test asserts the shape (8 in, 8 out, indices
-// intact) rather than endorsing it as correct; see the report.
+// independent measurements. The shape is asserted, not endorsed as correct;
+// ordering is pinned by the sixteen-core fixture above, since lexical and
+// numeric order coincide below cpu10 and this fixture could not tell them apart.
 func TestCollectCpufreqReportsAllEightLogicalCores(t *testing.T) {
 	root := t.TempDir()
 	for i := 0; i < 8; i++ {

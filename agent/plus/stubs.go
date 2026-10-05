@@ -15,7 +15,6 @@ package plus
 // The last three sit outside sysfs and have to go through sourcePath rather
 // than a plain join; the first four are sysfs-relative.
 
-func collectCpufreq(root string) *CpufreqStats            { return nil }
 func collectNetAll(root string) map[string]*NetIfaceStats { return nil }
 func collectNvme(root string) *NvmeStats                  { return nil }
 func collectWiFi(root string) *WiFiStats                  { return nil }

@@ -181,3 +181,54 @@ func TestCollectDPTFIgnoresUnrelatedFilesUnderClassThermal(t *testing.T) {
 
 	assert.Equal(t, map[string]float64{"INT3400 Thermal": 20.0}, collectDPTF(root))
 }
+
+// --- M15 / M16 follow-ups from the Task 3 re-review --------------------------
+// Fixtures only; dptf.go is untouched. Both minors were adjudicated as
+// non-blocking, but neither had a test pinning it, so each could have been
+// deleted without turning anything red.
+//
+// M15 -- the empty-type guard. collectDPTF skips a zone when its type file is
+// unreadable *or* empty (`err != nil || name == ""`, dptf.go:40). No fixture
+// covered the second half: every type-writing fixture in this file supplies a
+// real name, so removing `|| name == ""` kept all eight DPTF tests green. The
+// re-review confirmed the consequence is not cosmetic -- with the guard gone a
+// blank type writes the key "" into the map, which marshals as {"":41.45} and
+// reaches the UI as an unnamed reading. The fixtures below use a type file that
+// exists and is readable but holds no name, which is what reaches that branch.
+func TestCollectDPTFSkipsZoneWithEmptyType(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(zonePath(root, "thermal_zone0"), "type"), "\n")
+	writeFile(t, filepath.Join(zonePath(root, "thermal_zone0"), "temp"), "41450\n")
+
+	assert.Empty(t, collectDPTF(root))
+}
+
+// TestCollectDPTFSkipsZoneWithWhitespaceOnlyType covers the other shape of
+// "empty": spaces rather than a bare newline. readTrimmed trims, so the value
+// reaching the guard is "" and the guard is what rejects it. This stands in for
+// the sysfs case of a type attribute that exists but was never populated.
+func TestCollectDPTFSkipsZoneWithWhitespaceOnlyType(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(zonePath(root, "thermal_zone0"), "type"), "   \n")
+	writeFile(t, filepath.Join(zonePath(root, "thermal_zone0"), "temp"), "41450\n")
+
+	assert.Empty(t, collectDPTF(root))
+}
+
+// TestCollectDPTFReturnsNilWhenNothingUsable covers M16, the bare `return nil`
+// after the loop (dptf.go:62). The re-review established it has zero behaviour
+// effect, because Collect gates on `len(d) > 0` and treats a nil map and an
+// empty one identically -- so this test pins intent rather than behaviour. Both
+// zones below match the thermal_zone* glob, so the early len(matches) == 0
+// return at dptf.go:34 must NOT fire; the fixture fails if the collector's
+// notion of "nothing to report" ever stops distinguishing "no zone directories"
+// from "zone directories that were all unusable".
+func TestCollectDPTFReturnsNilWhenNothingUsable(t *testing.T) {
+	root := t.TempDir()
+	// Matches the glob, has a name, but no temp.
+	writeFile(t, filepath.Join(zonePath(root, "thermal_zone0"), "type"), "SEN1\n")
+	// Matches the glob and has a temp, but no name.
+	writeFile(t, filepath.Join(zonePath(root, "thermal_zone1"), "temp"), "41450\n")
+
+	assert.Nil(t, collectDPTF(root))
+}

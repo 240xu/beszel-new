@@ -17,11 +17,13 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 	pbtests "github.com/pocketbase/pocketbase/tests"
 	"github.com/pocketbase/pocketbase/tools/hook"
+	"github.com/pocketbase/pocketbase/ui"
 )
 
 // NOTE: This is a copy of https://github.com/pocketbase/pocketbase/blob/master/tests/api.go
 // with the following changes:
 // - Removed automatic cleanup of the test app in ApiScenario.Test (Aug 17 2025)
+// - Clear ui.DistDirFS before building the router (see ApiScenario.test)
 
 // ApiScenario defines a single api request test case/scenario.
 type ApiScenario struct {
@@ -178,6 +180,16 @@ func (scenario *ApiScenario) test(t testing.TB) {
 		}
 	}
 	// defer testApp.Cleanup()
+
+	// apis.NewRouter binds the UI extensions routes as a side effect
+	// (pocketbase/apis/base.go:54) with no Id (pocketbase/apis/extensions.go:24),
+	// so a scenario loop reusing one app leaks an OnServe handler per iteration and
+	// the second one panics on the duplicate /_/extensions.js pattern. Clearing
+	// ui.DistDirFS makes that binding inert, as PocketBase does for its own
+	// equivalent scenario (pocketbase/apis/extensions_test.go:36).
+	oldDistDirFS := ui.DistDirFS
+	ui.DistDirFS = nil
+	t.Cleanup(func() { ui.DistDirFS = oldDistDirFS })
 
 	baseRouter, err := apis.NewRouter(testApp)
 	if err != nil {

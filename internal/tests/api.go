@@ -187,6 +187,10 @@ func (scenario *ApiScenario) test(t testing.TB) {
 	// the second one panics on the duplicate /_/extensions.js pattern. Clearing
 	// ui.DistDirFS makes that binding inert, as PocketBase does for its own
 	// equivalent scenario (pocketbase/apis/extensions_test.go:36).
+	//
+	// ui.DistDirFS is a package-level global, so this mutation is process-wide.
+	// Any test that calls t.Parallel() and also builds a router must not run
+	// concurrently with a scenario, or it will observe the nil value.
 	oldDistDirFS := ui.DistDirFS
 	ui.DistDirFS = nil
 	t.Cleanup(func() { ui.DistDirFS = oldDistDirFS })

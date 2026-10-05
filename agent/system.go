@@ -13,6 +13,7 @@ import (
 	"github.com/henrygd/beszel"
 	"github.com/henrygd/beszel/agent/battery"
 	"github.com/henrygd/beszel/agent/btrfs"
+	"github.com/henrygd/beszel/agent/plus"
 	"github.com/henrygd/beszel/agent/utils"
 	"github.com/henrygd/beszel/agent/wifi"
 	"github.com/henrygd/beszel/agent/zfs"
@@ -289,6 +290,13 @@ func (a *Agent) getSystemStats(cacheTimeMs uint16) system.Stats {
 	a.systemInfo.Uptime, _ = getUptime()
 	a.systemInfo.BandwidthBytes = systemStats.Bandwidth[0] + systemStats.Bandwidth[1]
 	a.systemInfo.Threads = a.systemDetails.Threads
+
+	// Beszelplus metrics
+	if plusStats, err := plus.Collect("/sys"); err == nil {
+		systemStats.Plus = plusStats
+	} else {
+		slog.Error("Error collecting plus metrics", "err", err)
+	}
 
 	return systemStats
 }

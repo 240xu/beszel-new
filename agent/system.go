@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/henrygd/beszel"
@@ -300,21 +301,72 @@ func (a *Agent) getSystemStats(cacheTimeMs uint16) system.Stats {
 // updatePlusStats refreshes the Beszelplus snapshot on the default interval and
 // copies the cached snapshot into every stats record.
 //
-// Collection walks every thermal zone, cpufreq policy and netdev counter, and
-// from Task 5 onward forks smartctl, so it only refreshes on the default
-// interval; real-time requests reuse the last snapshot, same treatment as the
-// Wi-Fi block in getSystemStats. The copy-out is unconditional because the hub
-// replaces each record's stats blob wholesale rather than merging fields, so
-// gating alone would drop plus from every gated-out record.
+// Collection walks every thermal zone, cpufreq policy and netdev counter -- a few
+// dozen small sysfs reads, with no subprocess and no SMART collection of its own
+// (see nvmePlusInput) -- so it only refreshes on the default interval;
+// real-time requests reuse the last snapshot, same treatment as the Wi-Fi block in
+// getSystemStats. The copy-out is unconditional because the hub replaces each
+// record's stats blob wholesale rather than merging fields, so gating alone would
+// drop plus from every gated-out record.
 func (a *Agent) updatePlusStats(cacheTimeMs uint16, systemStats *system.Stats) {
 	if cacheTimeMs == defaultDataCacheTimeMs {
-		if plusStats, err := plus.Collect(plus.ProdRoot); err == nil {
+		if plusStats, err := plus.Collect(plus.ProdRoot, nvmePlusInput(a.smartManager)); err == nil {
 			a.systemInfo.Plus = plusStats
 		} else {
 			slog.Error("Error collecting plus metrics", "err", err)
 		}
 	}
 	systemStats.Plus = a.systemInfo.Plus
+}
+
+// nvmeDiskType is the DiskType upstream stores for a drive smartctl reached over
+// NVMe. It is the only cheap discriminator between an NVMe device and the SATA and
+// mdraid entries that share the same map; the authoritative check is still
+// collectNvme's, which rejects anything lacking the NVMe health-log attributes.
+const nvmeDiskType = "nvme"
+
+// nvmePlusInput adapts upstream's parsed SMART data into the shape agent/plus
+// accepts.
+//
+// The adaptation lives here rather than in agent/plus because that package may not
+// import internal/entities/*, and because upstream already owns the smartctl
+// invocation and its refresh interval. GetCurrentData returns a copy of the
+// already-collected map and starts no subprocess, so this costs a map copy and
+// nothing more -- plus.Nvme is populated on exactly the cycles upstream's SMART
+// refreshes on, and is absent on exactly the cycles it has no data for.
+//
+// Attrs is upstream's attribute list flattened verbatim. The names are upstream's
+// (see parseSmartForNvme's list in smart.go) and collectNvme looks them up
+// unchanged; re-typing them into a struct here would add a second place for a
+// field to be renamed without a test failing.
+//
+// Only one drive is reported: the map is keyed by serial number, so with more
+// than one NVMe the lexicographically first serial wins. Ties are broken on the
+// serial rather than left to map order, so two runs over the same data agree.
+func nvmePlusInput(sm *SmartManager) *plus.NvmeInput {
+	if sm == nil {
+		return nil
+	}
+	data := sm.GetCurrentData()
+	serials := make([]string, 0, len(data))
+	for serial, d := range data {
+		if d.DiskType == nvmeDiskType {
+			serials = append(serials, serial)
+		}
+	}
+	if len(serials) == 0 {
+		return nil
+	}
+	sort.Strings(serials)
+	d := data[serials[0]]
+
+	attrs := make(map[string]uint64, len(d.Attributes))
+	for _, attr := range d.Attributes {
+		if attr != nil {
+			attrs[attr.Name] = attr.RawValue
+		}
+	}
+	return &plus.NvmeInput{Model: d.ModelName, TempC: float64(d.Temperature), Attrs: attrs}
 }
 
 // cpuModelFallbackKeys are the field names to look for in /proc/cpuinfo when

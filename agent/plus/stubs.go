@@ -9,13 +9,13 @@ package plus
 //	collectNetAll    <root>/class/net/<if>/statistics/*
 //	collectFanSteps  <root>/bus/acpi/devices/INT3404:00/state*
 //	collectWiFi      sourcePath(root, "/proc/net/wireless")
-//	collectNvme      sourcePath(root, "/dev/nvme0")
 //	collectFan       sourcePath(root, "/var/lib/pfanel/pfanel.db")
 //
-// The last three sit outside sysfs and have to go through sourcePath rather
-// than a plain join; the first four are sysfs-relative.
+// The last two sit outside sysfs and have to go through sourcePath rather than a
+// plain join; the first four are sysfs-relative. collectNvme is gone from this
+// list because it reads neither: it is handed upstream's parsed SMART data, so it
+// has no path of its own (see nvme.go).
 
-func collectNvme(root string) *NvmeStats         { return nil }
 func collectWiFi(root string) *WiFiStats         { return nil }
 func collectFan(root string) *FanStats           { return nil }
 func collectFanSteps(root string) []FanSpeedStep { return nil }

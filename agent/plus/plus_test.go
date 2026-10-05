@@ -13,13 +13,13 @@ import (
 )
 
 func TestCollectReturnsNonNilWithEmptyRoot(t *testing.T) {
-	s, err := Collect(t.TempDir())
+	s, err := Collect(t.TempDir(), nil)
 	require.NoError(t, err)
 	require.NotNil(t, s)
 }
 
 func TestCollectOmitsEmptySections(t *testing.T) {
-	s, err := Collect(t.TempDir())
+	s, err := Collect(t.TempDir(), nil)
 	require.NoError(t, err)
 	assert.Nil(t, s.DPTF)
 	assert.Nil(t, s.Cpufreq)
@@ -32,7 +32,7 @@ func TestCollectOmitsEmptySections(t *testing.T) {
 
 // prodSources are the collector inputs that live outside sysfs, so no relative
 // join onto the root can reach them.
-var prodSources = []string{"/proc/net/wireless", "/dev/nvme0", "/var/lib/pfanel/pfanel.db"}
+var prodSources = []string{"/proc/net/wireless", "/var/lib/pfanel/pfanel.db"}
 
 // sysfsSubpaths are the sysfs-relative locations the other four collectors glob.
 var sysfsSubpaths = []string{
@@ -85,7 +85,7 @@ func TestCollectAcceptsFixtureTreeWithEveryCollectorSource(t *testing.T) {
 
 	// Collect must walk the fixture tree without error, and while the
 	// collectors are still stubs it must report every section as absent.
-	s, err := Collect(root)
+	s, err := Collect(root, nil)
 	require.NoError(t, err)
 	require.NotNil(t, s)
 	assert.Nil(t, s.WiFi)
@@ -110,10 +110,10 @@ func populatedStats() Stats {
 			"wlp0s20f3": {RxBytes: 1 << 30, TxBytes: 1 << 29, RxPackets: 10, TxPackets: 20, OperState: "up", SpeedMBit: 866, MTU: 1500},
 		},
 		Nvme: &NvmeStats{
-			Model: "WD SN770", PercentageUsed: 1, UnsafeShutdowns: 2, MediaErrors: 3,
-			AvailableSpare: 100, DataUnitsRead: 4, DataUnitsWritten: 5, PowerOnHours: 6,
-			PowerCycles: 7, ControllerBusyMin: 8, CriticalCompTempMin: 9,
-			TempC: 41.5, TempSensor2C: 40,
+			Model: "WD SN770", PercentageUsedPct: 1, UnsafeShutdowns: 2, MediaErrors: 3,
+			AvailableSparePct: 100, DataUnitsRead: 4, DataUnitsWritten: 5, PowerOnHours: 6,
+			PowerCycles: 7, ControllerBusyMin: 8, CriticalCompTimeMin: 9,
+			TempC: 41.5,
 		},
 		WiFi:     &WiFiStats{SignalDbm: -53, TxMBit: 780, FreqMHz: 5180, Retry: 4, Iface: "wlp0s20f3"},
 		Fan:      &FanStats{SetLevelPct: 55, EC76Pct: 60, RPMEst: 2400, RPMEstFlag: true, TempC: 44},
@@ -130,10 +130,11 @@ var unitTags = []string{
 	"freq_mhz", "min_mhz", "max_mhz",
 	// netall
 	"rx_bytes", "tx_bytes", "rx_packets", "tx_packets", "speed_mbit", "mtu",
-	// nvme
-	"percentage_used", "available_spare", "data_units_read", "data_units_written",
+	// nvme -- idx-style key names aside, the two percentages carry _pct and the
+	// two NVMe Time attributes carry _min; nvme_test.go owns the full payload.
+	"percentage_used_pct", "available_spare_pct", "data_units_read", "data_units_written",
 	"power_on_hours", "power_cycles", "unsafe_shutdowns", "media_errors",
-	"controller_busy_min", "critical_comp_temp_min", "temp_c", "temp_sensor2_c",
+	"controller_busy_min", "critical_comp_time_min", "temp_c",
 	// wifi
 	"signal_dbm", "tx_mbit", "retry",
 	// fan

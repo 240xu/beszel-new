@@ -27,8 +27,9 @@ import (
 // is what the old dptf-only early return did: a root with no thermal zones
 // printed one line and nothing else, so a second collector could never be seen.
 // Adding a collector is one append to sectionsFor, not another branch in main,
-// so the later tasks (net, nvme, wifi, fan) reuse this shape rather than
-// reinventing it.
+// so the later tasks (net, wifi, fan) reuse this shape rather than reinventing
+// it. NVMe joins the same way, with one difference: it reads nothing, so its
+// payload is injected with -nvme rather than discovered from the root.
 type section struct {
 	name  string
 	has   func() bool
@@ -52,15 +53,41 @@ func sectionsFor(s *plus.Stats) []section {
 			has:   func() bool { return len(s.NetAll) > 0 },
 			print: func() { printNetAll(s.NetAll) },
 		},
+		{
+			name:  "nvme",
+			has:   func() bool { return s.Nvme != nil },
+			print: func() { printNvme(s.Nvme) },
+		},
 	}
 }
 
 func main() {
 	root := flag.String("root", plus.ProdRoot, "sysfs root to read from")
 	asJSON := flag.Bool("json", false, "print the full stats payload as JSON")
+	nvmePath := flag.String("nvme", "",
+		"path to a JSON plus.NvmeInput to inject for the nvme section; empty means none")
 	flag.Parse()
 
-	stats, err := plus.Collect(*root)
+	// The NVMe collector reads no file, so there is nothing on the root to
+	// discover. Upstream's SMART manager is what fills this in production and it
+	// lives in package agent, which a dev harness cannot import, so -nvme takes
+	// the same struct from a file instead. That keeps the harness honest about
+	// the collector's real input shape instead of inventing a parallel one.
+	var nvme *plus.NvmeInput
+	if *nvmePath != "" {
+		b, err := os.ReadFile(*nvmePath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "pluscheck: read -nvme: %v\n", err)
+			os.Exit(1)
+		}
+		nvme = &plus.NvmeInput{}
+		if err := json.Unmarshal(b, nvme); err != nil {
+			fmt.Fprintf(os.Stderr, "pluscheck: parse -nvme: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	stats, err := plus.Collect(*root, nvme)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "pluscheck: collect failed: %v\n", err)
 		os.Exit(1)
@@ -175,4 +202,21 @@ func speedStr(mbit int) string {
 		return "unknown"
 	}
 	return fmt.Sprintf("%dM", mbit)
+}
+
+// printNvme prints the NVMe health projection one field per line.
+//
+// Every counter is a device-lifetime total, not a rate, so a run is only
+// meaningful against a previous one -- and unsafe_shutdowns in particular is the
+// field worth reading here, because it counts power cuts the drive did not get to
+// flush for. The two percentage fields are printed as percentages and the two NVMe
+// Time attributes as minutes, so the unit in the label is the unit on the wire.
+func printNvme(n *plus.NvmeStats) {
+	fmt.Printf("  model=%q\n", n.Model)
+	fmt.Printf("  temp_c=%.1f\n", n.TempC)
+	fmt.Printf("  percentage_used_pct=%.1f%%  available_spare_pct=%.1f%%\n", n.PercentageUsedPct, n.AvailableSparePct)
+	fmt.Printf("  unsafe_shutdowns=%d  media_errors=%d\n", n.UnsafeShutdowns, n.MediaErrors)
+	fmt.Printf("  power_on_hours=%d  power_cycles=%d\n", n.PowerOnHours, n.PowerCycles)
+	fmt.Printf("  data_units_read=%d  data_units_written=%d\n", n.DataUnitsRead, n.DataUnitsWritten)
+	fmt.Printf("  controller_busy_min=%d  critical_comp_time_min=%d\n", n.ControllerBusyMin, n.CriticalCompTimeMin)
 }

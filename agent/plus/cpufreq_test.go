@@ -195,7 +195,7 @@ func TestCollectReadsCpufreqThroughCollect(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(corePath(root, "cpu0"), "scaling_cur_freq"), "4100000\n")
 
-	s, err := Collect(root)
+	s, err := Collect(root, nil)
 	require.NoError(t, err)
 	require.NotNil(t, s.Cpufreq, "cpufreq must survive the Collect wiring")
 	assert.Equal(t, uint32(4100), coreAt(t, s.Cpufreq, 0).FreqMHz)

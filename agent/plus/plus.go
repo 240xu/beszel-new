@@ -71,20 +71,40 @@ type NetIfaceStats struct {
 	MTU       int    `json:"mtu,omitempty"`
 }
 
+// NvmeStats is the NVMe health log as Beszelplus reports it.
+//
+// Every value is copied from upstream's already-parsed SMART data; this package
+// never forks smartctl itself. Read the Contract paragraphs of collectNvme in
+// nvme.go for why, and NvmeInput there for the shape the data arrives in.
+//
+// Breaking change from the pre-Task-6 draft: percentage_used and available_spare
+// became percentage_used_pct and available_spare_pct (both are percentages, and
+// the bare names read as ratios), and critical_comp_temp_min became
+// critical_comp_time_min because the NVMe attribute is a duration in minutes, not
+// a temperature. temp_sensor2_c is gone: upstream does not carry the log's
+// temperature_sensors array into SmartData at all, so the field could only ever
+// have been a hardcoded zero on the wire.
+//
+// Every field carries omitempty, but collectNvme is all-or-nothing, so the two
+// levels still mean different things and the payload stays unambiguous. If the
+// enclosing "nvme" key is ABSENT, no NVMe data was collected and nothing is known.
+// If it is PRESENT, an absent field inside it means exactly zero: upstream emits
+// an attribute even for a legitimately zero reading, so an attribute is missing
+// only when the health log was never parsed. A consumer may therefore substitute
+// a numeric zero for a missing field, but only after checking the section exists.
 type NvmeStats struct {
 	Model               string  `json:"model,omitempty"`
-	PercentageUsed      float64 `json:"percentage_used,omitempty"`
-	UnsafeShutdowns     uint64  `json:"unsafe_shutdowns,omitempty"`
-	MediaErrors         uint64  `json:"media_errors,omitempty"`
-	AvailableSpare      float64 `json:"available_spare,omitempty"`
+	TempC               float64 `json:"temp_c,omitempty"`
+	AvailableSparePct   float64 `json:"available_spare_pct,omitempty"`
+	PercentageUsedPct   float64 `json:"percentage_used_pct,omitempty"`
 	DataUnitsRead       uint64  `json:"data_units_read,omitempty"`
 	DataUnitsWritten    uint64  `json:"data_units_written,omitempty"`
 	PowerOnHours        uint64  `json:"power_on_hours,omitempty"`
 	PowerCycles         uint64  `json:"power_cycles,omitempty"`
+	UnsafeShutdowns     uint64  `json:"unsafe_shutdowns,omitempty"`
+	MediaErrors         uint64  `json:"media_errors,omitempty"`
 	ControllerBusyMin   uint64  `json:"controller_busy_min,omitempty"`
-	CriticalCompTempMin uint64  `json:"critical_comp_temp_min,omitempty"`
-	TempC               float64 `json:"temp_c,omitempty"`
-	TempSensor2C        float64 `json:"temp_sensor2_c,omitempty"`
+	CriticalCompTimeMin uint64  `json:"critical_comp_time_min,omitempty"`
 }
 
 type WiFiStats struct {
@@ -148,7 +168,12 @@ func sourcePath(root, prodPath string) string {
 // receives that same root and joins its own sysfs subpaths, so tests can point
 // Collect at a t.TempDir() tree. Collectors whose input lives outside sysfs
 // resolve it through sourcePath instead.
-func Collect(root string) (*Stats, error) {
+//
+// nvme is upstream's already-parsed SMART data, or nil when none has been
+// collected. It is a parameter rather than something this package reads because
+// upstream owns the smartctl invocation: pass nil and the NVMe section is simply
+// absent, which is also what every fixture test does.
+func Collect(root string, nvme *NvmeInput) (*Stats, error) {
 	s := &Stats{}
 	if d := collectDPTF(root); len(d) > 0 {
 		s.DPTF = &DPTFStats{Zones: d}
@@ -159,7 +184,7 @@ func Collect(root string) (*Stats, error) {
 	if n := collectNetAll(root); len(n) > 0 {
 		s.NetAll = n
 	}
-	if v := collectNvme(root); v != nil {
+	if v := collectNvme(nvme); v != nil {
 		s.Nvme = v
 	}
 	if w := collectWiFi(root); w != nil {

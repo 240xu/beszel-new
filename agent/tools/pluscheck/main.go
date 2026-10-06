@@ -58,6 +58,11 @@ func sectionsFor(s *plus.Stats) []section {
 			has:   func() bool { return s.Nvme != nil },
 			print: func() { printNvme(s.Nvme) },
 		},
+		{
+			name:  "wifi",
+			has:   func() bool { return s.WiFi != nil },
+			print: func() { printWiFi(s.WiFi) },
+		},
 	}
 }
 
@@ -219,4 +224,51 @@ func printNvme(n *plus.NvmeStats) {
 	fmt.Printf("  power_on_hours=%d  power_cycles=%d\n", n.PowerOnHours, n.PowerCycles)
 	fmt.Printf("  data_units_read=%d  data_units_written=%d\n", n.DataUnitsRead, n.DataUnitsWritten)
 	fmt.Printf("  controller_busy_min=%d  critical_comp_time_min=%d\n", n.ControllerBusyMin, n.CriticalCompTimeMin)
+}
+
+// printWiFi prints the radio attributes one wire name per line.
+//
+// Two of the fields are worth reading together rather than alone, which is why
+// this is not one packed line: signal_dbm against tx_mbit separates a link that
+// is far away or contended (level low, rate still negotiated high) from a radio
+// with a transmit problem (level fine, rate collapsed), and that is the first
+// question anyone asks about a NAS that dropped off the network.
+//
+// retry is the driver's lifetime TransmitFailed counter, not a rate, so the label
+// says so; it also resets to zero when the interface reassociates, which is why
+// the trend needs a second run and a guarded subtraction.
+//
+// Every numeric field prints "unknown" rather than a bare 0. That is not
+// cosmetic: collectWiFi only assigns SignalDbm for a reading inside
+// [-150, 0), so a zero there can only mean the driver declined to report RSSI,
+// and for the two rate fields zero is equally not a real measurement. Printing 0
+// would read as "associated at no signal on no frequency".
+func printWiFi(w *plus.WiFiStats) {
+	fmt.Printf("  iface=%q\n", w.Iface)
+	fmt.Printf("  signal_dbm=%s\n", dbmStr(w.SignalDbm))
+	fmt.Printf("  retry=%d (cumulative, not a rate; resets on reassociation)\n", w.Retry)
+	fmt.Printf("  tx_mbit=%s\n", mbitStr(w.TxMBit))
+	fmt.Printf("  freq_mhz=%s\n", mhzStr(w.FreqMHz))
+}
+
+// dbmStr, mbitStr and mhzStr name the unknown case instead of printing a bare 0.
+func dbmStr(v int) string {
+	if v == 0 {
+		return "unknown"
+	}
+	return fmt.Sprintf("%d", v)
+}
+
+func mbitStr(v float64) string {
+	if v == 0 {
+		return "unknown"
+	}
+	return fmt.Sprintf("%.1f", v)
+}
+
+func mhzStr(v int) string {
+	if v == 0 {
+		return "unknown"
+	}
+	return fmt.Sprintf("%d", v)
 }

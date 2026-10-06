@@ -107,6 +107,22 @@ type NvmeStats struct {
 	CriticalCompTimeMin uint64  `json:"critical_comp_time_min,omitempty"`
 }
 
+// WiFiStats is a stateless snapshot of one associated station interface, taken
+// over nl80211. Absent "wifi" key means no station was associated, or the host has
+// no cfg80211 radio; within a present key an absent field means exactly zero.
+//
+// Contract: Retry is CUMULATIVE, not a rate, and is the driver's TransmitFailed
+// counter. It rises monotonically while the association holds and resets to zero
+// when the interface reassociates, so consumers must difference consecutive
+// samples and MUST guard the subtraction: an unguarded uint64 cur-prev across a
+// reassociation wraps to about 1.8e19. Reuse the rule netall.go documents for
+// Rx/TxBytes -- cur < prev means a reset.
+//
+// TxMBit is the instantaneous negotiated transmit rate, not throughput and not
+// link capacity: rate control renegotiates it continuously, so the same link
+// reports 866, 1040 and 1733 Mbit/s within a minute. Read it beside SignalDbm
+// rather than alone; level low with the rate still high is distance or
+// contention, level healthy with the rate collapsed is a transmit fault.
 type WiFiStats struct {
 	SignalDbm int     `json:"signal_dbm,omitempty"`
 	TxMBit    float64 `json:"tx_mbit,omitempty"`

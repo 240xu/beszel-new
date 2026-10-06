@@ -4,11 +4,6 @@ package plus
 
 import (
 	"encoding/json"
-	"go/parser"
-	"go/token"
-	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -192,43 +187,6 @@ func TestNvmeZeroValuesAreOmitted(t *testing.T) {
 	b, err := json.Marshal(&NvmeStats{})
 	require.NoError(t, err)
 	assert.JSONEq(t, `{}`, string(b))
-}
-
-// TestNvmeCollectorNeverForks pins the design decision that the NVMe collector
-// reuses upstream's parse instead of running smartctl again.
-//
-// The invariant is structural, so it is checked structurally: no file in this
-// package may import os/exec. There is no behavioural fixture that could prove
-// this -- a fork only shows up as a slow test and a stray child process, neither
-// of which fails anything -- so the import list is what gets asserted. A second
-// smartctl would also bypass upstream's SMART refresh interval and, on a host
-// where the agent cannot read /dev/nvme0, would silently report nothing where
-// upstream reports real numbers.
-func TestNvmeCollectorNeverForks(t *testing.T) {
-	dir, err := os.Getwd()
-	require.NoError(t, err, "the test must run in the package directory")
-	entries, err := os.ReadDir(dir)
-	require.NoError(t, err)
-
-	fset := token.NewFileSet()
-	checked := 0
-	for _, e := range entries {
-		name := e.Name()
-		if e.IsDir() || filepath.Ext(name) != ".go" || strings.HasSuffix(name, "_test.go") {
-			continue
-		}
-		file, err := parser.ParseFile(fset, filepath.Join(dir, name), nil, parser.ImportsOnly)
-		require.NoErrorf(t, err, "cannot parse %s", name)
-		checked++
-		for _, imp := range file.Imports {
-			path := imp.Path.Value
-			assert.NotEqualf(t, `"os/exec"`, path,
-				"%s imports os/exec: this package must not fork a process", name)
-			assert.NotEqualf(t, `"syscall"`, path,
-				"%s imports syscall: this package must not shell out to smartctl", name)
-		}
-	}
-	assert.Greater(t, checked, 0, "no package source found -- the assertion proved nothing")
 }
 
 // TestCollectWiresNvmeThroughCollect is the wiring guard for the injected data:

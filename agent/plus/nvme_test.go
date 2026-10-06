@@ -197,13 +197,26 @@ func TestNvmeZeroValuesAreOmitted(t *testing.T) {
 // TestNvmeCollectorNeverForks pins the design decision that the NVMe collector
 // reuses upstream's parse instead of running smartctl again.
 //
-// The invariant is structural, so it is checked structurally: no file in this
-// package may import os/exec. There is no behavioural fixture that could prove
-// this -- a fork only shows up as a slow test and a stray child process, neither
-// of which fails anything -- so the import list is what gets asserted. A second
-// smartctl would also bypass upstream's SMART refresh interval and, on a host
-// where the agent cannot read /dev/nvme0, would silently report nothing where
-// upstream reports real numbers.
+// The invariant is structural, so it is checked structurally. There is no
+// behavioural fixture that could prove this -- a fork only shows up as a slow
+// test and a stray child process, neither of which fails anything -- so the
+// import list is what gets asserted. A second smartctl would also bypass
+// upstream's SMART refresh interval and, on a host where the agent cannot read
+// /dev/nvme0, would silently report nothing where upstream reports real numbers.
+//
+// Scope change in Task 7 (WiFi). The ban used to be package-wide on os/exec.
+// WiFi needs the opposite: tx_mbit and freq_mhz come from running iw, which is
+// not reachable any other way -- there is no procfs or sysfs file for the
+// negotiated rate, and reading nl80211 over a netlink socket needs syscall,
+// which the ban below also forbids. So the package as a whole can no longer be
+// fork-free, and a ban that cannot hold is worse than no ban: it would push the
+// next collector to route around a test instead of around a rule.
+//
+// The invariant is therefore stated over the files that can actually reach
+// smartctl. os/exec stays banned everywhere except wifi.go; syscall stays banned
+// everywhere, including wifi.go, so nobody can reach for a raw fork instead.
+// TestWifiCollectorForksOnlyIw in wifi_test.go covers the other side of the
+// bargain: that the one permitted fork is the radio tool and not an NVMe one.
 func TestNvmeCollectorNeverForks(t *testing.T) {
 	dir, err := os.Getwd()
 	require.NoError(t, err, "the test must run in the package directory")
@@ -222,13 +235,25 @@ func TestNvmeCollectorNeverForks(t *testing.T) {
 		checked++
 		for _, imp := range file.Imports {
 			path := imp.Path.Value
-			assert.NotEqualf(t, `"os/exec"`, path,
-				"%s imports os/exec: this package must not fork a process", name)
+			if !forkedProducers[name] {
+				assert.NotEqualf(t, `"os/exec"`, path,
+					"%s imports os/exec: only wifi.go may fork, and only for iw", name)
+			}
 			assert.NotEqualf(t, `"syscall"`, path,
 				"%s imports syscall: this package must not shell out to smartctl", name)
 		}
 	}
 	assert.Greater(t, checked, 0, "no package source found -- the assertion proved nothing")
+}
+
+// forkedProducers is the whole set of files allowed to import os/exec, so the
+// exception above is a named list rather than a name compared inside the loop.
+// A new file that starts forking has to be added here deliberately.
+var forkedProducers = map[string]bool{"wifi.go": true}
+
+func TestForkedProducersListIsNotEmpty(t *testing.T) {
+	assert.NotEmpty(t, forkedProducers,
+		"an empty allowlist would silently re-ban os/exec package-wide")
 }
 
 // TestCollectWiresNvmeThroughCollect is the wiring guard for the injected data:

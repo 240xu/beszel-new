@@ -63,6 +63,11 @@ func sectionsFor(s *plus.Stats) []section {
 			has:   func() bool { return s.WiFi != nil },
 			print: func() { printWiFi(s.WiFi) },
 		},
+		{
+			name:  "fan_steps",
+			has:   func() bool { return len(s.FanSteps) > 0 },
+			print: func() { printFanSteps(s.FanSteps) },
+		},
 	}
 }
 
@@ -277,4 +282,24 @@ func mhzStr(v int) string {
 		return "unknown"
 	}
 	return fmt.Sprintf("%d", v)
+}
+
+// printFanSteps prints the firmware's own duty table, one line per step.
+//
+// The payload is a slice rather than a map, so its order is the firmware's step
+// order and this printer deliberately does not re-sort: a row that moves between
+// two runs is the collector's bug, and sorting here would hide the one property
+// the slice promises. Percent is a duty level the firmware accepts, RPMEst the
+// speed it associates with that duty -- an estimate, never a tachometer reading --
+// and the noise and power figures are what it declares for the same step.
+//
+// The count is printed next to the rows because the auto placeholder at state0 is
+// excluded by design, so a table of 12 files reports 11 steps and a bare row count
+// would otherwise look like a file went missing.
+func printFanSteps(steps []plus.FanSpeedStep) {
+	fmt.Printf("  %d step(s), auto placeholder excluded\n", len(steps))
+	for _, s := range steps {
+		fmt.Printf("  %3d%% -> %5d rpm, %6d mdb, %5d mW\n",
+			s.Percent, s.RPMEst, s.NoiseMdb, s.PowerMw)
+	}
 }

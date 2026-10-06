@@ -22,5 +22,4 @@ package plus
 // hold build-tagged files without leaking a netlink dependency to platforms that
 // cannot compile it.
 
-func collectFan(root string) *FanStats           { return nil }
-func collectFanSteps(root string) []FanSpeedStep { return nil }
+func collectFan(root string) *FanStats { return nil }

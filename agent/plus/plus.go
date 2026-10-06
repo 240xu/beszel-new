@@ -108,8 +108,27 @@ type NvmeStats struct {
 }
 
 // WiFiStats is a stateless snapshot of one associated station interface, taken
-// over nl80211. Absent "wifi" key means no station was associated, or the host has
-// no cfg80211 radio; within a present key an absent field means exactly zero.
+// over nl80211.
+//
+// An absent "wifi" key means no station was associated, or the host has no
+// cfg80211 radio. Inside a present key an absent field means UNKNOWN, never
+// exactly zero: a value is assigned only once the read that proves it has
+// succeeded, and omitempty drops the zero left behind on the paths that returned
+// early. Three tiers, and only the first is a fact about the machine:
+//
+//   - iface is assigned from the interface that reported itself associated, and a
+//     nameless interface is skipped, so a present iface proves association.
+//   - freq_mhz comes from that same BSS; absent means it carried no frequency
+//     attribute, not a link sitting on channel 0.
+//   - signal_dbm, tx_mbit and retry are assigned only after the GET_STATION query
+//     returned, so an absent one is either a denied or empty query -- the normal
+//     outcome in a default container -- or a driver that reported nothing for that
+//     attribute. The wire cannot tell the two apart, so a consumer MUST render an
+//     absent field as unknown and MUST NOT substitute 0.
+//
+// signal_dbm adds one more consequence: only readings in [-150, 0) are accepted,
+// so the Go value can never be 0 and omitempty would drop it if it were. 0 dBm is
+// unrepresentable, and an absent signal_dbm always means no usable RSSI arrived.
 //
 // Contract: Retry is CUMULATIVE, not a rate, and is the driver's TransmitFailed
 // counter. It rises monotonically while the association holds and resets to zero
@@ -127,8 +146,11 @@ type WiFiStats struct {
 	SignalDbm int     `json:"signal_dbm,omitempty"`
 	TxMBit    float64 `json:"tx_mbit,omitempty"`
 	FreqMHz   int     `json:"freq_mhz,omitempty"`
-	Retry     uint64  `json:"retry,omitempty"`
-	Iface     string  `json:"iface,omitempty"`
+	// Retry is the wire doc for the cumulative contract above, kept on the field
+	// because that is the line a UI author reads: the name carries no _total, so a
+	// consumer that trusts it as a rate graphs a line that only ever rises.
+	Retry uint64 `json:"retry,omitempty"`
+	Iface string `json:"iface,omitempty"`
 }
 
 type FanStats struct {

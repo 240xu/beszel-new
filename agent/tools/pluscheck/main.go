@@ -236,13 +236,19 @@ func printNvme(n *plus.NvmeStats) {
 //
 // retry is the driver's lifetime TransmitFailed counter, not a rate, so the label
 // says so; it also resets to zero when the interface reassociates, which is why
-// the trend needs a second run and a guarded subtraction.
+// the trend needs a second run and a guarded subtraction. It is the one field
+// printed raw rather than through the unknown-formatter, because a zero here is
+// worth seeing -- it is what a link with no failed frames looks like -- even
+// though a station query that never succeeded looks the same, here and on the
+// wire.
 //
-// Every numeric field prints "unknown" rather than a bare 0. That is not
-// cosmetic: collectWiFi only assigns SignalDbm for a reading inside
-// [-150, 0), so a zero there can only mean the driver declined to report RSSI,
-// and for the two rate fields zero is equally not a real measurement. Printing 0
-// would read as "associated at no signal on no frequency".
+// The other three print "unknown" rather than a bare 0, because a zero is never a
+// measurement of them: collectWiFi assigns signal_dbm only for a reading inside
+// [-150, 0), freq_mhz only from a BSS that carried a frequency attribute, and
+// tx_mbit only from a station reply that arrived and whose bitrate the driver may
+// still have left out. omitempty then drops all three zeros, so the JSON key is
+// missing in exactly the same cases. That is the rule WiFiStats' doc comment
+// states, and this harness follows it instead of restating it more loosely.
 func printWiFi(w *plus.WiFiStats) {
 	fmt.Printf("  iface=%q\n", w.Iface)
 	fmt.Printf("  signal_dbm=%s\n", dbmStr(w.SignalDbm))

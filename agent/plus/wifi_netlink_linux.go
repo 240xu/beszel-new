@@ -24,13 +24,13 @@ import (
 )
 
 const (
-	// wifiTimeout bounds every query, so a wedged response cannot stall collection.
+	// wifiTimeout bounds the dumps and the station request, where a driver
+	// callback decides how long the kernel takes. Family lookups do not block.
 	wifiTimeout = 2 * time.Second
 	// bitsPerMBit divides TransmitBitrate, which is in bits/second.
 	bitsPerMBit = 1e6
 	// wifiWiphyDir gates netlink access: looking up the nl80211 family while
-	// cfg80211 is unloaded makes the kernel run modprobe, which loads the module on
-	// a host with no radio and otherwise fails on every poll.
+	// cfg80211 is unloaded makes the kernel run modprobe, which loads the module.
 	wifiWiphyDir = "/sys/class/ieee80211"
 	// signalFloorDbM filters the zero a driver leaves when it cannot report RSSI.
 	signalFloorDbM = -150
@@ -61,6 +61,14 @@ func newNL80211Client() (*nl80211Client, error) {
 	}
 	conn, err := genetlink.Dial(nil)
 	if err != nil {
+		client.Close()
+		return nil, err
+	}
+	// Deadline first: collectWiFiWith cannot pin it until this returns, so a CTRL
+	// round trip issued earlier would be the one query here with no bound. The
+	// order is held by TestWifiFamilyLookupRunsUnderADeadline.
+	if err := conn.SetDeadline(time.Now().Add(wifiTimeout)); err != nil {
+		conn.Close()
 		client.Close()
 		return nil, err
 	}

@@ -2,372 +2,74 @@
 
 package plus
 
+// Cross-platform contract tests for the WiFi wire shape. No Linux-only symbol may
+// appear here: it would pass every test on this host, then break the GOOS=windows
+// vet. platform_scope_test.go holds the split.
+
 import (
-	"errors"
-	"net"
-	"os"
-	"path/filepath"
+	"encoding/json"
 	"regexp"
 	"strconv"
 	"testing"
-	"time"
 
-	native "github.com/mdlayher/wifi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// fakeWiFiClient serves fixtures for the nl80211 mapping. One station per BSSID,
-// and every call is recorded so a test can prove which interface was queried.
-type fakeWiFiClient struct {
-	ifaces    []*native.Interface
-	ifacesErr error
-	bss       map[string]*native.BSS
-	bssErr    error
-	station   map[string]*native.StationInfo
-	stErr     error
-	deadline  time.Time
-	closed    bool
-	bssAsked  []string
-	// bssErrWithData models a driver that answers with a usable BSS *and* an
-	// error, which is the case where ignoring the error would change the result.
-	bssErrWithData error
-	// stationMAC records what each Station call was asked for, so a test can
-	// prove the associated BSSID is the one queried.
-	stationMAC []net.HardwareAddr
-}
-
-func (f *fakeWiFiClient) Interfaces() ([]*native.Interface, error) {
-	return f.ifaces, f.ifacesErr
-}
-
-func (f *fakeWiFiClient) BSS(ifi *native.Interface) (*native.BSS, error) {
-	f.bssAsked = append(f.bssAsked, ifi.Name)
-	if f.bssErr != nil {
-		return nil, f.bssErr
-	}
-	if bss := f.bss[ifi.Name]; bss != nil && f.bssErrWithData != nil {
-		return bss, f.bssErrWithData
-	}
-	return f.bss[ifi.Name], nil
-}
-
-func (f *fakeWiFiClient) Station(ifi *native.Interface, mac net.HardwareAddr) (*native.StationInfo, error) {
-	f.stationMAC = append(f.stationMAC, mac)
-	if f.stErr != nil {
-		return nil, f.stErr
-	}
-	return f.station[ifi.Name], nil
-}
-
-func (f *fakeWiFiClient) SetDeadline(t time.Time) error {
-	f.deadline = t
-	return nil
-}
-
-func (f *fakeWiFiClient) Close() error {
-	f.closed = true
-	return nil
-}
-
-var testBSSID = net.HardwareAddr{0x02, 0x11, 0x22, 0x33, 0x44, 0x55}
-
-// associated builds the normal case: one station interface, associated, with a
-// station reply. Values are the ones measured on the real NAS so a unit or field
-// mistake shows up as a number that cannot be right.
-func associated() *fakeWiFiClient {
-	return &fakeWiFiClient{
-		ifaces: []*native.Interface{
-			{Name: "wlp0s20f3", Index: 3, Type: native.InterfaceTypeStation},
-		},
-		bss: map[string]*native.BSS{
-			"wlp0s20f3": {
-				SSID:      "CMCC-Da3Z-5G",
-				BSSID:     testBSSID,
-				Frequency: 5180,
-				Status:    native.BSSStatusAssociated,
-				// The scan cache, in mBm. Deliberately inconsistent with
-				// StationInfo.Signal so a mix-up cannot pass by coincidence.
-				Signal: -3700,
-			},
-		},
-		station: map[string]*native.StationInfo{
-			"wlp0s20f3": {Signal: -42, TransmitBitrate: 780_000_000, TransmitFailed: 1146, TransmitRetries: 98464},
-		},
-	}
-}
-
-func TestCollectWiFiMapsAllFourFields(t *testing.T) {
-	got := collectWiFiWith(associated())
-	require.NotNil(t, got)
-	assert.Equal(t, "wlp0s20f3", got.Iface)
-	assert.Equal(t, 5180, got.FreqMHz)
-	assert.Equal(t, -42, got.SignalDbm)
-	assert.Equal(t, 780.0, got.TxMBit)
-	assert.Equal(t, uint64(1146), got.Retry)
-}
-
-// TestCollectWiFiRetryIsTransmitFailed pins the counter identity. TransmitFailed
-// and TransmitRetries sit next to each other in StationInfo and differ by two
-// orders of magnitude in the fixture, so reading the wrong one cannot pass.
-func TestCollectWiFiRetryIsTransmitFailed(t *testing.T) {
-	client := associated()
-	got := collectWiFiWith(client)
-	require.NotNil(t, got)
-	assert.Equal(t, uint64(1146), got.Retry, "retry must be TransmitFailed")
-	assert.NotEqual(t, uint64(98464), got.Retry, "TransmitRetries is a different counter")
-}
-
-// TestCollectWiFiTxMBitConvertsBitsPerSecond pins the unit. TransmitBitrate is
-// bits/second, so 780000000 is 780 Mbit/s. The neighbouring RateInfo.Bitrate is
-// in 100 kbit/s units and a /10 conversion there is the wrong answer by 1e5.
-func TestCollectWiFiTxMBitConvertsBitsPerSecond(t *testing.T) {
-	client := associated()
-	client.station["wlp0s20f3"] = &native.StationInfo{Signal: -42, TransmitBitrate: 780_000_000}
-	got := collectWiFiWith(client)
-	require.NotNil(t, got)
-	assert.Equal(t, 780.0, got.TxMBit, "bits/second divided by 1e6, not by 10")
-	assert.NotEqual(t, 78_000_000.0, got.TxMBit)
-}
-
-// TestCollectWiFiSignalIsStationNotBSSCache pins the source and its unit.
-// BSS.Signal is the scan cache in mBm and StationInfo.Signal is dBm; the
-// fixture gives them different magnitudes so only the right one can pass.
-func TestCollectWiFiSignalIsStationNotBSSCache(t *testing.T) {
-	client := associated()
-	got := collectWiFiWith(client)
-	require.NotNil(t, got)
-	assert.Equal(t, -42, got.SignalDbm, "StationInfo.Signal is already dBm")
-	assert.NotEqual(t, -3700, got.SignalDbm, "BSS.Signal is mBm and must not be used")
-	assert.NotEqual(t, -37, got.SignalDbm, "BSS.Signal is not divided here")
-}
-
-// TestCollectWiFiFreqIsBSSFrequency pins where freq_mhz comes from. The
-// associated BSS is authoritative; Interface.Frequency can differ before
-// association completes and is not a fallback.
-func TestCollectWiFiFreqIsBSSFrequency(t *testing.T) {
-	client := associated()
-	client.ifaces[0].Frequency = 2412
-	got := collectWiFiWith(client)
-	require.NotNil(t, got)
-	assert.Equal(t, 5180, got.FreqMHz, "the associated BSS frequency")
-	assert.NotEqual(t, 2412, got.FreqMHz, "Interface.Frequency is not the source")
-}
-
-func TestCollectWiFiSkipsUnassociatedAndNonStation(t *testing.T) {
-	client := associated()
-	client.ifaces = []*native.Interface{
-		{Name: "wlan0ap", Index: 1, Type: native.InterfaceTypeAP},
-		{Name: "wlp0s20f3", Index: 3, Type: native.InterfaceTypeStation},
-	}
-	client.bss["wlp0s20f3"] = &native.BSS{
-		BSSID: testBSSID, Frequency: 5180, Status: native.BSSStatusAuthenticated,
-	}
-	assert.Nil(t, collectWiFiWith(client), "only an associated BSS counts")
-}
-
-func TestCollectWiFiTakesTheFirstAssociatedStation(t *testing.T) {
-	client := associated()
-	client.ifaces = []*native.Interface{
-		{Name: "wlan0ap", Index: 1, Type: native.InterfaceTypeAP},
-		{Name: "wlp1s20f3", Index: 2, Type: native.InterfaceTypeStation},
-		{Name: "wlp0s20f3", Index: 3, Type: native.InterfaceTypeStation},
-	}
-	client.bss["wlan0ap"] = &native.BSS{Frequency: 2412, Status: native.BSSStatusAssociated}
-	client.bss["wlp1s20f3"] = &native.BSS{
-		BSSID: testBSSID, Frequency: 2412, Status: native.BSSStatusAssociated,
-	}
-	client.station["wlan0ap"] = &native.StationInfo{Signal: -70, TransmitBitrate: 72_200_000}
-	client.station["wlp1s20f3"] = &native.StationInfo{Signal: -55, TransmitBitrate: 144_400_000}
-	got := collectWiFiWith(client)
-	require.NotNil(t, got)
-	assert.Equal(t, "wlp1s20f3", got.Iface, "Stats.WiFi is one object, so the first one wins")
-	assert.Equal(t, 2412, got.FreqMHz)
-	assert.NotEqual(t, "wlp0s20f3", got.Iface)
-}
-
-func TestCollectWiFiKeepsAssociationWhenStationStatsAreDenied(t *testing.T) {
-	for name, deny := range map[string]func(*fakeWiFiClient){
-		"the query fails": func(c *fakeWiFiClient) { c.stErr = errors.New("operation not permitted") },
-		"the reply is nil": func(c *fakeWiFiClient) {
-			c.station = map[string]*native.StationInfo{}
-		},
-	} {
-		t.Run(name, func(t *testing.T) { assertWifiKeepsAssociationOnly(t, deny) })
-	}
-}
-
-func assertWifiKeepsAssociationOnly(t *testing.T, deny func(*fakeWiFiClient)) {
-	t.Helper()
-	client := associated()
-	deny(client)
-	got := collectWiFiWith(client)
-	require.NotNil(t, got, "the BSS already proved association")
-	assert.Equal(t, "wlp0s20f3", got.Iface)
-	assert.Equal(t, 5180, got.FreqMHz)
-	assert.Zero(t, got.SignalDbm)
-	assert.Zero(t, got.TxMBit)
-	assert.Zero(t, got.Retry)
-}
-
-func TestCollectWiFiKeepsAssociationWhenBSSIDIsUnknown(t *testing.T) {
-	client := associated()
-	client.bss["wlp0s20f3"].BSSID = nil
-	got := collectWiFiWith(client)
-	require.NotNil(t, got)
-	assert.Equal(t, 5180, got.FreqMHz)
-	assert.Zero(t, got.SignalDbm)
-}
-
-func TestCollectWiFiSkipsNilAndNamelessInterfaces(t *testing.T) {
-	client := associated()
-	client.ifaces = []*native.Interface{
-		nil,
-		{Index: 2, Type: native.InterfaceTypeStation},
-	}
-	assert.Nil(t, collectWiFiWith(client))
-	assert.Empty(t, client.bssAsked, "no BSS query for an interface with no name")
-}
-
-func TestCollectWiFiNilOnEveryErrorPath(t *testing.T) {
-	for name, setup := range map[string]func(*fakeWiFiClient){
-		"interface list fails":     func(c *fakeWiFiClient) { c.ifacesErr = errors.New("boom") },
-		"interface list is empty":  func(c *fakeWiFiClient) { c.ifaces = nil },
-		"BSS query fails":          func(c *fakeWiFiClient) { c.bssErr = errors.New("boom") },
-		"BSS reply is nil":         func(c *fakeWiFiClient) { c.bss = map[string]*native.BSS{} },
-		"no interface is a radio":  func(c *fakeWiFiClient) { c.ifaces[0].Type = native.InterfaceTypeAP },
-		"associated BSS is absent": func(c *fakeWiFiClient) { delete(c.bss, "wlp0s20f3") },
-	} {
-		t.Run(name, func(t *testing.T) {
-			client := associated()
-			setup(client)
-			assert.Nil(t, collectWiFiWith(client), "a failure omits the section rather than reporting zeros")
+// TestWiFiZeroValuesAreOmitted pins the presence contract where Task 17 reads it:
+// the three keys must be absent rather than zero, since that zero is the absence of
+// a reading, not a measurement.
+func TestWiFiZeroValuesAreOmitted(t *testing.T) {
+	t.Run("a complete payload carries all five keys", func(t *testing.T) {
+		b, err := json.Marshal(&WiFiStats{
+			SignalDbm: -42, TxMBit: 780, FreqMHz: 5180, Retry: 1146, Iface: "wlp0s20f3",
 		})
-	}
+		require.NoError(t, err)
+		assert.JSONEq(t,
+			`{"signal_dbm":-42,"tx_mbit":780,"freq_mhz":5180,"retry":1146,"iface":"wlp0s20f3"}`,
+			string(b))
+	})
+
+	t.Run("association without station statistics carries two", func(t *testing.T) {
+		b, err := json.Marshal(&WiFiStats{FreqMHz: 5180, Iface: "wlp0s20f3"})
+		require.NoError(t, err)
+		assert.JSONEq(t, `{"freq_mhz":5180,"iface":"wlp0s20f3"}`, string(b),
+			"iface and freq_mhz are the proof of association, so they survive")
+		assert.NotContains(t, string(b), `"signal_dbm":0`, "an unread RSSI must not reach the wire as a zero")
+		assert.NotContains(t, string(b), `"tx_mbit":0`, "an unread bitrate must not reach the wire as a zero")
+		assert.NotContains(t, string(b), `"retry":0`, "an unread counter must not reach the wire as a zero")
+	})
+
+	t.Run("a value of zero sends no key at all", func(t *testing.T) {
+		b, err := json.Marshal(&WiFiStats{})
+		require.NoError(t, err)
+		assert.JSONEq(t, `{}`, string(b),
+			"every field carries omitempty, as TestNvmeZeroValuesAreOmitted requires of NvmeStats")
+	})
 }
 
-func TestCollectWiFiRejectsImplausibleSignal(t *testing.T) {
-	for name, signal := range map[string]int{
-		"no reading at all":    0,
-		"positive, impossible": 40,
-		"below the floor":      -300,
-	} {
-		t.Run(name, func(t *testing.T) {
-			client := associated()
-			client.station["wlp0s20f3"] = &native.StationInfo{
-				Signal: signal, TransmitBitrate: 780_000_000, TransmitFailed: 1146,
-			}
-			got := collectWiFiWith(client)
-			require.NotNil(t, got)
-			assert.Zero(t, got.SignalDbm, "out-of-range RSSI is dropped, not published")
-			assert.Equal(t, 780.0, got.TxMBit, "the other fields survive")
-		})
-	}
-}
-
-// TestCollectWiFiDropsNegativeRetry guards the uint64 conversion. A malformed
-// reply must not wrap into a value near 1.8e19.
-func TestCollectWiFiDropsNegativeRetry(t *testing.T) {
-	client := associated()
-	client.station["wlp0s20f3"] = &native.StationInfo{
-		Signal: -42, TransmitBitrate: 780_000_000, TransmitFailed: -1,
-	}
-	got := collectWiFiWith(client)
-	require.NotNil(t, got)
-	assert.Zero(t, got.Retry)
-}
-
-// TestCollectWiFiSetsTheDeadline bounds the exchange against a literal rather
-// than against wifiTimeout, so raising the constant cannot raise the bar with it.
-func TestCollectWiFiSetsTheDeadline(t *testing.T) {
-	client := associated()
-	before := time.Now()
-	collectWiFiWith(client)
-	assert.True(t, client.deadline.After(before),
-		"the exchange must carry a deadline")
-	assert.True(t, client.deadline.Before(time.Now().Add(30*time.Second)),
-		"and it must be a short one: a wedged netlink query would otherwise stall "+
-			"the whole collection pass, got %v", client.deadline.Sub(before))
-	assert.True(t, client.deadline.After(time.Now().Add(-time.Minute)),
-		"and not already expired")
-}
-
-// TestCollectWiFiGatesOnCfg80211Devices proves the modprobe guard. Without it a
-// host with no radio would run modprobe on every poll.
-func TestCollectWiFiGatesOnCfg80211Devices(t *testing.T) {
-	empty := t.TempDir()
-	assert.Nil(t, collectWiFi(empty), "no registered device means no netlink query")
-	withRadio := t.TempDir()
-	wiphy := filepath.Join(withRadio, "class", "ieee80211")
-	require.NoError(t, os.MkdirAll(filepath.Join(wiphy, "phy0"), 0o755))
-	assert.True(t, hasWirelessDevice(wiphy))
-}
-
-// TestCollectWiFiSkipsABSSReportedAlongsideAnError covers the driver that
-// answers with usable data and an error at once. Ignoring the error would let a
-// stale or unassociated BSS through, so the error has to win.
-func TestCollectWiFiSkipsABSSReportedAlongsideAnError(t *testing.T) {
-	client := associated()
-	client.bssErrWithData = errors.New("netlink: interrupted")
-	assert.Nil(t, collectWiFiWith(client),
-		"a BSS that arrives with an error is not evidence of association")
-}
-
-// TestCollectWiFiQueriesTheAssociatedBSSID pins which MAC the station query is
-// addressed to: the BSSID of the BSS that reported itself associated.
-func TestCollectWiFiQueriesTheAssociatedBSSID(t *testing.T) {
-	client := associated()
-	collectWiFiWith(client)
-	require.Len(t, client.stationMAC, 1)
-	assert.Equal(t, testBSSID, client.stationMAC[0],
-		"GET_STATION must address the associated BSSID")
-}
-
-func TestHasWirelessDeviceIgnoresMissingDir(t *testing.T) {
-	assert.False(t, hasWirelessDevice(t.TempDir()+"/absent"))
-}
-
-func TestNL80211ClientImplementsWifiClient(t *testing.T) {
-	var _ wifiClient = (*nl80211Client)(nil)
-}
-
-// ---------------------------------------------------------------------------
 // /proc/net/wireless marker bytes -- characterisation, not production coverage.
-//
-// Task 7's first implementation read /proc/net/wireless and ran iw. Both are
-// gone: nl80211 supplies all four fields directly (wifi_netlink_linux.go), so no
-// procfs parse and no subprocess remain. The knowledge below is kept because it
-// is why that simplification was safe, and because the trap it describes is the
-// one a future reader re-enters first.
-//
-// The kernel prints each quality column as %3d followed by a marker byte that is
-// '.' only when the driver set the matching IW_QUAL_*_UPDATED bit, and ' ' when
-// it did not. Confirmed on this host with cat -A:
+// Task 7's first implementation read this file and ran iw; both are gone, and this
+// is why dropping them was safe. Each quality column is %3d plus a marker byte, '.'
+// for a set IW_QUAL_*_UPDATED bit and ' ' for a clear one, confirmed with cat -A:
 //
 //	wlp0s20f3: 0000   70.  -37.  -256        0      0      0   1187      4        0
 //	                        ^^  ^^  ^^^ space
 //
-// So link and level carry '.' here while noise carries a space, and that is a
-// per-driver, per-poll difference rather than a fixed layout. Requiring the dot
-// rejects drivers that leave the flags clear; forbidding it rejects the ones that
-// set them. A correct pattern therefore accepts both, which is (-?\d+)[. ]: inside
-// a character class a dot is a literal, and only a dot outside one is a wildcard.
-//
-// The two tests below pin the halves of that claim. What makes it worth pinning
-// is not the marker but the consequence, which TestWirelessQualityWildcardDot
-// measures rather than asserts by hand-waving.
+// Markers vary per driver and poll, so accept both: (-?\d+)[. ]. Not [\s.] (\s eats
+// the row separator), not an unescaped dot.
 
-// wirelessRow builds a data row whose three quality columns carry the given
-// markers, over the trailing counters of a real row from this host.
 func wirelessRow(link, level, noise string) string {
-	return "wlp0s20f3: 0000   " + link + "  " + level + "  " + noise +
+	return wirelessRowNamed("wlp0s20f3", link, level, noise)
+}
+
+func wirelessRowNamed(name, link, level, noise string) string {
+	return name + ": 0000   " + link + "  " + level + "  " + noise +
 		"        0      0      0   1187      4        0"
 }
 
-// wirelessQuality is the pattern these fixtures are about.
 const wirelessQuality = `(-?\d+)[. ]`
 
-// wirelessColumns returns every integer the pattern extracts, in order.
 func wirelessColumns(pat, row string) []int {
 	matches := regexp.MustCompile(pat).FindAllStringSubmatch(row, -1)
 	cols := make([]int, 0, len(matches))
@@ -381,11 +83,14 @@ func wirelessColumns(pat, row string) []int {
 	return cols
 }
 
-// wifiRetryIndex is where retry sits in the extracted run: status, three quality
-// columns, then nwid, crypt, frag, retry, misc. The fixture puts retry at 1187 and
-// its neighbour misc at 4, two orders of magnitude apart, so an off-by-one or an
-// off-by-three cannot land on it by luck.
+// wifiRetryIndex is where retry sits in the extracted run -- status, three quality
+// columns, then nwid, crypt, frag, retry, misc -- and the fixture puts 1187 there.
 const wifiRetryIndex = 7
+
+func wirelessMultiLine() string {
+	return wirelessRowNamed("wlp0s20f3", "70.", "-37.", "-256 ") + "\n" +
+		wirelessRowNamed("wlp1s20f3", "72.", "-41.", "-256 ")
+}
 
 func TestWirelessQualityAcceptsBothMarkerKinds(t *testing.T) {
 	for name, row := range map[string]string{
@@ -405,20 +110,28 @@ func TestWirelessQualityAcceptsBothMarkerKinds(t *testing.T) {
 	}
 }
 
+// TestWirelessQualityMultiLine separates [. ] from [\s.], which one row cannot: the
+// two agree there. \s matches the newline ending a row, so the variant latches
+// row one's trailing counter onto the next row and extracts a column the kernel
+// never printed. Later rows shift by one, and retry then reads nwid on 1187.
+func TestWirelessQualityMultiLine(t *testing.T) {
+	cols := wirelessColumns(wirelessQuality, wirelessMultiLine())
+	require.Len(t, cols, 18, "two rows of nine columns each")
+	assert.Equal(t, []int{0, 70, -37, -256, 0, 0, 0, 1187, 4}, cols[:9], "row one")
+	assert.Equal(t, []int{1187, 4}, cols[9+wifiRetryIndex:], "row two retry and misc stay put")
+
+	loose := wirelessColumns(`(-?\d+)[\s.]`, wirelessMultiLine())
+	assert.Len(t, loose, 19, "one invented column from the row separator")
+	assert.Equal(t, 1187, loose[9+wifiRetryIndex+1], "row two retry moves one position right")
+	assert.Equal(t, 0, loose[9+wifiRetryIndex],
+		"so the index the correct pattern reads 1187 at returns nwid instead: a plausible zero, "+
+			"on a link that has never stopped retrying, with nothing to notice it")
+}
+
 // TestWirelessQualityWildcardDot measures the mutation the pattern exists to
-// prevent, rather than asserting a hand-picked wrong value.
-//
-// Rewriting [. ] as an unescaped . does not truncate a long value -- the digit
-// run is greedy, so the group still takes every digit. What it does is match
-// inside the interface name: wlp0s20f3 yields three spurious columns (0, 20, 3)
-// before the real ones. Every positional index after that shifts by three, so a
-// reader asking for retry gets -256, the noise value, and never learns anything
-// went wrong. That is the silent wrong value this pattern is here to prevent.
-//
-// For the record, the other variant that cannot be caught is [-?\d+][\s.]: on
-// these fixtures it is functionally identical, because the kernel's only two
-// markers are a dot and a space. It is listed here so nobody re-tests it expecting
-// a failure.
+// prevent. An unescaped dot does not truncate a long value -- the digit run is
+// greedy -- but it matches inside the interface name, so wlp0s20f3 adds three
+// spurious columns and every index after them shifts.
 func TestWirelessQualityWildcardDot(t *testing.T) {
 	row := wirelessRow("70.", "-37.", "-256000.")
 
@@ -440,8 +153,7 @@ func TestWirelessQualityWildcardDot(t *testing.T) {
 			"on a healthy link is 0 -- indistinguishable from a legitimately zero retry, and "+
 			"nothing in the code reports a problem")
 
-	// A row whose frag is non-zero shows the shift landing on a wrong-but-plausible
-	// field instead of on zero.
+	// A non-zero frag shows the shift landing on a plausible wrong field.
 	varred := "wlp0s20f3: 0000   70.  -37.  -256000.    0      0      7   1187      4        0"
 	require.Equal(t, 1187, wirelessColumns(wirelessQuality, varred)[wifiRetryIndex])
 	assert.Equal(t, 7, wirelessColumns(`(-?\d+).`, varred)[wifiRetryIndex+2],

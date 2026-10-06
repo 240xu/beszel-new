@@ -18,18 +18,25 @@ package plus
 // none of them is expressible -- the rule is a literal comparison inside an
 // unconditional loop, not a lookup.
 //
-// Three independent checks, because one is easy to reason your way around:
+// Four independent checks, because one is easy to reason your way around:
 //
-//	compiledFiles      asks the go tool which files the build actually
-//	                   includes, so the scan cannot be narrowed by adding a
-//	                   file, renaming one, or gating one behind a build tag.
+//	compiledFiles      asks the go tool which files the build actually includes,
+//	                   so the scan cannot be narrowed by adding a file or
+//	                   renaming one. It reports the PRODUCTION build -- the
+//	                   subprocess carries no -tags, so no //go:build testing file,
+//	                   _test.go included, is in that list -- which is the right
+//	                   scope for a production invariant.
 //	TestPlusPackageIsForkFree     asserts on those files' import lists.
 //	TestPlusClosureCannotFork     asserts on the transitive import closure, which
-//	                   also covers a fork moved into a subdirectory.
-//	TestOnlyThisFileForksInTests  keeps the go tool invocation below from
-//	                   spreading to other test files.
-//	TestPlusIsALeafPackage       rules out a subdirectory, which neither of
-//	                   the two above can see.
+//	                   also covers a fork moved into an imported helper package.
+//	TestOnlyThisFileForksInTests  globs the directory rather than the build, so it
+//	                   is the one that sees a fork behind a build tag or in a
+//	                   _test.go file -- including the go tool call above.
+//	TestPlusIsALeafPackage       rules out a subdirectory, which none of the
+//	                   three above can see.
+//
+// Between them: a fork in any compiled file, behind any build tag, in any test
+// file, in any imported package, or at any depth below this directory.
 //
 // os/exec in a *_test.go file is out of scope for the production invariant --
 // running the test suite is not what ships -- so TestOnlyThisFileForksInTests
@@ -38,6 +45,7 @@ package plus
 import (
 	"go/parser"
 	"go/token"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -55,6 +63,10 @@ import (
 // previous version of this rule could be narrowed: skip a subdirectory, or skip
 // anything that does not end in .go, and the assertion quietly covers less while
 // still passing. Asking the go tool instead means the scan and the build agree.
+//
+// What it does not give is tag coverage: no -tags, so nothing behind
+// `//go:build testing` appears. That is not a hole -- a file the production build
+// skips cannot fork in production -- it is a limit on this function.
 func compiledFiles(t *testing.T) []string {
 	t.Helper()
 	out, err := exec.Command("go", "list", "-f", "{{range .GoFiles}}{{.}} {{end}}", ".").Output()
@@ -133,14 +145,14 @@ func TestOnlyThisFileForksInTests(t *testing.T) {
 		"only this file may run the go tool, and only for the two structural checks above")
 }
 
-// TestPlusIsALeafPackage closes the gap the two checks above share.
+// TestPlusIsALeafPackage closes the gap the other three share.
 //
-// Both of them look at agent/plus as a single directory: compiledFiles reads
-// .GoFiles, which the go tool reports for that directory only, and the closure
-// check is the layer that would otherwise catch a fork one level down. Mutation
-// testing showed the combination "put the fork in a subdirectory and disable the
-// closure check" defeats both, because a subdirectory's files appear in neither
-// the file list nor this package's own import list.
+// All of them look at agent/plus as a single directory: compiledFiles reads
+// .GoFiles, which the go tool reports for that directory only, the closure check
+// covers what is imported rather than what sits there, and the directory check
+// stops at the top level. A fork one or more levels down appears in none of them,
+// so mutation testing showed the combination "put the fork in a subdirectory and
+// disable the closure check" defeats everything.
 //
 // So the invariant is stated directly: this package has no subpackages. Every
 // collector belongs in this directory, which is also what keeps the rebase
@@ -154,11 +166,31 @@ func TestPlusIsALeafPackage(t *testing.T) {
 		if !e.IsDir() {
 			continue
 		}
-		if found, _ := filepath.Glob(filepath.Join(e.Name(), "*.go")); len(found) > 0 {
+		has, err := subdirHasGoFile(e.Name())
+		require.NoErrorf(t, err, "cannot inspect subdirectory %s", e.Name())
+		if has {
 			subdirs = append(subdirs, e.Name())
 		}
 	}
 	assert.Empty(t, subdirs,
 		"agent/plus must stay a leaf package: files in a subdirectory appear in neither "+
 			"TestPlusPackageIsForkFree nor TestPlusClosureCannotFork")
+}
+
+// subdirHasGoFile looks at any depth, not just the top of dir: a <dir>/*.go glob
+// is invisible to a directory holding only another directory, which is how
+// a/b/fork.go passed every check. Matching the extension at every depth also stops
+// the rule being narrowed by a build tag, the bypass compiledFiles invites.
+func subdirHasGoFile(dir string) (bool, error) {
+	found := false
+	err := filepath.WalkDir(dir, func(_ string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() && filepath.Ext(d.Name()) == ".go" {
+			found = true
+		}
+		return nil
+	})
+	return found, err
 }

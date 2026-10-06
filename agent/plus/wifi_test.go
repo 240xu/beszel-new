@@ -29,6 +29,12 @@ type fakeWiFiClient struct {
 	deadline  time.Time
 	closed    bool
 	bssAsked  []string
+	// bssErrWithData models a driver that answers with a usable BSS *and* an
+	// error, which is the case where ignoring the error would change the result.
+	bssErrWithData error
+	// stationMAC records what each Station call was asked for, so a test can
+	// prove the associated BSSID is the one queried.
+	stationMAC []net.HardwareAddr
 }
 
 func (f *fakeWiFiClient) Interfaces() ([]*native.Interface, error) {
@@ -40,10 +46,14 @@ func (f *fakeWiFiClient) BSS(ifi *native.Interface) (*native.BSS, error) {
 	if f.bssErr != nil {
 		return nil, f.bssErr
 	}
+	if bss := f.bss[ifi.Name]; bss != nil && f.bssErrWithData != nil {
+		return bss, f.bssErrWithData
+	}
 	return f.bss[ifi.Name], nil
 }
 
 func (f *fakeWiFiClient) Station(ifi *native.Interface, mac net.HardwareAddr) (*native.StationInfo, error) {
+	f.stationMAC = append(f.stationMAC, mac)
 	if f.stErr != nil {
 		return nil, f.stErr
 	}
@@ -267,14 +277,19 @@ func TestCollectWiFiDropsNegativeRetry(t *testing.T) {
 	assert.Zero(t, got.Retry)
 }
 
+// TestCollectWiFiSetsTheDeadline bounds the exchange against a literal rather
+// than against wifiTimeout, so raising the constant cannot raise the bar with it.
 func TestCollectWiFiSetsTheDeadline(t *testing.T) {
 	client := associated()
 	before := time.Now()
 	collectWiFiWith(client)
-	assert.False(t, client.deadline.Before(before.Add(wifiTimeout-time.Second)),
-		"the exchange must be bounded")
-	assert.False(t, client.deadline.After(time.Now().Add(wifiTimeout+time.Second)),
-		"and not outlive the budget")
+	assert.True(t, client.deadline.After(before),
+		"the exchange must carry a deadline")
+	assert.True(t, client.deadline.Before(time.Now().Add(30*time.Second)),
+		"and it must be a short one: a wedged netlink query would otherwise stall "+
+			"the whole collection pass, got %v", client.deadline.Sub(before))
+	assert.True(t, client.deadline.After(time.Now().Add(-time.Minute)),
+		"and not already expired")
 }
 
 // TestCollectWiFiGatesOnCfg80211Devices proves the modprobe guard. Without it a
@@ -286,6 +301,26 @@ func TestCollectWiFiGatesOnCfg80211Devices(t *testing.T) {
 	wiphy := filepath.Join(withRadio, "class", "ieee80211")
 	require.NoError(t, os.MkdirAll(filepath.Join(wiphy, "phy0"), 0o755))
 	assert.True(t, hasWirelessDevice(wiphy))
+}
+
+// TestCollectWiFiSkipsABSSReportedAlongsideAnError covers the driver that
+// answers with usable data and an error at once. Ignoring the error would let a
+// stale or unassociated BSS through, so the error has to win.
+func TestCollectWiFiSkipsABSSReportedAlongsideAnError(t *testing.T) {
+	client := associated()
+	client.bssErrWithData = errors.New("netlink: interrupted")
+	assert.Nil(t, collectWiFiWith(client),
+		"a BSS that arrives with an error is not evidence of association")
+}
+
+// TestCollectWiFiQueriesTheAssociatedBSSID pins which MAC the station query is
+// addressed to: the BSSID of the BSS that reported itself associated.
+func TestCollectWiFiQueriesTheAssociatedBSSID(t *testing.T) {
+	client := associated()
+	collectWiFiWith(client)
+	require.Len(t, client.stationMAC, 1)
+	assert.Equal(t, testBSSID, client.stationMAC[0],
+		"GET_STATION must address the associated BSSID")
 }
 
 func TestHasWirelessDeviceIgnoresMissingDir(t *testing.T) {

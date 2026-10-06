@@ -28,6 +28,8 @@ package plus
 //	                   also covers a fork moved into a subdirectory.
 //	TestOnlyThisFileForksInTests  keeps the go tool invocation below from
 //	                   spreading to other test files.
+//	TestPlusIsALeafPackage       rules out a subdirectory, which neither of
+//	                   the two above can see.
 //
 // os/exec in a *_test.go file is out of scope for the production invariant --
 // running the test suite is not what ships -- so TestOnlyThisFileForksInTests
@@ -129,4 +131,34 @@ func TestOnlyThisFileForksInTests(t *testing.T) {
 	}
 	assert.Equal(t, []string{"fork_policy_test.go"}, forking,
 		"only this file may run the go tool, and only for the two structural checks above")
+}
+
+// TestPlusIsALeafPackage closes the gap the two checks above share.
+//
+// Both of them look at agent/plus as a single directory: compiledFiles reads
+// .GoFiles, which the go tool reports for that directory only, and the closure
+// check is the layer that would otherwise catch a fork one level down. Mutation
+// testing showed the combination "put the fork in a subdirectory and disable the
+// closure check" defeats both, because a subdirectory's files appear in neither
+// the file list nor this package's own import list.
+//
+// So the invariant is stated directly: this package has no subpackages. Every
+// collector belongs in this directory, which is also what keeps the rebase
+// surface flat. A subdirectory is therefore a test failure rather than a place a
+// future collector could hide a fork.
+func TestPlusIsALeafPackage(t *testing.T) {
+	entries, err := os.ReadDir(".")
+	require.NoError(t, err)
+	var subdirs []string
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		if found, _ := filepath.Glob(filepath.Join(e.Name(), "*.go")); len(found) > 0 {
+			subdirs = append(subdirs, e.Name())
+		}
+	}
+	assert.Empty(t, subdirs,
+		"agent/plus must stay a leaf package: files in a subdirectory appear in neither "+
+			"TestPlusPackageIsForkFree nor TestPlusClosureCannotFork")
 }

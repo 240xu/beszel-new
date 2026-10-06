@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -150,8 +151,9 @@ func TestCollectFanStepsSkipsStateWithUnparsableBody(t *testing.T) {
 		1: "25:not-defined:3200:12500:1250",
 		2: "30:not-defined:3800",
 		3: "40:not-defined:5100:20000:2000",
+		4: "50:not-defined:6300:25000:2500:",
 	}))
-	require.Len(t, steps, 2)
+	require.Len(t, steps, 2, "a short row and a trailing-separator row must both be skipped")
 	assert.Equal(t, []int{25, 40}, percentsOf(steps))
 }
 
@@ -197,6 +199,23 @@ func TestParseFpsLineAcceptsTrailingNewline(t *testing.T) {
 	s, ok := parseFpsLine("25:not-defined:3200:12500:1250\n")
 	require.True(t, ok)
 	assert.Equal(t, 1250, s.PowerMw)
+}
+
+// TestParseFpsLineRejectsExtraFields covers the other half of the field-count
+// guard. Only the short direction was asserted at first, which left "at least five
+// fields" passing the whole suite: reading the first five of a longer row turns a
+// firmware that appended a column into a plausible-looking step rather than a skip.
+// The count is therefore exact in both directions.
+func TestParseFpsLineRejectsExtraFields(t *testing.T) {
+	for _, line := range []string{
+		"25:not-defined:3200:12500:1250:",
+		"25:not-defined:3200:12500:1250:extra",
+		"25:not-defined:3200:12500:1250:0:0:0:0",
+	} {
+		_, ok := parseFpsLine(line)
+		assert.Falsef(t, ok, "a %d-field line must be skipped, not truncated: %q",
+			len(strings.Split(line, ":")), line)
+	}
 }
 
 // TestParseFpsLineKeepsEachColumnInItsOwnField pins the column mapping with four

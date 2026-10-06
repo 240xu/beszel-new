@@ -166,6 +166,19 @@ type FanStats struct {
 	TempC      float64 `json:"temp_c,omitempty"`
 }
 
+// FanSpeedStep is one row of the firmware's own _FPS duty curve, read straight from
+// sysfs rather than inferred from the EC duty byte. RPMEst is the nominal speed the
+// firmware claims for that duty, never a tach reading: a real one lives in fan_speed_rpm,
+// from the optional _FST object, which reads 0xFFFFFFFF when the platform has no sensor.
+// So unlike FanStats, this struct carries no rpm_est_is_estimate marker. That flag exists
+// because FanStats.rpm_est is omitempty, so a consumer must be able to tell an absent
+// reading from a labelled one; rpm_est here is always present, always non-zero unless the
+// firmware says so, and always named for what it is, so a constant-true flag would carry
+// no information a consumer could branch on. NoiseMdb and PowerMw are nominal multiples
+// of Percent (see parseFpsLine), not acoustic or electrical measurements.
+//
+// Percent is not guaranteed unique: _FPS has an independent trip_point_index column, so
+// two states may share a duty. UI must key rows by index, never by percent alone.
 type FanSpeedStep struct {
 	Percent  int    `json:"percent"`
 	RPMEst   uint16 `json:"rpm_est"`

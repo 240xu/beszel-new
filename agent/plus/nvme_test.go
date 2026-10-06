@@ -15,17 +15,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// nvmeAttrsFixture mirrors what upstream's parseSmartForNvme produces for the
-// live drive on this NAS, read out of `sudo smartctl -a -j /dev/nvme0` during the
-// task: 19 fields in the log become 17 named attributes, and these are the ten
+// nvmeAttrsFixture mirrors what upstream's parseSmartForNvme produces for a real
+// drive, read out of `sudo smartctl -a -j /dev/nvme0` during the task. The log
+// carries 18 fields, of which upstream maps the 17 scalars into named attributes
+// — the 18th is a slice SmartAttribute cannot hold — and these are the ten
 // Beszelplus projects.
 //
-// The values are deliberately NOT the ones the plan's fixture used. A field
+// The values are deliberately not the ones the plan's fixture used. A field
 // mapping can only be caught if the source values are distinguishable, and the
-// plan's fixture set data_units_read=1878358 against power_on_hours=169 and
-// unsafe_shutdowns=18 -- different magnitudes, so a swap is visible, but
-// percentage_used=0 and media_errors=0 and critical_comp_time=0 are all zero,
-// which means any test built on it cannot tell those three apart at all.
+// plan's fixture gave percentage_used, media_errors and critical_comp_time all
+// the same value, so a test built on it cannot tell those three apart at all.
+// Every value here is distinct instead. They are a captured snapshot, not live
+// readings: the drive's own counters only ever move upwards, so no comment in
+// this file may quote a counter value as if it were a fact about the machine.
 func nvmeAttrsFixture() map[string]uint64 {
 	return map[string]uint64{
 		"CriticalWarning":         0,
@@ -252,12 +254,14 @@ func TestCollectWiresNvmeThroughCollect(t *testing.T) {
 	})
 }
 
-// TestCollectNvmeIgnoresUpstreamTempSensors is a guard on a decision rather than
-// on code: upstream's NVMe parse drops the log's temperature_sensors array
-// (agent/smart.go maps 17 scalar fields and has no place to put a slice), so a
-// second sensor temperature is not reachable from SmartData at all. If a future
-// upstream revision starts carrying it, this test is where the new field should
-// be added -- it asserts the current, deliberate absence.
+// TestCollectNvmeIgnoresUpstreamTempSensors guards a decision, not code. Upstream
+// cannot carry the log's temperature_sensors array into SmartData — agent/smart.go
+// maps the log's 17 scalar fields and SmartAttribute has nowhere to put a slice —
+// and it does not need to, because the second sensor already reaches the hub as
+// the system temperature nvme_sensor_2. A copy inside the NVMe block would be the
+// same number twice, so the field stays deliberately absent. If a future upstream
+// revision does start carrying the array, this test is where the new field
+// belongs.
 func TestCollectNvmeIgnoresUpstreamTempSensors(t *testing.T) {
 	got := collectNvme(nvmeInputFixture())
 	require.NotNil(t, got)
@@ -265,7 +269,7 @@ func TestCollectNvmeIgnoresUpstreamTempSensors(t *testing.T) {
 	b, err := json.Marshal(got)
 	require.NoError(t, err)
 	assert.NotContains(t, string(b), "sensor2",
-		"temp_sensor2_c cannot be sourced from upstream; see NvmeStats' doc")
+		"temp_sensor2_c would only duplicate upstream's nvme_sensor_2; see NvmeStats' doc")
 }
 
 // TestNvmeInputMarshalsForTheDevHarness keeps NvmeInput a plain wire type.

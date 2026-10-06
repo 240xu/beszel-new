@@ -81,9 +81,9 @@ type NetIfaceStats struct {
 // became percentage_used_pct and available_spare_pct (both are percentages, and
 // the bare names read as ratios), and critical_comp_temp_min became
 // critical_comp_time_min because the NVMe attribute is a duration in minutes, not
-// a temperature. temp_sensor2_c is gone: upstream does not carry the log's
-// temperature_sensors array into SmartData at all, so the field could only ever
-// have been a hardcoded zero on the wire.
+// a temperature. temp_sensor2_c is gone because upstream already carries that
+// reading: the second sensor reaches the hub as its own system temperature
+// Temperatures["nvme_sensor_2"], so a copy here would be the same number twice.
 //
 // Every field carries omitempty, but collectNvme is all-or-nothing, so the two
 // levels still mean different things and the payload stays unambiguous. If the
@@ -148,13 +148,13 @@ type Stats struct {
 // sourcePath resolves a collector's production absolute path against root.
 //
 // Most inputs live under sysfs, so their collectors join a relative subpath
-// onto root. These do not: the WiFi radio table is procfs, the NVMe device node
-// is /dev and the fan database is /var. Their production location is absolute,
-// so root serves only as an injection point for tests — any non-production root
-// re-roots the path under a fixture tree, and returns it verbatim for the
-// production root or an empty root. The production case has to be tested first
-// because filepath.Join would otherwise turn /proc/net/wireless into
-// /sys/proc/net/wireless under ProdRoot.
+// onto root. These do not: the WiFi radio table is procfs and the fan database
+// is /var. Their production location is absolute, so root serves only as an
+// injection point for tests — any non-production root re-roots the path under a
+// fixture tree, and returns it verbatim for the production root or an empty
+// root. The production case has to be tested first because filepath.Join would
+// otherwise turn /proc/net/wireless into /sys/proc/net/wireless under ProdRoot.
+// collectNvme is absent because it has no path of its own to resolve at all.
 func sourcePath(root, prodPath string) string {
 	if root == "" || root == ProdRoot {
 		return prodPath

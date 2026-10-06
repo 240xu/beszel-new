@@ -16,5 +16,6 @@ package plus
 // list because it reads neither: it is handed upstream's parsed SMART data, so it
 // has no path of its own (see nvme.go).
 
+func collectWiFi(root string) *WiFiStats         { return nil }
 func collectFan(root string) *FanStats           { return nil }
 func collectFanSteps(root string) []FanSpeedStep { return nil }

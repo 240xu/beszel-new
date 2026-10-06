@@ -162,7 +162,10 @@ func TestCollectFanStepsSkipsStateWithUnparsableBody(t *testing.T) {
 func TestCollectFanStepsIgnoresNonNumericStateFiles(t *testing.T) {
 	root := writeFanFixture(t, map[int]string{1: "25:not-defined:3200:12500:1250"})
 	dir := filepath.Join(root, "bus", "acpi", "devices", "INT3404:00")
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "state_default"), []byte("not-a-table\n"), 0o644))
+	// The body is a well-formed row on purpose. A name with no number is only
+	// detectable by its name; if the collector filtered it downstream instead --
+	// or not at all -- a parseable body is the only thing that exposes the miss.
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "state_default"), []byte("50:not-defined:9999:7:7\n"), 0o644))
 	assert.Equal(t, []int{25}, percentsOf(collectFanSteps(root)))
 }
 
@@ -183,6 +186,17 @@ func TestCollectFanStepsIgnoresOtherFanInstances(t *testing.T) {
 	steps := collectFanSteps(root)
 	require.Len(t, steps, 11, "a second instance's rows must not be appended to the first's")
 	assert.Equal(t, uint16(3200), steps[0].RPMEst, "row 1 belongs to INT3404:00, not :01")
+}
+
+// TestParseFpsLineAcceptsTrailingNewline pins the trimming at the parse boundary
+// rather than only where the collector happens to read the file. The kernel's
+// state files end in "\n" (od -c confirms it), so parseFpsLine has to tolerate an
+// untrimmed line itself: the collector currently strips it first, and a caller that
+// ever stops doing so would otherwise lose every row to a silent parse failure.
+func TestParseFpsLineAcceptsTrailingNewline(t *testing.T) {
+	s, ok := parseFpsLine("25:not-defined:3200:12500:1250\n")
+	require.True(t, ok)
+	assert.Equal(t, 1250, s.PowerMw)
 }
 
 // TestParseFpsLineKeepsEachColumnInItsOwnField pins the column mapping with four

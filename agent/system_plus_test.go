@@ -58,9 +58,15 @@ func TestUpdatePlusStatsGatesOnDefaultIntervalAndBackfillsCache(t *testing.T) {
 
 // TestInfoPlusSurvivesCborRoundTrip guards the Info cache slot on the wire: key
 // 28 has to decode back, and must not be swallowed by another field's key.
+// fanIntPtr builds the *int FanStats uses to keep a real 0 distinct from an
+// unknown duty.
+func fanIntPtr(v int) *int { return &v }
+
 func TestInfoPlusSurvivesCborRoundTrip(t *testing.T) {
 	original := system.Info{
-		Plus: &plus.Stats{Fan: &plus.FanStats{EC76Pct: 61, RPMEst: 2450, RPMEstFlag: true}},
+		Plus: &plus.Stats{Fan: &plus.FanStats{
+			EC76Pct: fanIntPtr(61), RPMEst: 2450, RPMEstFlag: true, SampleTsS: 1791333981,
+		}},
 	}
 	b, err := cbor.Marshal(original)
 	require.NoError(t, err)
@@ -69,9 +75,26 @@ func TestInfoPlusSurvivesCborRoundTrip(t *testing.T) {
 	require.NoError(t, cbor.Unmarshal(b, &decoded))
 	require.NotNil(t, decoded.Plus)
 	require.NotNil(t, decoded.Plus.Fan)
-	assert.Equal(t, 61, decoded.Plus.Fan.EC76Pct)
+	// EC76Pct is a pointer so a real 0 duty stays distinct from an unknown one, and
+	// that distinction has to survive the cache encoding as well as the JSON wire --
+	// a cbor round trip that flattened the pointer would turn "duty 61" back into a
+	// value no consumer could tell from "duty not recorded".
+	require.NotNil(t, decoded.Plus.Fan.EC76Pct, "the duty pointer must survive cbor")
+	assert.Equal(t, 61, *decoded.Plus.Fan.EC76Pct)
 	assert.Equal(t, uint16(2450), decoded.Plus.Fan.RPMEst)
 	assert.True(t, decoded.Plus.Fan.RPMEstFlag)
+	assert.Equal(t, int64(1791333981), decoded.Plus.Fan.SampleTsS)
+
+	// And a nil pointer must round trip as nil rather than as a pointer to 0.
+	b, err = cbor.Marshal(system.Info{
+		Plus: &plus.Stats{Fan: &plus.FanStats{EC76Pct: nil, RPMEstFlag: true}},
+	})
+	require.NoError(t, err)
+	var unknown system.Info
+	require.NoError(t, cbor.Unmarshal(b, &unknown))
+	require.NotNil(t, unknown.Plus)
+	require.NotNil(t, unknown.Plus.Fan)
+	assert.Nil(t, unknown.Plus.Fan.EC76Pct, "an unknown duty must not decode as 0")
 }
 
 // ---------------------------------------------------------------------------
@@ -251,7 +274,7 @@ func TestNvmePlusInputFeedsDistinctValuePerProjectedField(t *testing.T) {
 	in := nvmePlusInput(nvmeManagerFixture(nvmeSyntheticAttrs()))
 	require.NotNil(t, in)
 
-	stats, err := plus.Collect(t.TempDir(), in)
+	stats, err := plus.Collect(t.TempDir(), in, nil)
 	require.NoError(t, err)
 	require.NotNil(t, stats.Nvme, "the nvme section must survive the projection")
 
@@ -383,7 +406,7 @@ func TestNvmePlusInputKeepsLegitimateZeroAttributes(t *testing.T) {
 		assert.Zero(t, got, "%s must carry its zero through", name)
 	}
 
-	stats, err := plus.Collect(t.TempDir(), in)
+	stats, err := plus.Collect(t.TempDir(), in, nil)
 	require.NoError(t, err)
 	require.NotNil(t, stats.Nvme, "a healthy drive reading zero must still get the section")
 	assert.Zero(t, stats.Nvme.MediaErrors)

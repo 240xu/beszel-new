@@ -13,13 +13,13 @@ import (
 )
 
 func TestCollectReturnsNonNilWithEmptyRoot(t *testing.T) {
-	s, err := Collect(t.TempDir(), nil)
+	s, err := Collect(t.TempDir(), nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, s)
 }
 
 func TestCollectOmitsEmptySections(t *testing.T) {
-	s, err := Collect(t.TempDir(), nil)
+	s, err := Collect(t.TempDir(), nil, nil)
 	require.NoError(t, err)
 	assert.Nil(t, s.DPTF)
 	assert.Nil(t, s.Cpufreq)
@@ -31,8 +31,11 @@ func TestCollectOmitsEmptySections(t *testing.T) {
 }
 
 // prodSources are the collector inputs that live outside sysfs, so no relative
-// join onto the root can reach them.
-var prodSources = []string{"/proc/net/wireless", "/var/lib/pfanel/pfanel.db"}
+// join onto the root can reach them. pfanel's history database used to be listed
+// here and was removed in Task 9: package agent/pfanel opens it now, because the
+// sqlite driver reaches os/exec through modernc.org/libc and this package's fork
+// policy forbids that. See FanSample's doc comment.
+var prodSources = []string{"/proc/net/wireless"}
 
 // sysfsSubpaths are the sysfs-relative locations the other four collectors glob.
 var sysfsSubpaths = []string{
@@ -67,7 +70,9 @@ func TestSourcePathInjectsFixtureRoot(t *testing.T) {
 
 // TestCollectAcceptsFixtureTreeWithEveryCollectorSource builds the whole input
 // layout Collect hands down and checks every source resolves inside it, so the
-// wiring can be exercised without touching the real filesystem.
+// wiring can be exercised without touching the real filesystem. pfanel's database
+// is not among them any more: it is read by package agent/pfanel and handed in as a
+// FanSample, so an empty file at that path proves nothing here.
 func TestCollectAcceptsFixtureTreeWithEveryCollectorSource(t *testing.T) {
 	root := t.TempDir()
 
@@ -85,7 +90,7 @@ func TestCollectAcceptsFixtureTreeWithEveryCollectorSource(t *testing.T) {
 
 	// Collect must walk the fixture tree without error, and while the
 	// collectors are still stubs it must report every section as absent.
-	s, err := Collect(root, nil)
+	s, err := Collect(root, nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, s)
 	assert.Nil(t, s.WiFi)
@@ -116,7 +121,7 @@ func populatedStats() Stats {
 			TempC: 41.5,
 		},
 		WiFi:     &WiFiStats{SignalDbm: -53, TxMBit: 780, FreqMHz: 5180, Retry: 4, Iface: "wlp0s20f3"},
-		Fan:      &FanStats{SetLevelPct: 55, EC76Pct: 60, RPMEst: 2400, RPMEstFlag: true, TempC: 44},
+		Fan:      &FanStats{SetLevelPct: intPtr(55), EC76Pct: intPtr(60), RPMEst: 2400, RPMEstFlag: true, Gov: "curve", SampleTsS: 1791333981, TempC: 44},
 		FanSteps: []FanSpeedStep{{Percent: 0, RPMEst: 0, NoiseMdb: 20, PowerMw: 3}, {Percent: 100, RPMEst: 5200, NoiseMdb: 45, PowerMw: 11}},
 	}
 }
@@ -139,6 +144,9 @@ var unitTags = []string{
 	"signal_dbm", "tx_mbit", "retry",
 	// fan
 	"set_level_pct", "ec76_pct", "rpm_est", "rpm_est_is_estimate", "temp_c",
+	// fan -- gov is a mode name rather than a quantity, so only sample_ts_s is
+	// listed here; its _s suffix is what tells a consumer the unit is seconds.
+	"sample_ts_s",
 	// fan steps
 	"percent", "rpm_est", "noise_mdb", "power_mw",
 }
@@ -154,6 +162,10 @@ func TestStatsUseUnitSuffixes(t *testing.T) {
 		assert.Contains(t, str, `"`+want+`"`, "unit tag %q missing from the marshalled payload", want)
 	}
 }
+
+// intPtr builds the *int fields FanStats uses to keep a real 0 distinct from an
+// unknown, which is the whole reason those two fields are pointers.
+func intPtr(v int) *int { return &v }
 
 // ambiguousTags are names the unit contract rejects: bare physical units and
 // the megabit/megabyte-ambiguous "_mbps".

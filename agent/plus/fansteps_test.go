@@ -268,7 +268,7 @@ func TestCollectFanStepsDropsSentinelSpeed(t *testing.T) {
 // so a collector that reads the right files but is never wired into the payload
 // fails here rather than in a live run.
 func TestCollectExposesFanStepsThroughCollect(t *testing.T) {
-	s, err := Collect(writeFanFixture(t, realFanStates), nil)
+	s, err := Collect(writeFanFixture(t, realFanStates), nil, nil)
 	require.NoError(t, err)
 	require.Len(t, s.FanSteps, 11)
 	assert.Equal(t, 25, s.FanSteps[0].Percent)

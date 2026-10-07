@@ -153,17 +153,66 @@ type WiFiStats struct {
 	Iface string `json:"iface,omitempty"`
 }
 
+// FanStats is the newest row of pfanel's own history database: the programmed fan
+// level, the live EC duty byte, pfanel's speed estimate and the control mode it was
+// running under, as of SampleTsS.
+//
+// NULL IS NOT ZERO. level and ec76 are pointers because both columns have real 0
+// values on this host -- 226 rows at level 0, 77 at ec76 0 -- alongside NULLs, 70
+// and 63 respectively. A plain int plus omitempty renders "no level recorded" and
+// "level set to 0" as the same absent key, which is exactly the confusion the wire
+// contract elsewhere in this package forbids. omitempty drops a nil pointer but
+// still emits a non-nil pointer to 0, so all three states stay distinguishable:
+//
+//	absent key        the column was NULL -- unknown, never substitute a number
+//	"set_level_pct":0 pfanel recorded a real 0
+//	"set_level_pct":N pfanel recorded N
+//
+// RPMEst is an ESTIMATE, never a tachometer reading. This platform has no fan speed
+// sensor: fan_speed_rpm reads 0xFFFFFFFF and OSDL returns a constant placeholder.
+// The flag is emitted on every sample precisely because rpm_est is omitempty, so a
+// present value can be recognised as an estimate and a UI can label it; 0 means "no
+// estimate available", not "the fan is stopped", which no reading can establish.
+//
+// RPMEst has two possible sources with different scales, which is a known
+// limitation rather than a settled design. Normally it is pfanel's own stored rpm,
+// which on the live database is a pure function of the duty byte -- 50 distinct
+// duties map to exactly 50 distinct (duty, rpm) pairs -- so it is a table lookup
+// carrying no information beyond ec76. When a row stored no rpm it is instead
+// interpolated from ec76 through the 11-step firmware _FPS table in
+// FanSpeedStep.RPMEst. The two scales do not agree (the live table holds 49 distinct
+// rpm values against _FPS's 11), so a consumer may see rpm_est jump scale at the
+// moment the fallback starts. Reporting pfanel's value first is the lesser evil: it
+// keeps the reading consistent with the row it came from, and hiding the change
+// would be worse than showing it.
+//
+// Gov is pfanel's control mode passed through verbatim: curve, free, s0i3, quiet,
+// manual, or absent when the row recorded none. It is deliberately NOT validated
+// against an enum, because the column belongs to another program that can add a
+// value, and dropping an unrecognised mode would be worse than forwarding it.
+//
+// SampleTsS is the row's ts in Unix SECONDS, not milliseconds, and carries no
+// omitempty because it is always read alongside the rest of the row. It is exposed so
+// a consumer can judge staleness itself rather than trusting a sample that pfanel
+// wrote long ago; pfanel samples roughly every 12 seconds.
 type FanStats struct {
-	// SetLevelPct is the programmed level (0 = firmware curve).
-	SetLevelPct int `json:"set_level_pct,omitempty"`
-	// EC76Pct is the live duty byte from EC 0x76. It tracks load and may exceed
-	// SetLevelPct because the firmware curve overrides the programmed floor.
-	EC76Pct int `json:"ec76_pct,omitempty"`
-	// RPMEst is interpolated from EC76Pct via _FPS. NOT a tach reading.
+	// SetLevelPct is pfanel's programmed level. Nil when the row recorded none.
+	SetLevelPct *int `json:"set_level_pct,omitempty"`
+	// EC76Pct is the live duty byte. It tracks load and may exceed SetLevelPct
+	// because the firmware curve overrides the programmed floor. Nil when unknown;
+	// 0 is a real duty. Same pointer contract as SetLevelPct.
+	EC76Pct *int `json:"ec76_pct,omitempty"`
+	// RPMEst is pfanel's own estimate, or a _FPS interpolation when the row stored
+	// none. NOT a tach reading; see the type comment.
 	RPMEst uint16 `json:"rpm_est,omitempty"`
 	// RPMEstFlag is always true so consumers can assert the value is labelled.
-	RPMEstFlag bool    `json:"rpm_est_is_estimate"`
-	TempC      float64 `json:"temp_c,omitempty"`
+	RPMEstFlag bool `json:"rpm_est_is_estimate"`
+	// Gov is pfanel's control mode, verbatim. See the type comment for the values.
+	Gov string `json:"gov,omitempty"`
+	// SampleTsS is the row's timestamp in Unix seconds, so a consumer can check how
+	// stale the reading is. No omitempty: it is read with every row.
+	SampleTsS int64   `json:"sample_ts_s"`
+	TempC     float64 `json:"temp_c,omitempty"`
 }
 
 // FanSpeedStep is one row of the firmware's own _FPS duty curve, read straight from
@@ -221,10 +270,13 @@ func sourcePath(root, prodPath string) string {
 // resolve it through sourcePath instead.
 //
 // nvme is upstream's already-parsed SMART data, or nil when none has been
-// collected. It is a parameter rather than something this package reads because
-// upstream owns the smartctl invocation: pass nil and the NVMe section is simply
-// absent, which is also what every fixture test does.
-func Collect(root string, nvme *NvmeInput) (*Stats, error) {
+// collected, and fan is pfanel's newest history row or nil. Both are parameters
+// rather than something this package reads, and for the same reason twice over:
+// upstream owns the smartctl invocation, and the only sqlite driver in the build
+// graph reaches os/exec through modernc.org/libc, which this package's fork policy
+// forbids. Pass nil and the section is simply absent, which is also what every
+// fixture test does.
+func Collect(root string, nvme *NvmeInput, fan *FanSample) (*Stats, error) {
 	s := &Stats{}
 	if d := collectDPTF(root); len(d) > 0 {
 		s.DPTF = &DPTFStats{Zones: d}
@@ -241,7 +293,7 @@ func Collect(root string, nvme *NvmeInput) (*Stats, error) {
 	if w := collectWiFi(root); w != nil {
 		s.WiFi = w
 	}
-	if f := collectFan(root); f != nil {
+	if f := collectFan(root, fan); f != nil {
 		s.Fan = f
 	}
 	if st := collectFanSteps(root); len(st) > 0 {

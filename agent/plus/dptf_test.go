@@ -154,7 +154,7 @@ func TestCollectReadsDPTFThroughCollect(t *testing.T) {
 	writeFile(t, filepath.Join(zonePath(root, "thermal_zone9"), "type"), "x86_pkg_temp\n")
 	writeFile(t, filepath.Join(zonePath(root, "thermal_zone9"), "temp"), "46000\n")
 
-	s, err := Collect(root, nil)
+	s, err := Collect(root, nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, s.DPTF)
 	assert.Equal(t, map[string]float64{"x86_pkg_temp": 46.0}, s.DPTF.Zones)

@@ -9,10 +9,15 @@ package plus
 //	collectNetAll    <root>/class/net/<if>/statistics/*
 //	collectFanSteps  <root>/bus/acpi/devices/INT3404:00/state*
 //	collectWiFi      sourcePath(root, "/sys/class/ieee80211") -- gate only
-//	collectFan       sourcePath(root, "/var/lib/pfanel/pfanel.db")
 //
-// The last two sit outside the paths their siblings join, so they go through
-// sourcePath rather than a plain join; the first three are sysfs-relative.
+// collectWiFi sits outside the paths its siblings join, so it goes through sourcePath
+// rather than a plain join; the first three are sysfs-relative.
+//
+// collectFan is no longer in this list because it no longer reads a file. pfanel's
+// history database is opened by package agent/pfanel and arrives as a FanSample,
+// because the only sqlite driver in this build graph reaches os/exec through
+// modernc.org/libc, which the fork policy test forbids in this package's closure.
+// See FanSample's doc comment for the full reasoning.
 // collectNvme is gone from this list because it reads neither: it is handed
 // upstream's parsed SMART data, so it has no path of its own (see nvme.go).
 //
@@ -21,5 +26,3 @@ package plus
 // every other platform in wifi_netlink_stub.go, so that package agent/plus can
 // hold build-tagged files without leaking a netlink dependency to platforms that
 // cannot compile it.
-
-func collectFan(root string) *FanStats { return nil }

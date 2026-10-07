@@ -195,14 +195,14 @@ func TestNvmeZeroValuesAreOmitted(t *testing.T) {
 // directly, so nothing else would notice Collect dropping the argument.
 func TestCollectWiresNvmeThroughCollect(t *testing.T) {
 	t.Run("injected", func(t *testing.T) {
-		s, err := Collect(t.TempDir(), nvmeInputFixture())
+		s, err := Collect(t.TempDir(), nvmeInputFixture(), nil)
 		require.NoError(t, err)
 		require.NotNil(t, s.Nvme, "nvme must survive the Collect wiring")
 		assert.Equal(t, uint64(19), s.Nvme.UnsafeShutdowns)
 	})
 
 	t.Run("nil upstream data", func(t *testing.T) {
-		s, err := Collect(t.TempDir(), nil)
+		s, err := Collect(t.TempDir(), nil, nil)
 		require.NoError(t, err)
 		assert.Nil(t, s.Nvme)
 

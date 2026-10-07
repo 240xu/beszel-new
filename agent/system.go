@@ -14,6 +14,7 @@ import (
 	"github.com/henrygd/beszel"
 	"github.com/henrygd/beszel/agent/battery"
 	"github.com/henrygd/beszel/agent/btrfs"
+	"github.com/henrygd/beszel/agent/pfanel"
 	"github.com/henrygd/beszel/agent/plus"
 	"github.com/henrygd/beszel/agent/utils"
 	"github.com/henrygd/beszel/agent/wifi"
@@ -310,7 +311,9 @@ func (a *Agent) getSystemStats(cacheTimeMs uint16) system.Stats {
 // drop plus from every gated-out record.
 func (a *Agent) updatePlusStats(cacheTimeMs uint16, systemStats *system.Stats) {
 	if cacheTimeMs == defaultDataCacheTimeMs {
-		if plusStats, err := plus.Collect(plus.ProdRoot, nvmePlusInput(a.smartManager)); err == nil {
+		if plusStats, err := plus.Collect(
+			plus.ProdRoot, nvmePlusInput(a.smartManager), fanPlusInput(),
+		); err == nil {
 			a.systemInfo.Plus = plusStats
 		} else {
 			slog.Error("Error collecting plus metrics", "err", err)
@@ -324,6 +327,32 @@ func (a *Agent) updatePlusStats(cacheTimeMs uint16, systemStats *system.Stats) {
 // mdraid entries that share the same map; the authoritative check is still
 // collectNvme's, which rejects anything lacking the NVMe health-log attributes.
 const nvmeDiskType = "nvme"
+
+// fanPlusInput reads pfanel's newest history row for agent/plus to convert.
+//
+// The database is opened by package agent/pfanel rather than by agent/plus itself:
+// the only sqlite driver in the build graph reaches os/exec through modernc.org/libc,
+// and agent/plus' fork policy test forbids os/exec anywhere in that package's import
+// closure. This function is the injection point, the same shape nvmePlusInput is for
+// SMART data.
+//
+// A machine without pfanel installed returns nil, and the fan section is then simply
+// absent. Anything else -- a locked database, a corrupt file, a schema that lost a
+// column -- is logged at debug rather than error, because none of them is a fault of
+// the agent and none should spam the log once per collection interval. ErrNoRow is
+// not even logged: an empty samples table is a normal state for a fresh install.
+func fanPlusInput() *plus.FanSample {
+	sample, err := pfanel.LatestSample(pfanel.DBPath)
+	switch {
+	case err == nil:
+		return sample
+	case errors.Is(err, pfanel.ErrNoRow):
+		return nil
+	default:
+		slog.Debug("pfanel history unavailable", "err", err)
+		return nil
+	}
+}
 
 // nvmePlusInput adapts upstream's parsed SMART data into the shape agent/plus
 // accepts.

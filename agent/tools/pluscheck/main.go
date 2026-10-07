@@ -11,12 +11,14 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
 
+	"github.com/henrygd/beszel/agent/pfanel"
 	"github.com/henrygd/beszel/agent/plus"
 )
 
@@ -64,6 +66,11 @@ func sectionsFor(s *plus.Stats) []section {
 			print: func() { printWiFi(s.WiFi) },
 		},
 		{
+			name:  "fan",
+			has:   func() bool { return s.Fan != nil },
+			print: func() { printFan(s.Fan) },
+		},
+		{
 			name:  "fan_steps",
 			has:   func() bool { return len(s.FanSteps) > 0 },
 			print: func() { printFanSteps(s.FanSteps) },
@@ -97,7 +104,20 @@ func main() {
 		}
 	}
 
-	stats, err := plus.Collect(*root, nvme)
+	// Unlike nvme, the fan sample is read here rather than injected. The reason nvme
+	// has to be injected is that agent/plus may not import agent; the reason this one
+	// can be read here is the other half of that arrangement -- agent/plus may not
+	// import the sqlite driver either, because it reaches os/exec through
+	// modernc.org/libc. Package agent/pfanel owns the read and sits outside that
+	// closure, so this harness may call it directly.
+	fanPath := flag.String("fan-db", pfanel.DBPath,
+		"pfanel history database to read the newest sample from; empty means none")
+	fanSample, err := pfanel.LatestSample(*fanPath)
+	if err != nil && !errors.Is(err, pfanel.ErrNoRow) {
+		fmt.Fprintf(os.Stderr, "pluscheck: fan sample: %v\n", err)
+	}
+
+	stats, err := plus.Collect(*root, nvme, fanSample)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "pluscheck: collect failed: %v\n", err)
 		os.Exit(1)
@@ -282,6 +302,58 @@ func mhzStr(v int) string {
 		return "unknown"
 	}
 	return fmt.Sprintf("%d", v)
+}
+
+// printFan prints pfanel's newest history row.
+//
+// The two duty fields print through levelStr rather than a bare number, because
+// pfanel stores NULL in both and the live table also holds real 0 values in both --
+// 70 NULL levels against 226 rows at level 0, 63 NULL duties against 77 at duty 0.
+// Printing either as a plain number would make "not recorded" and "set to zero" the
+// same output, which is the confusion the pointer fields exist to prevent.
+//
+// The rpm line carries the label "ESTIMATE, not a tachometer reading" in full rather
+// than relying on the field name. This host has no fan speed sensor -- fan_speed_rpm
+// reads 0xFFFFFFFF -- and pfanel's stored rpm is a pure function of the duty byte:
+// 50 distinct duties give exactly 50 distinct (duty, rpm) pairs, so the column is a
+// table lookup carrying no information beyond ec76. A live run is the last place
+// someone is likely to read that, so it is spelled out here.
+func printFan(f *plus.FanStats) {
+	fmt.Printf("  set_level_pct=%s  ec76_pct=%s  gov=%s\n",
+		levelStr(f.SetLevelPct), levelStr(f.EC76Pct), govStr(f.Gov))
+	fmt.Printf("  rpm_est=%d -- %s\n", f.RPMEst, estimateLabel(f.RPMEst))
+	fmt.Printf("  temp_c=%s  sample_ts_s=%d\n", celsiusStr(f.TempC), f.SampleTsS)
+}
+
+// estimateLabel names the one thing a bare number cannot: that rpm_est is computed,
+// not measured. Zero means no estimate was available, which is printed as such
+// rather than as a fan turning at zero.
+func estimateLabel(rpm uint16) string {
+	if rpm == 0 {
+		return "no estimate available (this host has no tachometer)"
+	}
+	return "ESTIMATE, not a tachometer reading"
+}
+
+func levelStr(v *int) string {
+	if v == nil {
+		return "unknown"
+	}
+	return fmt.Sprintf("%d", *v)
+}
+
+func govStr(v string) string {
+	if v == "" {
+		return "unknown"
+	}
+	return fmt.Sprintf("%q", v)
+}
+
+func celsiusStr(v float64) string {
+	if v == 0 {
+		return "unknown"
+	}
+	return fmt.Sprintf("%.1f C", v)
 }
 
 // printFanSteps prints the firmware's own duty table, one line per step.

@@ -153,6 +153,24 @@ type WiFiStats struct {
 	Iface string `json:"iface,omitempty"`
 }
 
+// FanSample is one raw row of pfanel's history database, handed in by the caller.
+//
+// It lives beside the type it feeds rather than beside the conversion code, so the
+// producer's shape and the consumer's contract are read together. The sqlite read
+// is in package agent/pfanel because the only driver in this build graph reaches
+// os/exec through modernc.org/libc, which fork_policy_test.go forbids in a
+// collector closure. level, ec76 and rpm are pointers because the live table holds
+// both NULLs and real zeros in all three; the wire rules are in FanStats.
+type FanSample struct {
+	TsUnix int64 // Unix seconds, as stored.
+	// level, ec76 and rpm are nil when the column was NULL.
+	LevelPct *int
+	EC76Pct  *int
+	RPM      *int
+	TempC    float64
+	Gov      string
+}
+
 // FanStats is the newest row of pfanel's own history database: the programmed fan
 // level, the live EC duty byte, pfanel's speed estimate and the control mode it was
 // running under, as of SampleTsS.
@@ -174,27 +192,44 @@ type WiFiStats struct {
 // present value can be recognised as an estimate and a UI can label it; 0 means "no
 // estimate available", not "the fan is stopped", which no reading can establish.
 //
-// RPMEst has two possible sources with different scales, which is a known
-// limitation rather than a settled design. Normally it is pfanel's own stored rpm,
-// which on the live database is a pure function of the duty byte -- 50 distinct
-// duties map to exactly 50 distinct (duty, rpm) pairs -- so it is a table lookup
-// carrying no information beyond ec76. When a row stored no rpm it is instead
-// interpolated from ec76 through the 11-step firmware _FPS table in
-// FanSpeedStep.RPMEst. The two scales do not agree (the live table holds 49 distinct
-// rpm values against _FPS's 11), so a consumer may see rpm_est jump scale at the
-// moment the fallback starts. Reporting pfanel's value first is the lesser evil: it
-// keeps the reading consistent with the row it came from, and hiding the change
-// would be worse than showing it.
+// RPMEst has two sources and they are ONE curve sampled at two resolutions, not two
+// scales. It is normally pfanel's own stored rpm; only a row that stored none falls
+// back to interpolating ec76 through the firmware's 11-step _FPS table in
+// FanSpeedStep.RPMEst. Measured on the live database the two are equal to the digit
+// at every _FPS step point a pfanel row exists for -- 8 of the 11, 25/30/40/50/60/
+// 70/80/100 -- and pfanel's other 42 values all sit between those step points, so
+// its table is a finer sampling of the same curve rather than a second one. Across
+// all 50 non-zero duties the median absolute difference is 17 rpm (under 0.3%) and
+// the largest is 334 rpm (4.0%) at duty 65. A consumer may therefore show the table
+// and the live value side by side and must not expect them to match; a step at the
+// moment the fallback engaged would be at most that 4%.
 //
-// Gov is pfanel's control mode passed through verbatim: curve, free, s0i3, quiet,
-// manual, or absent when the row recorded none. It is deliberately NOT validated
-// against an enum, because the column belongs to another program that can add a
-// value, and dropping an unrecognised mode would be worse than forwarding it.
+// The fallback is unreachable on today's data rather than merely rare: every row
+// whose rpm is NULL also has ec76 = 0, and the guard in collectFan interpolates only
+// a duty above 0. So duty 0 is always "no estimate" -- 0, with the key absent -- and
+// the _FPS path never runs. It is kept because a pfanel release storing NULL rpm at
+// a non-zero duty would make it live, and a reading that degrades beats one that
+// disappears.
 //
-// SampleTsS is the row's ts in Unix SECONDS, not milliseconds, and carries no
-// omitempty because it is always read alongside the rest of the row. It is exposed so
-// a consumer can judge staleness itself rather than trusting a sample that pfanel
-// wrote long ago; pfanel samples roughly every 12 seconds.
+// CONTRACT FOR CONSUMERS: two of these fields are on the wire and must survive being
+// mirrored into a client type. They are stated here because this is the authoritative
+// wire contract; a client interface that omits them is wrong, not shorter.
+//
+//   - gov is OPTIONAL: string | undefined, never null. Absent when the row recorded
+//     none. pfanel's control mode verbatim -- curve, free, s0i3, quiet, manual and
+//     whatever a later release adds. Validate it for display, never against a closed
+//     enum: the column belongs to another program, and dropping an unrecognised mode
+//     would be worse than forwarding it.
+//   - sample_ts_s is REQUIRED: number, always present, and it carries no omitempty.
+//     It is the row's ts in Unix SECONDS, not milliseconds. Nothing else in this
+//     struct carries a time, so this is the only signal that the sample is current.
+//     A consumer must compare it against its own clock and mark, grey or warn on a
+//     stale reading; omitting it makes a collector that silently stopped refreshing
+//     indistinguishable from a healthy one.
+//
+// SampleTsS is read alongside the rest of the row and is exposed so staleness stays
+// the consumer's judgement rather than something it has to take on trust. pfanel
+// samples roughly every 12 seconds.
 type FanStats struct {
 	// SetLevelPct is pfanel's programmed level. Nil when the row recorded none.
 	SetLevelPct *int `json:"set_level_pct,omitempty"`
@@ -207,10 +242,13 @@ type FanStats struct {
 	RPMEst uint16 `json:"rpm_est,omitempty"`
 	// RPMEstFlag is always true so consumers can assert the value is labelled.
 	RPMEstFlag bool `json:"rpm_est_is_estimate"`
-	// Gov is pfanel's control mode, verbatim. See the type comment for the values.
+	// Gov is pfanel's control mode, verbatim, and absent when the row recorded none.
+	// OPTIONAL in a client type -- string | undefined, never null; read the consumer
+	// contract above before mirroring this struct.
 	Gov string `json:"gov,omitempty"`
 	// SampleTsS is the row's timestamp in Unix seconds, so a consumer can check how
-	// stale the reading is. No omitempty: it is read with every row.
+	// stale the reading is. No omitempty: it is read with every row, and a client
+	// type must declare it REQUIRED, because it is the only staleness signal here.
 	SampleTsS int64   `json:"sample_ts_s"`
 	TempC     float64 `json:"temp_c,omitempty"`
 }

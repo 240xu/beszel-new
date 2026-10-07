@@ -2,7 +2,7 @@
 
 package plus
 
-// Fork policy for agent/plus.
+// Fork policy for the plus side of the agent.
 //
 // Task 6 pinned "the NVMe collector never forks smartctl" as a structural
 // invariant. Task 7 originally weakened it to exempt wifi.go and discovered, by
@@ -12,35 +12,72 @@ package plus
 // data, and data can be edited.
 //
 // So this file states the rule with no exemption mechanism at all. There is no
-// map, no allowlist, and no skip condition in the loop below: a file either may
-// import os/exec or may not, and the answer is the same for every file. The
-// three ways the old rule was defeated are structurally impossible here because
-// none of them is expressible -- the rule is a literal comparison inside an
-// unconditional loop, not a lookup.
+// map, no allowlist, and no per-file verdict: inside the scope below, a file
+// either may import os/exec or may not, and the answer is the same for every
+// file.
 //
-// Four independent checks, because one is easy to reason your way around:
+// WHY THE SCOPE IS A PACKAGE SET AND NOT ONE DIRECTORY
 //
-//	compiledFiles      asks the go tool which files the build actually includes,
-//	                   so the scan cannot be narrowed by adding a file or
-//	                   renaming one. It reports the PRODUCTION build -- the
-//	                   subprocess carries no -tags, so no //go:build testing file,
-//	                   _test.go included, is in that list -- which is the right
-//	                   scope for a production invariant.
-//	TestPlusPackageIsForkFree     asserts on those files' import lists.
-//	TestPlusClosureCannotFork     asserts on the transitive import closure, which
-//	                   also covers a fork moved into an imported helper package.
-//	TestOnlyThisFileForksInTests  globs the directory rather than the build, so it
-//	                   is the one that sees a fork behind a build tag or in a
-//	                   _test.go file -- including the go tool call above.
-//	TestPlusIsALeafPackage       rules out a subdirectory, which none of the
-//	                   three above can see.
+// Task 9 added agent/pfanel, which reads pfanel's sqlite history and hands the
+// row to agent/plus as a plus.FanSample. It is a SIBLING of agent/plus and it
+// imports agent/plus, so it is outside agent/plus's own directory and above it
+// in the graph -- the closure check looks downward, at what agent/plus depends
+// on, and this package is what depends on it. Every check below used to be
+// bounded by agent/plus alone, so a live fork dropped into agent/pfanel compiled,
+// ran, and left the whole suite green. No assertion was wrong; the invariant's
+// reach had moved out from under it.
 //
-// Between them: a fork in any compiled file, behind any build tag, in any test
-// file, in any imported package, or at any depth below this directory.
+// The scope is therefore agent/plus plus every sibling package that imports
+// agent/plus, computed by governedPackages below rather than written down. A
+// future plus-side collector that consumes plus samples is covered the moment it
+// exists, with no edit here and no way to be quietly forgotten.
+//
+// Deliberately outside that scope, and why:
+//
+//   - agent, agent/utils, agent/zfs fork on purpose: beszel runs smartctl and
+//     similar tools to collect NVMe, ZFS and power data. Pushing them in would
+//     have made this rule false the moment the sqlite driver was needed, and a
+//     rule that has to be exempted is the Task 7 failure again.
+//   - agent/tools/pluscheck is a development harness, not shipped collector code.
+//   - internal/entities/system translates plus structs onto the hub wire; it
+//     holds no collector logic to fork from.
+//
+// WHAT COUNTS AS A FORK, GIVEN pfanel NEEDS os/exec ITSELF
+//
+// agent/pfanel must import modernc.org/sqlite, and that driver reaches os/exec
+// through modernc.org/libc, which implements C system() with exec.Command. So
+// "os/exec is in the closure" is not by itself a finding, and a closure ban
+// would be a permanent false positive rather than a rule.
+//
+// The distinction drawn here is OWNERSHIP, not name and not package list:
+//
+//	os/exec may enter a collector's closure only by way of a package outside
+//	this module.
+//
+// Any package in this module that directly imports os/exec is code we wrote, in
+// this repository, in a file this same test can name -- so it is a fork, and the
+// assertion fires whether the fork sits in the collector, in a helper of ours it
+// imports, or one level down behind a build tag. A route that has to cross into
+// a third-party module first is attributed to that module instead: libc uses
+// os/exec for system(), a SELECT never reaches it, and policing it is not an
+// invariant we can hold or that the split was built to hold.
+//
+// Four checks over that scope:
+//
+//	TestPlusPackageIsForkFree      the files the production build compiles, so a
+//	                              fork cannot hide behind a new file, a renamed
+//	                              one, or a build tag the scan ignores.
+//	TestCollectorClosureCannotFork the attribution rule above, over the whole
+//	                              transitive closure rather than our own files.
+//	TestOnlyThisFileForksInTests   the directory rather than the build, so it
+//	                              also sees test files and tagged files,
+//	                              including the go tool call in this file.
+//	TestCollectorPackagesAreLeaves no subdirectory, which none of the three
+//	                              above can see at any depth.
 //
 // os/exec in a *_test.go file is out of scope for the production invariant --
 // running the test suite is not what ships -- so TestOnlyThisFileForksInTests
-// covers that side separately rather than leaving it implicit.
+// bounds that side separately rather than leaving it implicit.
 
 import (
 	"go/parser"
@@ -48,6 +85,7 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -56,8 +94,89 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// compiledFiles lists the non-test .go files the compiler includes for the
-// current build configuration.
+// modulePath is this module, read from the go tool so the ownership test below
+// never depends on a package path spelled out by hand.
+func modulePath(t *testing.T) string {
+	t.Helper()
+	out, err := exec.Command("go", "list", "-m", "-f", "{{.Path}}").Output()
+	require.NoError(t, err, "the go tool must be runnable")
+	return strings.TrimSpace(string(out))
+}
+
+// selfImportPath is the package these tests live in, github.com/henrygd/beszel's
+// agent/plus. Derived rather than written down so the scope below is computed
+// from where the test actually is.
+func selfImportPath(t *testing.T) string {
+	t.Helper()
+	out, err := exec.Command("go", "list", "-f", "{{.ImportPath}}", ".").Output()
+	require.NoError(t, err)
+	return strings.TrimSpace(string(out))
+}
+
+// governedPackages is the scope: agent/plus, then every sibling package that
+// imports it.
+//
+// "Sibling" means a directory beside agent/plus, so the set is the plus-side
+// collector layer by construction. agent itself is the parent rather than a
+// sibling, and agent/tools is a grandparent, so neither can be swept in by
+// widening the rule -- both fork legitimately and must stay out (see header).
+//
+// A sibling counts only if the go tool confirms a package is there: agent holds
+// directories that are not packages at all (test-data, tools), and asking the go
+// tool keeps the scan and the build in agreement the same way compiledFiles
+// does.
+func governedPackages(t *testing.T) []string {
+	t.Helper()
+	self := selfImportPath(t)
+	side := self[:strings.LastIndex(self, "/")+1]
+	packages := []string{self}
+
+	entries, err := os.ReadDir("..")
+	require.NoError(t, err)
+	for _, e := range entries {
+		if !e.IsDir() || e.Name() == path.Base(self) {
+			continue
+		}
+		if !hasGoFileAtTopLevel(filepath.Join("..", e.Name())) {
+			continue
+		}
+		pkg := side + e.Name()
+		if importsPackage(t, pkg, self) {
+			packages = append(packages, pkg)
+		}
+	}
+	require.NotEmpty(t, packages, "the policy must govern at least agent/plus")
+	return packages
+}
+
+// hasGoFileAtTopLevel reports whether dir holds a .go file directly, not at some
+// depth. agent/tools holds only agent/tools/pluscheck, and it is a directory of
+// harnesses rather than a package; a recursive test would report it as one.
+func hasGoFileAtTopLevel(dir string) bool {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		if !e.IsDir() && filepath.Ext(e.Name()) == ".go" {
+			return true
+		}
+	}
+	return false
+}
+
+// importsPackage asks the go tool whether pkg's non-test imports include want.
+func importsPackage(t *testing.T, pkg, want string) bool {
+	t.Helper()
+	out, err := exec.Command("go", "list", "-f", "{{join .Imports \" \"}}", pkg).Output()
+	if err != nil {
+		return false
+	}
+	return contains(strings.Fields(string(out)), want)
+}
+
+// compiledFiles lists the non-test .go files the compiler includes for pkg in the
+// current build configuration, by directory and base name.
 //
 // It deliberately does not read the directory. Directory walking is how the
 // previous version of this rule could be narrowed: skip a subdirectory, or skip
@@ -66,115 +185,196 @@ import (
 //
 // What it does not give is tag coverage: no -tags, so nothing behind
 // `//go:build testing` appears. That is not a hole -- a file the production build
-// skips cannot fork in production -- it is a limit on this function.
-func compiledFiles(t *testing.T) []string {
+// skips cannot fork in production -- it is a limit on this function, and
+// TestOnlyThisFileForksInTests covers the other side.
+func compiledFiles(t *testing.T, pkg string) (dir string, names []string) {
 	t.Helper()
-	out, err := exec.Command("go", "list", "-f", "{{range .GoFiles}}{{.}} {{end}}", ".").Output()
-	require.NoError(t, err,
-		"the go tool must be runnable: this is the structural check, and skipping it silently "+
-			"would leave the rule as prose that never executes")
-	names := strings.Fields(string(out))
-	require.NotEmpty(t, names, "no package source found -- the assertion proved nothing")
-	return names
+	out, err := exec.Command("go", "list", "-f", "{{.Dir}}|{{range .GoFiles}}{{.}} {{end}}", pkg).Output()
+	require.NoErrorf(t, err, "cannot list %s", pkg)
+	d, fileList, _ := strings.Cut(strings.TrimSpace(string(out)), "|")
+	dir, names = d, strings.Fields(fileList)
+	require.NotEmptyf(t, names, "no package source found for %s -- the assertion proved nothing", pkg)
+	return dir, names
 }
 
-// TestPlusPackageIsForkFree is the invariant. The two assertions are inside the
-// loop with no condition, so there is no per-file verdict to widen.
+// TestPlusPackageIsForkFree is the invariant, over every governed package. The two
+// assertions are inside the loop with no condition, so there is no per-file
+// verdict to widen.
 func TestPlusPackageIsForkFree(t *testing.T) {
 	fset := token.NewFileSet()
-	for _, name := range compiledFiles(t) {
-		file, err := parser.ParseFile(fset, name, nil, parser.ImportsOnly)
-		require.NoErrorf(t, err, "cannot parse %s", name)
-		for _, imp := range file.Imports {
-			assert.NotEqualf(t, `"os/exec"`, imp.Path.Value,
-				"%s imports os/exec. No file in agent/plus may fork, whatever the program is "+
-					"called and however the name is spelled: NVMe reuses upstream's parse, and "+
-					"everything else reads sysfs or netlink.", name)
-			assert.NotEqualf(t, `"syscall"`, imp.Path.Value,
-				"%s imports syscall. syscall is the raw-fork entry point, so banning it stops "+
-					"os/exec being bypassed rather than obeyed.", name)
-		}
-	}
-}
-
-// TestPlusClosureCannotFork covers what the file scan cannot: a fork hidden in a
-// subdirectory of agent/plus, or reached through a helper the package imports.
-// Neither appears in this package's own import lists, so only the closure sees
-// them.
-//
-// syscall is deliberately not asserted here. On Linux the standard library pulls
-// it in through time and slices whether or not anything asks for it, so its
-// presence carries no signal. os/exec does, and it is absent.
-func TestPlusClosureCannotFork(t *testing.T) {
-	out, err := exec.Command("go", "list", "-deps", ".").Output()
-	require.NoError(t, err, "the go tool must be runnable")
-	deps := strings.Fields(string(out))
-	require.NotEmpty(t, deps, "an empty closure would prove nothing")
-	for _, dep := range deps {
-		assert.NotEqual(t, "os/exec", dep,
-			"agent/plus depends on os/exec through %s; the fork would run in production "+
-				"while living in no file of this package", dep)
-	}
-}
-
-// TestOnlyThisFileForksInTests bounds the one permitted fork, which exists only
-// so the two checks above can ask the go tool.
-//
-// It asserts the exact list rather than that it is non-empty. Asserting only
-// non-empty is what let the previous exemption list be widened in silence: any
-// addition kept the test green.
-func TestOnlyThisFileForksInTests(t *testing.T) {
-	entries, err := os.ReadDir(".")
-	require.NoError(t, err)
-	var forking []string
-	fset := token.NewFileSet()
-	for _, e := range entries {
-		name := e.Name()
-		if e.IsDir() || filepath.Ext(name) != ".go" {
-			continue
-		}
-		file, err := parser.ParseFile(fset, name, nil, parser.ImportsOnly)
-		require.NoErrorf(t, err, "cannot parse %s", name)
-		for _, imp := range file.Imports {
-			if imp.Path.Value == `"os/exec"` {
-				forking = append(forking, name)
+	for _, pkg := range governedPackages(t) {
+		dir, names := compiledFiles(t, pkg)
+		for _, name := range names {
+			file, err := parser.ParseFile(fset, filepath.Join(dir, name), nil, parser.ImportsOnly)
+			require.NoErrorf(t, err, "cannot parse %s", name)
+			for _, imp := range file.Imports {
+				assert.NotEqualf(t, `"os/exec"`, imp.Path.Value,
+					"%s imports os/exec. No file on the plus side may fork, whatever the program is "+
+						"called and however the name is spelled: NVMe reuses upstream's parse, and "+
+						"everything else reads sysfs or netlink.", name)
+				assert.NotEqualf(t, `"syscall"`, imp.Path.Value,
+					"%s imports syscall. syscall is the raw-fork entry point, so banning it stops "+
+						"os/exec being bypassed rather than obeyed.", name)
 			}
 		}
 	}
-	assert.Equal(t, []string{"fork_policy_test.go"}, forking,
-		"only this file may run the go tool, and only for the two structural checks above")
 }
 
-// TestPlusIsALeafPackage closes the gap the other three share.
+// TestCollectorClosureCannotFork is the attribution rule, and it is what tells our
+// fork apart from a dependency's.
 //
-// All of them look at agent/plus as a single directory: compiledFiles reads
-// .GoFiles, which the go tool reports for that directory only, the closure check
-// covers what is imported rather than what sits there, and the directory check
-// stops at the top level. A fork one or more levels down appears in none of them,
-// so mutation testing showed the combination "put the fork in a subdirectory and
-// disable the closure check" defeats everything.
+// The closure is walked one level of import lists wide, and every package that
+// directly imports os/exec is required to be outside this module. That catches a
+// fork in a collector, in a helper of ours the collector imports, or anywhere
+// below either -- none of which any file scan above can see, because the file is
+// not the collector's.
 //
-// So the invariant is stated directly: this package has no subpackages. Every
-// collector belongs in this directory, which is also what keeps the rebase
-// surface flat. A subdirectory is therefore a test failure rather than a place a
-// future collector could hide a fork.
-func TestPlusIsALeafPackage(t *testing.T) {
-	entries, err := os.ReadDir(".")
-	require.NoError(t, err)
-	var subdirs []string
-	for _, e := range entries {
-		if !e.IsDir() {
+// It deliberately does not ban os/exec from the closure as a whole. agent/pfanel
+// has to import modernc.org/sqlite, and modernc.org/libc implements C system()
+// with exec.Command, so the driver arrives already holding os/exec. Attribution
+// is what keeps that from being a permanent red: the route crosses into another
+// module, and a SELECT never reaches system() anyway.
+//
+// syscall is deliberately not asserted here. On Linux the standard library pulls
+// it in through time and slices whether or not anything asks for it, so its
+// presence carries no signal even under attribution.
+func TestCollectorClosureCannotFork(t *testing.T) {
+	mod := modulePath(t)
+	for _, pkg := range governedPackages(t) {
+		attributions := importersOf(t, pkg, "os/exec")
+		if len(attributions) == 0 {
+			// Nothing in the closure imports os/exec, so the attribution rule has
+			// no purchase and nothing is being let through: agent/plus reaches no
+			// fork of any kind today.
+			t.Logf("%s: os/exec is absent from the closure entirely", pkg)
 			continue
 		}
-		has, err := subdirHasGoFile(e.Name())
-		require.NoErrorf(t, err, "cannot inspect subdirectory %s", e.Name())
-		if has {
-			subdirs = append(subdirs, e.Name())
+		t.Logf("%s: os/exec enters the closure via %s", pkg, strings.Join(attributions, " "))
+		for _, importer := range attributions {
+			assert.Falsef(t, inModule(importer, mod),
+				"%s reaches os/exec through %s, which is a package in this module: that is a fork we "+
+					"wrote, not a dependency's. Anything outside this module is attributed to that "+
+					"module instead (modernc.org/libc uses os/exec for C system()), so the third-party "+
+					"driver is not what this rule polices.", pkg, importer)
 		}
 	}
-	assert.Empty(t, subdirs,
-		"agent/plus must stay a leaf package: files in a subdirectory appear in neither "+
-			"TestPlusPackageIsForkFree nor TestPlusClosureCannotFork")
+}
+
+// importersOf lists every package in pkg's transitive closure whose own imports
+// include want.
+//
+// go list's .Imports excludes _test.go files, so the go tool call in this file
+// never appears here and the check does not have to excuse itself.
+func importersOf(t *testing.T, pkg, want string) []string {
+	t.Helper()
+	out, err := exec.Command("go", "list", "-deps", "-f", "{{.ImportPath}}|{{join .Imports \",\"}}", pkg).Output()
+	require.NoErrorf(t, err, "cannot walk the closure of %s", pkg)
+	var found []string
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		importer, imports, _ := strings.Cut(line, "|")
+		if importer == "" {
+			continue
+		}
+		if contains(strings.Split(imports, ","), want) {
+			found = append(found, importer)
+		}
+	}
+	return found
+}
+
+// inModule reports whether an import path belongs to this module.
+func inModule(importPath, mod string) bool {
+	return importPath == mod || strings.HasPrefix(importPath, mod+"/")
+}
+
+// TestOnlyThisFileForksInTests bounds the one permitted fork, which exists only
+// so the checks above can ask the go tool.
+//
+// It walks every governed directory rather than the build, so it sees test files
+// and files behind any build tag. It asserts the exact list rather than that it
+// is non-empty. Asserting only non-empty is what let the previous exemption list
+// be widened in silence: any addition kept the test green. Exact equality means a
+// second forking file -- in agent/pfanel as much as in agent/plus -- is a failure
+// someone has to read, not a row to append.
+func TestOnlyThisFileForksInTests(t *testing.T) {
+	var forking []string
+	fset := token.NewFileSet()
+	for _, g := range governed(t) {
+		entries, err := os.ReadDir(g.dir)
+		require.NoError(t, err)
+		for _, e := range entries {
+			name := e.Name()
+			if e.IsDir() || filepath.Ext(name) != ".go" {
+				continue
+			}
+			file, err := parser.ParseFile(fset, filepath.Join(g.dir, name), nil, parser.ImportsOnly)
+			require.NoErrorf(t, err, "cannot parse %s", name)
+			for _, imp := range file.Imports {
+				if imp.Path.Value == `"os/exec"` {
+					forking = append(forking, g.label+"/"+name)
+				}
+			}
+		}
+	}
+	assert.Equal(t, []string{"plus/fork_policy_test.go"}, forking,
+		"only the fork policy itself may run the go tool, and only for the structural checks above")
+}
+
+// governedPackage is one entry of the scope, carrying the directory to read
+// alongside the import path. dir is relative to this test's working directory.
+type governedPackage struct {
+	pkg   string
+	dir   string
+	label string
+}
+
+// governed is governedPackages paired with the directories the two directory
+// checks have to walk, so a reported file name carries the package it came from.
+func governed(t *testing.T) []governedPackage {
+	t.Helper()
+	self := selfImportPath(t)
+	out := []governedPackage{{pkg: self, dir: ".", label: path.Base(self)}}
+	for _, pkg := range governedPackages(t) {
+		if pkg != self {
+			name := path.Base(pkg)
+			out = append(out, governedPackage{pkg: pkg, dir: filepath.Join("..", name), label: name})
+		}
+	}
+	return out
+}
+
+// TestCollectorPackagesAreLeaves closes the gap the other three share.
+//
+// All of them look at one package directory: compiledFiles reads .GoFiles, which
+// the go tool reports for that directory only, the closure check covers what is
+// imported rather than what sits there, and the directory check stops at the top
+// level. A fork one or more levels down appears in none of them, so mutation
+// testing showed the combination "put the fork in a subdirectory and disable the
+// closure check" defeats everything.
+//
+// So the invariant is stated directly: no governed package has subpackages. Every
+// collector belongs in its own directory, which is also what keeps the rebase
+// surface flat. A subdirectory is a test failure rather than a place a future
+// collector could hide a fork.
+func TestCollectorPackagesAreLeaves(t *testing.T) {
+	for _, g := range governed(t) {
+		entries, err := os.ReadDir(g.dir)
+		require.NoError(t, err)
+		var subdirs []string
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			has, err := subdirHasGoFile(filepath.Join(g.dir, e.Name()))
+			require.NoErrorf(t, err, "cannot inspect subdirectory %s", e.Name())
+			if has {
+				subdirs = append(subdirs, e.Name())
+			}
+		}
+		assert.Emptyf(t, subdirs,
+			"%s must stay a leaf package: files in a subdirectory appear in neither "+
+				"TestPlusPackageIsForkFree nor TestCollectorClosureCannotFork", g.pkg)
+	}
 }
 
 // subdirHasGoFile looks at any depth, not just the top of dir: a <dir>/*.go glob
@@ -193,4 +393,16 @@ func subdirHasGoFile(dir string) (bool, error) {
 		return nil
 	})
 	return found, err
+}
+
+// contains reports whether list holds want, by exact match: substring matching on
+// a comma-joined import list would read os/exec as present in some os/exec
+// neighbour.
+func contains(list []string, want string) bool {
+	for _, s := range list {
+		if s == want {
+			return true
+		}
+	}
+	return false
 }

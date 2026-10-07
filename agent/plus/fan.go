@@ -5,22 +5,6 @@ import (
 	"sort"
 )
 
-// FanSample is one raw row of pfanel's history database, handed in by the caller.
-//
-// The sqlite read lives in package agent/pfanel because the only driver in this
-// build graph reaches os/exec through modernc.org/libc, which fork_policy_test.go
-// forbids in this closure. level, ec76 and rpm are pointers because the live table
-// has both NULLs and real zeros in all three; read the contract in FanStats.
-type FanSample struct {
-	TsUnix int64 // Unix seconds, as stored.
-	// level, ec76 and rpm are nil when the column was NULL.
-	LevelPct *int
-	EC76Pct  *int
-	RPM      *int
-	TempC    float64
-	Gov      string
-}
-
 // collectFan converts pfanel's newest row into the reported state. A nil sample
 // yields nil, so the "fan" key is absent rather than present-and-empty.
 //
@@ -38,10 +22,11 @@ func collectFan(root string, sample *FanSample) *FanStats {
 		SetLevelPct: sample.LevelPct,
 		EC76Pct:     sample.EC76Pct,
 	}
-	// The stored rpm wins: it is pfanel's own estimate for the duty it recorded and
-	// is finer-grained than the 11-step table. _FPS interpolation is the fallback for
-	// rows that stored none. Above uint16's ceiling the value is rejected rather than
-	// wrapped, as parseFpsLine does for fan_speed_rpm.
+	// The stored rpm wins: it is pfanel's own estimate for the duty it recorded, sampling
+	// the same firmware curve more finely than the 11-step table rather than on a different
+	// scale (measured agreement in FanStats). _FPS interpolation is the fallback for rows
+	// that stored none; a value above uint16's ceiling is rejected, not wrapped, as in
+	// parseFpsLine.
 	switch {
 	case sample.RPM != nil && *sample.RPM > 0 && *sample.RPM <= 65535:
 		s.RPMEst = uint16(*sample.RPM)

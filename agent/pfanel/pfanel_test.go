@@ -281,3 +281,37 @@ func TestDSNIsReadOnlyAndWaits(t *testing.T) {
 	assert.Contains(t, got, "mode=ro", "the reader must never be able to write the file")
 	assert.Contains(t, got, "busy_timeout")
 }
+
+// TestLatestSampleGradesRealFailuresByClass pins the two failure classes the caller
+// grades apart, against real databases rather than hand-built errors.
+//
+// This is the root guard behind the agent's log levels. The caller builds its test
+// errors by wrapping ErrRead itself, so that test passes whether or not this file
+// ever wraps ErrRead -- it proved the switch, not the wire between the two halves.
+// Here a real pfanel that lost a column has to arrive as ErrRead and NOT as ErrOpen:
+// the file opened perfectly well, and grading it as an open failure would log a
+// permissions problem for what is a schema disagreement between two programs.
+func TestLatestSampleGradesRealFailuresByClass(t *testing.T) {
+	// A pfanel release that dropped gov. RealDDL has six columns, this has five.
+	dropped := writeDB(t,
+		"CREATE TABLE samples(ts INTEGER PRIMARY KEY, temp REAL, level INTEGER, ec76 INTEGER, rpm INTEGER);",
+		[][]any{{int64(1791333981), 49.0, 30, 30, 3800}})
+
+	_, err := LatestSample(dropped)
+	require.Error(t, err, "an older pfanel without gov is a schema change an operator must see")
+	assert.ErrorIs(t, err, ErrRead, "a dropped column is a read failure, and must reach the caller as one")
+	assert.NotErrorIs(t, err, ErrOpen,
+		"the database opened; grading this as ErrOpen would report a permissions problem that does not exist")
+	assert.NotErrorIs(t, err, ErrNoRow, "the row exists, so this is not a fresh install")
+}
+
+// TestLatestSampleHealthyPathIsNeitherClass keeps the classes honest from the other
+// side: a database that reads cleanly must not be wrapped in either sentinel, or a
+// caller that graded on them would treat a working pfanel as broken.
+func TestLatestSampleHealthyPathIsNeitherClass(t *testing.T) {
+	s, err := LatestSample(writeDB(t, realDDL, [][]any{{int64(1791333981), 49.0, 30, 30, 3800, "curve"}}))
+	require.NoError(t, err, "a current pfanel reads with no sentinel attached")
+	require.NotNil(t, s)
+	assert.NotErrorIs(t, err, ErrOpen)
+	assert.NotErrorIs(t, err, ErrRead)
+}

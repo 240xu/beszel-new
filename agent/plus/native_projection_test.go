@@ -85,22 +85,16 @@ func TestNoExportedNativeFanProjection(t *testing.T) {
 						"rpm_est_is_estimate", where, fn.Name.Name)
 			}
 		}
-		if gen, ok := typeDecl(f); ok {
-			for _, spec := range gen.Specs {
-				ts, ok := spec.(*ast.TypeSpec)
-				if !ok {
-					continue
-				}
-				st, ok := ts.Type.(*ast.StructType)
-				if !ok {
-					continue
-				}
-				for _, field := range st.Fields.List {
-					for _, r := range renderedTypes(&ast.FieldList{List: []*ast.Field{field}}) {
-						assert.NotEqualf(t, nativeFanShape, resolveNamed(r, named),
-							"%s: %s.%s is the native Fans shape, which cannot carry "+
-								"rpm_est_is_estimate", fset.Position(ts.Pos()), ts.Name.Name, fieldName(field))
-					}
+		for _, spec := range typeSpecs(f) {
+			st, ok := spec.Type.(*ast.StructType)
+			if !ok {
+				continue
+			}
+			for _, field := range st.Fields.List {
+				for _, r := range renderedTypes(&ast.FieldList{List: []*ast.Field{field}}) {
+					assert.NotEqualf(t, nativeFanShape, resolveNamed(r, named),
+						"%s: %s.%s is the native Fans shape, which cannot carry "+
+							"rpm_est_is_estimate", fset.Position(spec.Pos()), spec.Name.Name, fieldName(field))
 				}
 			}
 		}
@@ -151,27 +145,37 @@ func namedTypeShapes(paths []string, t *testing.T) map[string]string {
 		fset := token.NewFileSet()
 		f, err := parser.ParseFile(fset, p, nil, 0)
 		require.NoErrorf(t, err, "cannot parse %s", p)
-		gen, ok := typeDecl(f)
-		if !ok {
-			continue
-		}
-		for _, spec := range gen.Specs {
-			if ts, ok := spec.(*ast.TypeSpec); ok {
-				out[ts.Name.Name] = types.ExprString(ts.Type)
-			}
+		for _, spec := range typeSpecs(f) {
+			out[spec.Name.Name] = types.ExprString(spec.Type)
 		}
 	}
 	return out
 }
 
-// typeDecl returns the file's single type declaration block, if it has one.
-func typeDecl(f *ast.File) (*ast.GenDecl, bool) {
+// typeSpecs returns every type specification the file declares, across all of its
+// type declaration blocks.
+//
+// It has to walk all of them, not just the first. go/parser starts a new declaration
+// block at a blank line, so a file that writes one `type` per line separated by
+// blank lines -- which is how plus.go is written -- has one block per type. Reading
+// only the first block leaves every later type unregistered, which silently
+// disables name resolution for all of them: a projection spelled
+// `type NativeFanMap InnerFanMap` then looks like an unknown name rather than the
+// native shape, and the guard passes it.
+func typeSpecs(f *ast.File) []*ast.TypeSpec {
+	var out []*ast.TypeSpec
 	for _, decl := range f.Decls {
-		if gen, ok := decl.(*ast.GenDecl); ok && gen.Tok == token.TYPE {
-			return gen, true
+		gen, ok := decl.(*ast.GenDecl)
+		if !ok || gen.Tok != token.TYPE {
+			continue
+		}
+		for _, spec := range gen.Specs {
+			if ts, ok := spec.(*ast.TypeSpec); ok {
+				out = append(out, ts)
+			}
 		}
 	}
-	return nil, false
+	return out
 }
 
 // resolveNamed reduces a written type to the shape it ultimately has, following this
@@ -195,7 +199,10 @@ func resolveNamed(rendered string, named map[string]string) string {
 func stripWrappers(s string) string {
 	for {
 		switch {
-		case strings.HasPrefix(s, "*"), strings.HasPrefix(s, "&"), strings.HasPrefix(s, "[]"):
+		case strings.HasPrefix(s, "[]"):
+			// Two characters, so it cannot share the single-character arm below.
+			s = s[2:]
+		case strings.HasPrefix(s, "*"), strings.HasPrefix(s, "&"):
 			s = s[1:]
 		default:
 			return s

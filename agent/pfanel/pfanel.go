@@ -35,18 +35,13 @@ func dsn(path string) string {
 
 // LatestSample returns pfanel's newest samples row, or nil with a nil error when the
 // database or its samples table is absent. The error classes are split as the package
-// comment describes.
-//
-// The order of the three tests below is the whole design, so it is worth stating: a
-// message only decides the outcome once the filesystem has already ruled out
-// absence. Get that backwards and a machine with an unreadable pfanel reads as a
-// machine with no pfanel, which is the failure this ordering exists to prevent.
+// comment describes, and the order below is the whole design: a message decides the
+// outcome only after the filesystem has ruled out absence.
 func LatestSample(path string) (*plus.FanSample, error) {
 	db, err := sql.Open("sqlite", dsn(path))
 	if err != nil {
-		// Malformed DSN only: sql.Open parses and returns without connecting, so
-		// this branch cannot see a filesystem condition. The open failures that
-		// operators actually meet arrive at the switch below instead.
+		// Malformed DSN only: sql.Open returns without connecting, so the open
+		// failures operators meet arrive at the switch below instead.
 		return nil, fmt.Errorf("%w %s: %w", ErrOpen, path, err)
 	}
 	defer db.Close()
@@ -64,15 +59,10 @@ func LatestSample(path string) (*plus.FanSample, error) {
 	case err != nil:
 		switch {
 		case isAbsent(err):
-			// Opened as a database and understood it; there is just no samples
-			// table in it. Another program, or a pfanel too old to have one.
 			return nil, nil
 		case notOnDisk(path):
-			// The file is not there. Not a fault, and not this package's to grade.
 			return nil, nil
 		case isOpenFailure(err):
-			// The file is there and the driver still could not open it: wrong
-			// permissions, wrong owner, replaced by something it cannot read.
 			return nil, fmt.Errorf("%w %s: %w", ErrOpen, path, err)
 		default:
 			return nil, fmt.Errorf("%w %s: %w", ErrRead, path, err)
@@ -96,27 +86,24 @@ func LatestSample(path string) (*plus.FanSample, error) {
 	return s, nil
 }
 
-// isAbsent matches the one driver message that means "nothing here to read", and it
-// is a claim about the SCHEMA rather than about the file: the database was opened
-// and understood, it simply has no samples table.
+// isAbsent matches the one driver message that means "nothing here to read": the
+// database was opened and understood, and simply has no samples table.
 //
-// It deliberately does NOT match the driver's "unable to open database file". That
-// message is not a statement that the file is missing -- the driver emits the same
-// string for EACCES -- so matching it classified "installed and unreadable" as "not
-// installed" and returned nil, nil, which silenced the entire class this package
-// grades. Existence is decided by notOnDisk instead, from the filesystem, where a
-// permission error cannot masquerade as an absent file. A pfanel release rewording
-// this substring can now move a real failure between ErrOpen and ErrRead, but it can
-// no longer make one disappear.
+// It deliberately does NOT match "unable to open database file". That message is not
+// a statement that the file is missing -- the driver emits it for EACCES too -- so
+// matching it classified an installed-but-unreadable pfanel as not installed and
+// returned nil, nil, silencing the class ErrOpen exists to name. Existence is
+// decided by notOnDisk instead, where a permission error cannot pass for an absent
+// file. A pfanel release rewording this substring can now move a real failure
+// between ErrOpen and ErrRead, but can no longer make one disappear.
+//
+// isOpenFailure is the other half of the same distinction: the driver's "I could not
+// get a handle on the file" family, consulted only after notOnDisk has established
+// that the file IS there, so a match means installed and unreadable.
 func isAbsent(err error) bool {
 	return strings.Contains(err.Error(), "no such table")
 }
 
-// isOpenFailure matches the driver's "I could not get a handle on the file" family,
-// which is a different question from isAbsent's. It is only consulted after notOnDisk
-// has established that the file IS present, so a match here means installed and
-// unreadable -- the condition ErrOpen exists to name, and the only one that can
-// sometimes clear without an operator.
 func isOpenFailure(err error) bool {
 	msg := err.Error()
 	return strings.Contains(msg, "unable to open database file") ||
@@ -126,10 +113,10 @@ func isOpenFailure(err error) bool {
 // notOnDisk reports that path is definitely not there.
 //
 // Only a definitive "does not exist" counts. A stat that failed for any other reason
-// -- a parent directory we cannot search, a path we cannot even form -- is not proof
-// of absence, so it returns false and the driver's error is graded above instead of
-// dropped. Errnoent's absence and EACCES's absence look identical if you test with
-// err != nil, and that is precisely how a fault becomes silence.
+// -- an unsearchable parent directory, say -- is not proof of absence, so it returns
+// false and the driver's error is graded above instead of dropped. Absence by
+// ENOENT and absence by EACCES look identical under `err != nil`, and conflating
+// them is how a fault becomes silence.
 func notOnDisk(path string) bool {
 	_, err := os.Stat(path)
 	return errors.Is(err, os.ErrNotExist)

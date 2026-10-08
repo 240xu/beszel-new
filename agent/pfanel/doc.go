@@ -29,13 +29,31 @@
 // plain int column cannot carry it. pfanel.go has the query and the per-column NULL
 // handling.
 //
-// Errors are split so an operator hears about the ones that matter. A missing
-// database or a missing samples table is a supported configuration -- a machine
-// without pfanel -- and is reported as nil, nil. A table that exists but holds no
-// rows is a real state rather than a failure, and gets its own ErrNoRow so a caller
-// can drop the sample without logging it. Everything else -- locked, corrupt, schema
-// drift -- is returned, because a silent stop is worse than a log line. The caller
-// currently logs all of it at debug, so a pfanel that stops being readable freezes
-// the fan section with no default-level trace; until that changes, the staleness
-// check in plus.FanStats.SampleTsS is what a consumer has to work with.
+// Errors are split so an operator hears about the ones that matter. A missing database
+// or a missing samples table is a supported configuration -- a machine without pfanel,
+// or one whose pfanel never wrote a samples table -- and is reported as nil, nil. A
+// table that exists but holds no rows is a real state rather than a failure, and gets
+// its own ErrNoRow so a caller can drop the sample without logging it. Everything else
+// arrives as ErrOpen or ErrRead, because a silent stop is worse than a log line, and
+// the caller in agent/system.go grades those Warn and Error respectively: Warn for
+// installed-but-unreadable, since a mode or owner bit can be corrected without the
+// collector's help, and Error for schema or media damage, which no interval heals.
+//
+// Silence is the part that has to be earned, and the way it is earned is the one thing
+// worth knowing before editing this package: it is decided by the FILESYSTEM, never by
+// the driver's wording. Deciding it from the message meant matching "unable to open
+// database file", which the driver also emits for EACCES -- so a pfanel that was
+// installed, current and completely healthy was classified as not installed, returned
+// nil with a nil error, and was reported at no level at all. The entire
+// installed-but-unreadable class was silently dropped, which is precisely the class
+// ErrOpen exists to name. Existence is now os.Stat, only a schema message ("no such
+// table") may imply absence without the filesystem agreeing, and a stat that failed
+// for any reason other than a definitive ENOENT counts as unknown rather than absent.
+//
+// The cost of that rule is worth stating too. A driver that rewords one of its strings
+// can still move a real failure between ErrOpen and ErrRead, hence between Warn and
+// Error, because the split still follows the driver's own open-versus-IO boundary. It
+// can no longer move one to silence, which is the property worth having. The remaining
+// staleness signal is unchanged: plus.FanStats.SampleTsS, and nothing else in the
+// sample carries a time.
 package pfanel

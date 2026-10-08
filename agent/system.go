@@ -337,16 +337,34 @@ const nvmeDiskType = "nvme"
 // SMART data.
 //
 // A machine without pfanel installed returns nil, and the fan section is then simply
-// absent. Anything else -- a locked database, a corrupt file, a schema that lost a
-// column -- is logged at debug rather than error, because none of them is a fault of
-// the agent and none should spam the log once per collection interval. ErrNoRow is
-// not even logged: an empty samples table is a normal state for a fresh install.
+// absent. That is not a fault, so it is not logged at all, and neither is ErrNoRow: an
+// empty samples table is the normal state of a fresh install. The two failures that ARE
+// faults are graded apart, and grading them alike is what made a lost column invisible:
+// pfanel.ErrOpen -- installed but unreadable -- is Warn, since permissions or a replaced
+// file may clear by themselves, while pfanel.ErrRead -- the newest row cannot be read
+// because the schema or the file no longer matches what pfanel asks for -- is Error,
+// because that is a disagreement between two programs which no interval heals. Neither
+// can spam: fanPlusInput runs only when the plus cache gate hits, once per
+// defaultDataCacheTimeMs. A failure the sentinels do not cover stays Debug rather than
+// being guessed at, so a future pfanel error class is reported without a wrong level.
+// fanLatestSample is the seam fanPlusInput reads through, so the grading above can be
+// driven with a pfanel error the tests choose. Production always holds
+// pfanel.LatestSample; nothing reassigns it outside tests. It mirrors the seam upstream
+// already provides for its own collectors, getFanSensors in fans.go.
+var fanLatestSample = pfanel.LatestSample
+
 func fanPlusInput() *plus.FanSample {
-	sample, err := pfanel.LatestSample(pfanel.DBPath)
+	sample, err := fanLatestSample(pfanel.DBPath)
 	switch {
 	case err == nil:
 		return sample
 	case errors.Is(err, pfanel.ErrNoRow):
+		return nil
+	case errors.Is(err, pfanel.ErrOpen):
+		slog.Warn("pfanel history could not be opened; fan sample dropped", "err", err)
+		return nil
+	case errors.Is(err, pfanel.ErrRead):
+		slog.Error("pfanel history could not be read; fan sample dropped", "err", err)
 		return nil
 	default:
 		slog.Debug("pfanel history unavailable", "err", err)

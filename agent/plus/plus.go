@@ -211,6 +211,14 @@ type FanSample struct {
 // a non-zero duty would make it live, and a reading that degrades beats one that
 // disappears.
 //
+// THERE IS NO NATIVE-FIELD PROJECTION, deliberately. Beszel's own Fans field is
+// map[string]uint16 and carries no marker, so a key there is indistinguishable from a
+// tachometer reading by the time anything reads it, and internal/records averages that
+// map into the hub's permanent f column -- an estimate written there cannot be taken
+// back on a later rebase. So the export that shaped this value like that map was
+// removed: the estimate is published here instead, where rpm_est_is_estimate travels
+// with it. A consumer wanting one number must carry the marker along.
+//
 // CONTRACT FOR CONSUMERS: two of these fields are on the wire and must survive being
 // mirrored into a client type. They are stated here because this is the authoritative
 // wire contract; a client interface that omits them is wrong, not shorter.

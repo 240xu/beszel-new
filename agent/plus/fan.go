@@ -36,16 +36,6 @@ func collectFan(root string, sample *FanSample) *FanStats {
 	return s
 }
 
-// FanRPMEst exposes the estimate for agent/fans.go to place in the native Fans field,
-// so this machine reuses beszel's existing FanChart.
-func FanRPMEst(sample *FanSample) map[string]uint16 {
-	f := collectFan(ProdRoot, sample)
-	if f == nil || f.RPMEst == 0 {
-		return nil
-	}
-	return map[string]uint16{"cpu_fan_1": f.RPMEst}
-}
-
 // estRPM interpolates a duty percentage to an approximate speed across the
 // firmware's table. pct at or below 0 yields 0, meaning "no estimate", not "stopped".
 func estRPM(pct int, steps []FanSpeedStep) uint16 {

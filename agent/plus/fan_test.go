@@ -304,18 +304,6 @@ func TestFanStatsWireDistinguishesUnknownZeroAndValue(t *testing.T) {
 	}
 }
 
-func TestFanRPMEstExposesOneKey(t *testing.T) {
-	m := FanRPMEst(&FanSample{TsUnix: 1791333981, EC76Pct: ptrInt(30), RPM: ptrInt(3800)})
-	if assert.NotNil(t, m) {
-		assert.Len(t, m, 1)
-		assert.NotZero(t, m["cpu_fan_1"])
-	}
-}
-
-func TestFanRPMEstIsNilWithoutAnEstimate(t *testing.T) {
-	assert.Nil(t, FanRPMEst(nil))
-}
-
 // ---------------------------------------------------------------------------
 // estRPM edge cases the brief's three-step table cannot express
 // ---------------------------------------------------------------------------

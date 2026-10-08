@@ -22,6 +22,10 @@ const latestRowSQL = `SELECT ts, temp, level, ec76, rpm, gov FROM samples ORDER 
 // ErrNoRow: see the package comment for why it is separate from every other error.
 var ErrNoRow = errors.New("pfanel: samples table is empty")
 
+// ErrOpen and ErrRead split opening from reading so the caller can grade them; both wrap the driver's own error.
+var ErrOpen = errors.New("pfanel: cannot open database")
+var ErrRead = errors.New("pfanel: cannot read newest row")
+
 // dsn opens read-only and waits out pfanel's write transaction. WHY both parts are
 // here, and what each costs, is in the package comment.
 func dsn(path string) string {
@@ -34,7 +38,7 @@ func dsn(path string) string {
 func LatestSample(path string) (*plus.FanSample, error) {
 	db, err := sql.Open("sqlite", dsn(path))
 	if err != nil {
-		return nil, fmt.Errorf("pfanel: open %s: %w", path, err)
+		return nil, fmt.Errorf("%w %s: %w", ErrOpen, path, err)
 	}
 	defer db.Close()
 
@@ -53,7 +57,7 @@ func LatestSample(path string) (*plus.FanSample, error) {
 		if isAbsent(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("pfanel: read %s: %w", path, err)
+		return nil, fmt.Errorf("%w %s: %w", ErrRead, path, err)
 	}
 
 	s := &plus.FanSample{TsUnix: ts, TempC: temp.Float64, Gov: gov.String}

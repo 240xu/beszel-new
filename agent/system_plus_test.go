@@ -3,6 +3,11 @@
 package agent
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -10,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/henrygd/beszel/agent/pfanel"
 	"github.com/henrygd/beszel/agent/plus"
 	"github.com/henrygd/beszel/internal/entities/smart"
 	"github.com/henrygd/beszel/internal/entities/system"
@@ -412,3 +418,112 @@ func TestNvmePlusInputKeepsLegitimateZeroAttributes(t *testing.T) {
 	assert.Zero(t, stats.Nvme.MediaErrors)
 	assert.Zero(t, stats.Nvme.PercentageUsedPct)
 }
+
+// ---------------------------------------------------------------------------
+// fanPlusInput (agent/system.go) — error grading.
+//
+// Every pfanel failure used to reach the same slog.Debug line, which is what made
+// a lost column invisible: a schema drift that stopped the fan panel dead looked
+// exactly like a machine with no pfanel, and neither left a trace worth reading.
+// The grading is the fix, so it is asserted here rather than read off a live log.
+// ---------------------------------------------------------------------------
+
+// logCapture records the levels a call emits. It implements slog.Handler itself
+// rather than parsing text, so the assertion is on the level the code chose.
+type logCapture struct{ levels []slog.Level }
+
+func (c *logCapture) Enabled(context.Context, slog.Level) bool { return true }
+func (c *logCapture) Handle(_ context.Context, r slog.Record) error {
+	c.levels = append(c.levels, r.Level)
+	return nil
+}
+func (c *logCapture) WithAttrs([]slog.Attr) slog.Handler { return c }
+func (c *logCapture) WithGroup(string) slog.Handler      { return c }
+
+// captureFanPlusInput swaps both seams fanPlusInput reads through — the pfanel
+// reader and the default logger — and restores them afterwards, so the cases below
+// cannot leak into each other or into the rest of the suite.
+func captureFanPlusInput(t *testing.T, read func(string) (*plus.FanSample, error)) *logCapture {
+	t.Helper()
+	prevRead, prevLog := fanLatestSample, slog.Default()
+	t.Cleanup(func() { fanLatestSample, _ = prevRead, prevLog; slog.SetDefault(prevLog) })
+	cap := &logCapture{}
+	fanLatestSample = read
+	slog.SetDefault(slog.New(cap))
+	return cap
+}
+
+// TestFanPlusInputGradesEveryPfanelFailure walks the four classes LatestSample can
+// return plus one it cannot yet produce, because the point of the exercise is that
+// the level is a decision per class rather than one default for all of them.
+//
+// Two of them are silent on purpose: no database and an empty table are what a
+// machine without pfanel and a fresh install look like, and logging either once a
+// minute would train the reader to ignore the log. ErrOpen is Warn because the
+// file is there and unreadable, which may clear by itself. ErrRead is Error because
+// pfanel and this reader disagree about the row, which no interval repairs.
+func TestFanPlusInputGradesEveryPfanelFailure(t *testing.T) {
+	cases := []struct {
+		name string
+		read func(string) (*plus.FanSample, error)
+		want []slog.Level
+	}{
+		{
+			name: "no database at all is not a fault",
+			read: func(string) (*plus.FanSample, error) { return nil, nil },
+			want: nil,
+		},
+		{
+			name: "an empty samples table is a fresh install",
+			read: func(string) (*plus.FanSample, error) { return nil, fmt.Errorf("scan: %w", pfanel.ErrNoRow) },
+			want: nil,
+		},
+		{
+			name: "installed but unopenable warns",
+			read: func(string) (*plus.FanSample, error) {
+				return nil, fmt.Errorf("%w %s: %w", pfanel.ErrOpen, pfanel.DBPath, fs.ErrPermission)
+			},
+			want: []slog.Level{slog.LevelWarn},
+		},
+		{
+			name: "an unreadable row errors, because that is schema drift",
+			read: func(string) (*plus.FanSample, error) {
+				return nil, fmt.Errorf("%w %s: %w", pfanel.ErrRead, pfanel.DBPath, errNoSuchColumn)
+			},
+			want: []slog.Level{slog.LevelError},
+		},
+		{
+			name: "an unclassified failure stays debug rather than being guessed at",
+			read: func(string) (*plus.FanSample, error) { return nil, errFuturePfanelClass },
+			want: []slog.Level{slog.LevelDebug},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cap := captureFanPlusInput(t, tc.read)
+			got := fanPlusInput()
+			assert.Nil(t, got, "a failed read must yield no sample")
+			assert.Equal(t, tc.want, cap.levels)
+		})
+	}
+}
+
+// TestFanPlusInputReturnsTheSampleOnSuccess keeps the grading from swallowing the
+// happy path: the cases above all return nil, so nothing in them would notice a
+// refactor that returned nil unconditionally.
+func TestFanPlusInputReturnsTheSampleOnSuccess(t *testing.T) {
+	want := &plus.FanSample{TsUnix: 1791333981, Gov: "curve"}
+	cap := captureFanPlusInput(t, func(string) (*plus.FanSample, error) { return want, nil })
+
+	got := fanPlusInput()
+	assert.Same(t, want, got, "a readable row must pass through untouched")
+	assert.Empty(t, cap.levels, "a successful read has nothing to report")
+}
+
+var (
+	// errNoSuchColumn is what a pfanel that dropped a column produces, spelled the
+	// way the driver spells it, so the ErrRead case is the real failure rather than
+	// a convenient label for one.
+	errNoSuchColumn      = errors.New(`SQL logic error: no such column: "rpm" (1)`)
+	errFuturePfanelClass = errors.New("pfanel: some failure mode that does not exist yet")
+)

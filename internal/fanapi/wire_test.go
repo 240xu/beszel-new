@@ -1,5 +1,3 @@
-//go:build testing
-
 package fanapi
 
 import (
@@ -80,6 +78,7 @@ func TestClassifyNamesEachRefusalSeparately(t *testing.T) {
 		{"temperature unreadable", fmt.Errorf("duty 70: %w: open /sys/class/thermal/thermal_zone9/temp: no such file", ErrTemperatureUnknown), http.StatusServiceUnavailable, "temperature_unknown"},
 		{"breaker latched", ErrBreakerOpen, http.StatusServiceUnavailable, "breaker_open"},
 		{"write not confirmed", fmt.Errorf("asked for 70, device reports 25: %w", ErrWriteUnconfirmed), http.StatusInternalServerError, "write_unconfirmed"},
+		{"the device refused the program", fmt.Errorf("program duty 70: %w", ErrWriteFailed), http.StatusInternalServerError, "write_failed"},
 		{"restore failed", fmt.Errorf("%w: restoring duty 25", ErrRollbackFailed), http.StatusInternalServerError, "rollback_failed"},
 		{"not this platform", plus.ErrFanControlUnsupported, http.StatusNotImplemented, "unsupported"},
 		{"anything else", errors.New("the disk went away"), http.StatusInternalServerError, "internal"},

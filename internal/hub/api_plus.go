@@ -284,7 +284,12 @@ func (fc *fanRoutes) auditList(e *core.RequestEvent) error {
 func (fc *fanRoutes) fail(e *core.RequestEvent, what string, err error) error {
 	fault := fanapi.Classify(err)
 	slog.Warn("fan write refused", "op", what, "code", fault.Code, "actor", actor(e), "err", err)
-	return e.Error(fault.Status, fault.Message, map[string]any{"code": fault.Code})
+	// Data is assigned rather than passed as errData: PocketBase rewrites a map
+	// errData into validation codes, which would replace every refusal with
+	// "validation_invalid_value" and leave the panel with nothing to branch on.
+	apiErr := e.Error(fault.Status, fault.Message, nil)
+	apiErr.Data = map[string]any{"code": fault.Code}
+	return apiErr
 }
 
 // decodeBody reads a request body strictly.
@@ -324,7 +329,16 @@ func strictJSON(body []byte, dst any) error {
 	}
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.DisallowUnknownFields()
-	return dec.Decode(dst)
+	if err := dec.Decode(dst); err != nil {
+		return err
+	}
+	// A second document behind the first is a caller sending something other than
+	// what it means to send, and taking the first half of it is how a body like
+	// {"level":70,...}{"level":25} would program 70.
+	if _, err := dec.Token(); err != io.EOF {
+		return errors.New("trailing content after the body")
+	}
+	return nil
 }
 
 // curveRequest mirrors plus.Curve by pointer so an absent field is not a zero

@@ -1,5 +1,3 @@
-//go:build testing
-
 package fanapi
 
 import (
@@ -88,6 +86,13 @@ func Classify(err error) Fault {
 // classifications is ordered, and the order is load-bearing: rollback before
 // unconfirmed, because an unconfirmed write whose restore failed leaves the fan
 // holding a duty nobody asked for, which is the part to act on tonight.
+// ErrWriteFailed is a device that refused the program outright, as opposed to
+// one that took the write and then disagreed about the result. The two are
+// different incidents: the first is the fan control path being broken, the
+// second is a lost race against another writer. Collapsing them would report a
+// broken path as a lost race and vice versa.
+var ErrWriteFailed = errors.New("the fan control device refused the write")
+
 var classifications = []struct {
 	sentinel error
 	status   int
@@ -98,6 +103,8 @@ var classifications = []struct {
 		"the fan is holding an unrequested duty: the previous one could not be restored"},
 	{ErrWriteUnconfirmed, http.StatusInternalServerError, "write_unconfirmed",
 		"the fan is not holding the duty that was requested"},
+	{ErrWriteFailed, http.StatusInternalServerError, "write_failed",
+		"the fan control device refused the write"},
 	{ErrNotConfirmed, http.StatusBadRequest, "confirm_required",
 		"the change must be confirmed before the fan is touched"},
 	{plus.ErrFanLevelNotAllowed, http.StatusBadRequest, "level_not_allowed",

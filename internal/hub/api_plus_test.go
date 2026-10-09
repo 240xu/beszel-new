@@ -30,8 +30,16 @@ import (
 type fanRig struct {
 	mu sync.Mutex
 
-	level     int
-	levelErr  error
+	level int
+	// setErr fails the write and getErr the read, kept apart because the guard
+	// meets them at different points and reports them differently: a read that
+	// fails before the write never reaches the device at all.
+	setErr error
+	getErr error
+	// loseTo is what a read-back reports once a write has landed. The device has
+	// no way to say "your write lost", so a read-back that disagrees with the
+	// request is the only evidence there is.
+	loseTo    *int
 	temp      int
 	tempErr   error
 	curve     []byte
@@ -62,8 +70,8 @@ func (r *fanRig) setLevel(level int) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.setCalls = append(r.setCalls, level)
-	if r.levelErr != nil {
-		return r.levelErr
+	if r.setErr != nil {
+		return r.setErr
 	}
 	r.level = level
 	return nil
@@ -72,7 +80,13 @@ func (r *fanRig) setLevel(level int) error {
 func (r *fanRig) getLevel() (int, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.level, r.levelErr
+	if r.getErr != nil {
+		return 0, r.getErr
+	}
+	if r.loseTo != nil && len(r.setCalls) > 0 {
+		return *r.loseTo, nil
+	}
+	return r.level, nil
 }
 
 func (r *fanRig) pfand() bool {
@@ -93,8 +107,8 @@ func (r *fanRig) readCurveBytes() ([]byte, error) {
 func (r *fanRig) writeCurveBytes(raw []byte) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.levelErr != nil {
-		return r.levelErr
+	if r.curveErr != nil {
+		return r.curveErr
 	}
 	r.curve = append([]byte(nil), raw...)
 	return nil
@@ -249,6 +263,16 @@ func (h *fanHarness) do(t *testing.T, role, method, path string, body any) *http
 	rec := httptest.NewRecorder()
 	h.handler.ServeHTTP(rec, req)
 	return rec
+}
+
+// faultCode reads the refusal code out of a PocketBase error body, where it
+// sits under "data" because that is the field ApiError serialises.
+func faultCode(t *testing.T, rec *httptest.ResponseRecorder) string {
+	t.Helper()
+	data, ok := decodeBody(t, rec)["data"].(map[string]any)
+	require.True(t, ok, "a refusal must carry a code, and it lives under data: %s", rec.Body.String())
+	code, _ := data["code"].(string)
+	return code
 }
 
 func decodeBody(t *testing.T, rec *httptest.ResponseRecorder) map[string]any {
@@ -446,7 +470,8 @@ func TestEveryWriteRouteInsistsOnConfirm(t *testing.T) {
 			h := newFanHarness(t)
 			rec := h.do(t, "admin", http.MethodPost, ep.path, ep.body)
 			assert.Equal(t, http.StatusBadRequest, rec.Code)
-			assert.Contains(t, rec.Body.String(), "confirm is required")
+			assert.Contains(t, strings.ToLower(rec.Body.String()), "confirm is required",
+				"PocketBase capitalises the message, so the claim is matched case-insensitively")
 			assert.Empty(t, h.rig.writes(), "an unconfirmed request must not reach the device")
 			assert.Empty(t, h.rig.actions, "an unconfirmed request must not touch the daemon")
 			assert.Equal(t, string(h.rig.curve), testCurveSource,
@@ -474,25 +499,27 @@ func TestLevelRefusalsAreDistinguishable(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		setup  func(*fanRig)
+		level  int
 		status int
 		code   string
 	}{
-		{"duty off the firmware whitelist", func(r *fanRig) {}, http.StatusBadRequest, "level_not_allowed"},
-		{"the daemon owns the fan", func(r *fanRig) { r.pfandUp = true }, http.StatusConflict, "pfand_active"},
-		{"at the emergency edge", func(r *fanRig) { r.temp = 85 }, http.StatusServiceUnavailable, "package_too_hot"},
-		{"the sensor cannot be read", func(r *fanRig) { r.tempErr = errors.New("no such file") }, http.StatusServiceUnavailable, "temperature_unknown"},
-		{"the curve cannot be read", func(r *fanRig) { r.curveErr = errors.New("no such file") }, http.StatusServiceUnavailable, "temperature_unknown"},
-		{"the device refused the write", func(r *fanRig) { r.levelErr = errors.New("device busy") }, http.StatusInternalServerError, "write_unconfirmed"},
+		{"duty off the firmware whitelist", func(r *fanRig) {}, 33, http.StatusBadRequest, "level_not_allowed"},
+		{"the daemon owns the fan", func(r *fanRig) { r.pfandUp = true }, 70, http.StatusConflict, "pfand_active"},
+		{"at the emergency edge", func(r *fanRig) { r.temp = 85 }, 70, http.StatusServiceUnavailable, "package_too_hot"},
+		{"the sensor cannot be read", func(r *fanRig) { r.tempErr = errors.New("no such file") }, 70, http.StatusServiceUnavailable, "temperature_unknown"},
+		{"the curve cannot be read", func(r *fanRig) { r.curveErr = errors.New("no such file") }, 70, http.StatusServiceUnavailable, "temperature_unknown"},
+		{"the device refused the program", func(r *fanRig) { r.setErr = errors.New("device busy") }, 70, http.StatusInternalServerError, "write_failed"},
+		{"the duty could not be read before the write", func(r *fanRig) { r.getErr = errors.New("device busy") }, 70, http.StatusInternalServerError, "internal"},
+		{"another writer took the single slot", func(r *fanRig) { lost := 25; r.loseTo = &lost }, 70, http.StatusInternalServerError, "write_unconfirmed"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newFanHarness(t)
 			tc.setup(h.rig)
 
 			rec := h.do(t, "admin", http.MethodPost, "/api/plus/fan/level",
-				map[string]any{"level": 70, "confirm": true})
+				map[string]any{"level": tc.level, "confirm": true})
 			require.Equal(t, tc.status, rec.Code, rec.Body.String())
-			body := decodeBody(t, rec)
-			assert.Equal(t, tc.code, body["code"])
+			assert.Equal(t, tc.code, faultCode(t, rec))
 		})
 	}
 }
@@ -517,8 +544,7 @@ func readLevelFault(t *testing.T, setup func(*fanRig)) string {
 	rec := h.do(t, "admin", http.MethodPost, "/api/plus/fan/level",
 		map[string]any{"level": 70, "confirm": true})
 	require.NotEqual(t, http.StatusOK, rec.Code, rec.Body.String())
-	code, _ := decodeBody(t, rec)["code"].(string)
-	return code
+	return faultCode(t, rec)
 }
 
 // TestARefusedWriteDoesNotTripTheBreakerIntoAFalseLockout: three refusals leave
@@ -531,7 +557,7 @@ func TestARefusedWriteDoesNotTripTheBreakerIntoAFalseLockout(t *testing.T) {
 	for range 4 {
 		rec := h.do(t, "admin", http.MethodPost, "/api/plus/fan/level",
 			map[string]any{"level": 70, "confirm": true})
-		assert.Equal(t, "pfand_active", decodeBody(t, rec)["code"])
+		assert.Equal(t, "pfand_active", faultCode(t, rec))
 	}
 	h.rig.pfandUp = false
 	rec := h.do(t, "admin", http.MethodPost, "/api/plus/fan/level",
@@ -545,7 +571,7 @@ func TestARefusedWriteDoesNotTripTheBreakerIntoAFalseLockout(t *testing.T) {
 // cooldown and find the same answer again.
 func TestTheBreakerIsReportedAfterTheGuardThatStoodInItsWay(t *testing.T) {
 	h := newFanHarness(t)
-	h.rig.levelErr = errors.New("device busy")
+	h.rig.setErr = errors.New("device busy")
 	for range 3 {
 		h.do(t, "admin", http.MethodPost, "/api/plus/fan/level",
 			map[string]any{"level": 70, "confirm": true})
@@ -554,13 +580,13 @@ func TestTheBreakerIsReportedAfterTheGuardThatStoodInItsWay(t *testing.T) {
 	h.rig.pfandUp = true
 	rec := h.do(t, "admin", http.MethodPost, "/api/plus/fan/level",
 		map[string]any{"level": 70, "confirm": true})
-	assert.Equal(t, "pfand_active", decodeBody(t, rec)["code"],
+	assert.Equal(t, "pfand_active", faultCode(t, rec),
 		"the guard in the way is the thing the operator has to act on")
 
 	h.rig.pfandUp = false
 	rec = h.do(t, "admin", http.MethodPost, "/api/plus/fan/level",
 		map[string]any{"level": 70, "confirm": true})
-	assert.Equal(t, "breaker_open", decodeBody(t, rec)["code"],
+	assert.Equal(t, "breaker_open", faultCode(t, rec),
 		"and the latch is still there once the guard is out of the way")
 }
 
@@ -607,7 +633,7 @@ func TestAbsentLevelIsNotZero(t *testing.T) {
 	rec := h.do(t, "admin", http.MethodPost, "/api/plus/fan/level",
 		map[string]any{"confirm": true})
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	assert.Contains(t, rec.Body.String(), "level is required")
+	assert.Contains(t, strings.ToLower(rec.Body.String()), "level is required")
 	assert.Empty(t, h.rig.writes())
 }
 
@@ -622,7 +648,8 @@ func TestAPartialCurveIsRefusedRatherThanZeroFilled(t *testing.T) {
 			delete(body, key)
 			rec := h.do(t, "admin", http.MethodPost, "/api/plus/fan/curve", body)
 			assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
-			assert.Contains(t, rec.Body.String(), key, "the response must name the field that was missing")
+			assert.Contains(t, rec.Body.String(), key,
+				"the response must name the field that was missing, so an operator can see which one their panel forgot")
 			assert.Equal(t, testCurveSource, string(h.rig.curve))
 		})
 	}
@@ -648,7 +675,7 @@ func TestACurveTheHostWouldNotRunIsRefusedBeforeItIsWritten(t *testing.T) {
 			body[tc.key] = tc.val
 			rec := h.do(t, "admin", http.MethodPost, "/api/plus/fan/curve", body)
 			assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
-			assert.Equal(t, "curve_rejected", decodeBody(t, rec)["code"])
+			assert.Equal(t, "curve_rejected", faultCode(t, rec))
 			assert.Equal(t, testCurveSource, string(h.rig.curve))
 		})
 	}
@@ -725,7 +752,7 @@ func TestNoFanResponseCarriesAHostPathOrAToken(t *testing.T) {
 				path   string
 				body   any
 			}{"level", http.MethodPost, "/api/plus/fan/level", map[string]any{"level": 70, "confirm": true}}},
-		{"failed write", func(r *fanRig) { r.levelErr = errors.New(secret) },
+		{"failed write", func(r *fanRig) { r.setErr = errors.New(secret) },
 			struct {
 				name   string
 				method string
@@ -812,7 +839,7 @@ func TestStateReportsTheCurveSoThePanelDoesNotFetchItSeparately(t *testing.T) {
 // legal temperature, so an unreadable reading must not answer with either.
 func TestStateMarksEachReadingRatherThanBorrowingAZero(t *testing.T) {
 	h := newFanHarness(t)
-	h.rig.levelErr = errors.New("gone")
+	h.rig.getErr = errors.New("gone")
 	h.rig.tempErr = errors.New("gone")
 	h.rig.curveErr = errors.New("gone")
 

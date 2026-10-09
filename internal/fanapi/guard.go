@@ -192,7 +192,9 @@ func (g *Guard) setLevelLocked(level int, req Request, now time.Time) (Result, e
 	}
 	if err := g.d.SetLevel(level); err != nil {
 		g.fail(now)
-		return Result{}, fmt.Errorf("program duty %d: %w", level, err)
+		// Wrapped so the wire can tell a device that refused the program from
+		// one that took it and then disagreed about the result.
+		return Result{}, fmt.Errorf("program duty %d: %w: %v", level, ErrWriteFailed, err)
 	}
 	got, err := g.d.GetLevel()
 	if err != nil || got != level {

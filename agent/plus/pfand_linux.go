@@ -12,10 +12,11 @@ import (
 // systemd starts pfand through bash, so it appears as an argument, not argv[0].
 const pfanDaemon = "/usr/local/bin/pfand"
 
-// PfandActive reports whether the curve daemon is running, so fan writes can be
-// refused while it is. /proc rather than `systemctl is-active`, which would have
-// to fork, and this package may not. Also the conservative direction: a daemon on
-// its way out still shows as present, so the answer errs toward refusing a write.
+// PfandActive reports whether the curve daemon is running, so Task 15 can tell
+// "pfand owns the curve" (ErrPfandActive) from a lost race. It does not refuse
+// here: that is Task 14's policy, and asking would tie setFanLevelAt's tests to
+// whether pfand runs on the build host. /proc, not systemctl, which would fork;
+// a daemon on its way out still shows, so the answer errs toward "running".
 func PfandActive() bool { return pfandActiveIn("/proc") }
 
 // pfandActiveIn takes the proc root for the same reason FanPaths does.

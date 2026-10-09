@@ -98,7 +98,7 @@ func deviceWritable(path, seam string) error {
 	return nil
 }
 
-func lockExclusive(fd int) error {
+func lockExclusive(path string, fd int) error {
 	var contended error
 	for i := 0; i < fanLockAttempts; i++ {
 		err := unix.Flock(fd, unix.LOCK_EX|unix.LOCK_NB)
@@ -112,7 +112,7 @@ func lockExclusive(fd int) error {
 		time.Sleep(fanLockBackoff)
 	}
 	return fmt.Errorf("lock %s is held by another writer after %d attempts: %w",
-		ProdFanLock, fanLockAttempts, contended)
+		path, fanLockAttempts, contended)
 }
 
 func withFanLock(paths FanPaths, fn func() error) error {
@@ -122,7 +122,7 @@ func withFanLock(paths FanPaths, fn func() error) error {
 	}
 	defer lf.Close()
 	fd := int(lf.Fd())
-	if err := lockExclusive(fd); err != nil {
+	if err := lockExclusive(paths.Lock, fd); err != nil {
 		return err
 	}
 	defer unix.Flock(fd, unix.LOCK_UN)
@@ -232,7 +232,7 @@ func SetFanLevel(level int) error { return setFanLevelAt(ProdFanPaths(), level) 
 
 func setFanLevelAt(paths FanPaths, level int) error {
 	if err := ValidateLevel(level); err != nil {
-		return err
+		return fmt.Errorf("%s: %w", err, ErrFanLevelNotAllowed)
 	}
 	expr := fmt.Sprintf("%s 1 %d", acpiFanPath("_FSL"), level)
 	return withFanLock(paths, func() error { return writeExpression(paths, expr) })

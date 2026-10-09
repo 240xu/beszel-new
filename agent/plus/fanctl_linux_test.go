@@ -192,7 +192,7 @@ func TestAcpiEvalGivesUpWhenLockIsHeld(t *testing.T) {
 	held, err := os.OpenFile(f.prod().Lock, os.O_CREATE|os.O_RDWR, 0o600)
 	require.NoError(t, err)
 	defer held.Close()
-	require.NoError(t, lockExclusive(int(held.Fd())))
+	require.NoError(t, lockExclusive(f.prod().Lock, int(held.Fd())))
 
 	start := time.Now()
 	_, err = acpiEvalAt(f.prod(), `\_SB.PCI0.LPCB.EC0.TFN1._FST 0`, 5*time.Second)
@@ -351,4 +351,144 @@ func TestPfandActiveNeedsNoFork(t *testing.T) {
 func statExists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
+}
+
+// The exported layer, the reject reasons, and the two failure paths below.
+// Every other test in this file injects FanPaths or calls the internal entry, so
+// none of it covers the seam Task 15 actually calls.
+
+func TestSetFanLevelExportedEntryReachesTheFixture(t *testing.T) {
+	f := newFixture(t)
+	f.assertIsolated(t)
+	require.NoError(t, SetFanLevel(40))
+	assert.Equal(t, `\_SB.PCI0.LPCB.EC0.TFN1._FSL 1 40`, f.written(),
+		"the exported entry must land the expression on the fixture device, verbatim")
+}
+
+func TestAcpiEvalExportedEntryReachesTheFixture(t *testing.T) {
+	f := newFixture(t)
+	f.assertIsolated(t)
+	f.appendResult(t, "[0,40,4294967295]")
+	got, err := AcpiEval(`\_SB.PCI0.LPCB.EC0.TFN1._FST 0`, 2*time.Second)
+	require.NoError(t, err)
+	assert.Equal(t, "[0,40,4294967295]", got)
+	assert.Equal(t, `\_SB.PCI0.LPCB.EC0.TFN1._FST 0`, f.written())
+}
+
+func TestGetFanLevelExportedEntryReachesTheFixture(t *testing.T) {
+	f := newFixture(t)
+	f.assertIsolated(t)
+	f.appendResult(t, "[0,70,4294967295]")
+	got, err := GetFanLevel()
+	require.NoError(t, err)
+	assert.Equal(t, 70, got)
+	assert.Equal(t, `\_SB.PCI0.LPCB.EC0.TFN1._FST 0`, f.written())
+}
+
+func TestReadEC76ExportedEntryReachesTheFixture(t *testing.T) {
+	f := newFixture(t)
+	f.assertIsolated(t)
+	f.appendResult(t, "25600")
+	got, err := ReadEC76()
+	require.NoError(t, err)
+	assert.Equal(t, 100, got)
+	assert.Equal(t, `\_SB.PCI0.LPCB.EC0.EC88 4 181 118 0 0`, f.written())
+}
+
+// TestPfandActiveExportedEntryDelegatesToProc pins the wrapper the four
+// pfandActiveIn tests never call. It compares against a scan of the same root
+// instead of a fixed boolean on purpose: the true answer is host state -- pfand
+// runs on the machine this was written on and does not run on CI -- so a literal
+// expectation could only ever pass on one of them. Delegation is the part of the
+// contract a test can check without asking the host anything.
+func TestPfandActiveExportedEntryDelegatesToProc(t *testing.T) {
+	assert.Equal(t, pfandActiveIn("/proc"), PfandActive(),
+		"the exported entry must be a pass-through to the /proc scan, not a second answer")
+}
+
+// TestSetFanLevelRejectionCarriesItsReason pins the reason a UI can switch on.
+// Task 15 has four outcomes to tell apart, and matching the English text is a
+// contract written in prose. The reason names the class; the detail has to
+// survive next to it, or the UI can classify but not explain.
+func TestSetFanLevelRejectionCarriesItsReason(t *testing.T) {
+	f := newFixture(t)
+	f.assertIsolated(t)
+	err := SetFanLevel(26)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrFanLevelNotAllowed)
+	assert.Contains(t, err.Error(), "invalid fan level",
+		"the reason names the class; the detail must still say which value was asked for")
+	assert.Empty(t, f.written(), "validation must run before the device is opened")
+}
+
+// TestUnreachableRejectReasonsStayUnwired is why the other three are declared and
+// not returned. ErrPackageTemperature and ErrThermalProfileT4 are Task 14's and
+// Task 13's guards, and a package producing them early would be advertising a
+// guard it does not have -- the silent wrong value this project treats as the
+// worst outcome. ErrPfandActive is a refusal Task 14 still has to decide: refuse,
+// or accept and let pfand overwrite on its next tick. Asking PfandActive here
+// would tie this test to whether pfand happens to run on the build host, and it
+// does run on this one.
+func TestUnreachableRejectReasonsStayUnwired(t *testing.T) {
+	f := newFixture(t)
+	f.assertIsolated(t)
+	err := SetFanLevel(50)
+	require.NoError(t, err, "a valid level on a healthy fixture is not a refusal")
+	assert.NotEmpty(t, f.written())
+	for _, reason := range []error{ErrPfandActive, ErrPackageTemperature, ErrThermalProfileT4} {
+		assert.NotErrorIs(t, err, reason)
+	}
+}
+
+// TestRejectReasonsAreDistinct keeps errors.Is usable: two sentinels sharing one
+// value collapse into a single reason, which is the failure these names exist to
+// remove.
+func TestRejectReasonsAreDistinct(t *testing.T) {
+	seen := map[error]bool{}
+	for _, reason := range []error{
+		ErrFanLevelNotAllowed, ErrPfandActive, ErrPackageTemperature, ErrThermalProfileT4,
+	} {
+		assert.NotEmpty(t, reason.Error(), "an unnamed reason is not a reason")
+		assert.Falsef(t, seen[reason], "%v is a duplicate sentinel, so errors.Is cannot tell them apart", reason)
+		seen[reason] = true
+	}
+}
+
+// TestSetFanLevelReportsAWriteFailure is the write-failure branch, which nothing
+// reached before: the missing-device cases stop inside deviceWritable, so
+// os.WriteFile never got the chance to fail. A directory standing in for the
+// device is the deterministic way to make it -- the guard still passes Stat, and
+// the write returns EISDIR. Dropping the error check makes this red, which is the
+// point: the caller would otherwise report the fan as set to a level nothing was
+// programmed with.
+func TestSetFanLevelReportsAWriteFailure(t *testing.T) {
+	f := newFixture(t)
+	require.NoError(t, os.Remove(f.device))
+	require.NoError(t, os.Mkdir(f.device, 0o755))
+	f.assertIsolated(t)
+
+	err := SetFanLevel(40)
+	require.Error(t, err, "a write that cannot succeed must not be reported as a set")
+	assert.Contains(t, err.Error(), "write device")
+	assert.NotErrorIs(t, err, ErrFanLevelNotAllowed,
+		"40 is on the whitelist, so this is an I/O failure and not a validation refusal")
+	assert.Equal(t, "", f.written(), "nothing reached the device, so nothing may claim otherwise")
+}
+
+// TestLockContentionNamesTheLockInUse keeps the contention message pointing at the
+// file that was actually locked. With PFAN_LOCK set, the constant would send
+// whoever reads the failure to a file nobody holds. The fixture lock lives in a
+// temp dir and cannot contain the production path as a substring, which is what
+// makes the NotContains a real assertion rather than a tautology.
+func TestLockContentionNamesTheLockInUse(t *testing.T) {
+	f := newFixture(t)
+	held, err := os.OpenFile(f.prod().Lock, os.O_CREATE|os.O_RDWR, 0o600)
+	require.NoError(t, err)
+	defer held.Close()
+	require.NoError(t, lockExclusive(f.prod().Lock, int(held.Fd())))
+
+	err = SetFanLevel(40)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), f.prod().Lock, "name the lock that was contended")
+	assert.NotContains(t, err.Error(), ProdFanLock, "not the constant, which is not the file in use")
 }

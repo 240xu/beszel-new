@@ -92,6 +92,11 @@ func TestThermalZoneMustBeAFilePath(t *testing.T) {
 		"/sys/class/thermal/thermal_zone9",
 		"/sys/class/thermal/",
 		"9",
+		// A relative path still ends in the right leaf, so only the "must be a
+		// full path" clause can catch it.
+		"sys/class/thermal/thermal_zone9/temp",
+		// Absolute and correctly named, but too shallow to be a zone file.
+		"/temp",
 	} {
 		src := strings.Replace(golden(t, "platform.conf"),
 			"THERMAL_ZONE=/sys/class/thermal/thermal_zone9/temp", "THERMAL_ZONE="+zone, 1)

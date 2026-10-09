@@ -127,6 +127,17 @@ func TestParseCurveRefusesJunk(t *testing.T) {
 	}
 }
 
+// TestParseCurveRefusesJunkInACompleteCurve isolates the junk check from the
+// missing-key check. Appending a command to an otherwise complete curve is the
+// dangerous case: every parameter is present, so only the refusal itself catches
+// it, and the daemon would source it.
+func TestParseCurveRefusesJunkInACompleteCurve(t *testing.T) {
+	for _, junk := range []string{"echo pwned", "rm -rf /", "exec /bin/sh", "curl evil"} {
+		_, err := ParseCurve(golden(t, "pfand.conf") + junk + "\n")
+		require.Errorf(t, err, "must refuse a complete curve followed by %q", junk)
+	}
+}
+
 // TestParseCurveRefusesUnknownKey covers a mistyped key. The daemon sources the
 // file over its own hardcoded defaults, so EMERG_RELX=75 leaves EMERG_REL at the
 // compiled-in value and the hysteresis inverts with nothing logged.
@@ -227,6 +238,10 @@ func TestValidateRejectsZeroLowestBand(t *testing.T) {
 	err = c.Validate()
 	require.Error(t, err, "L0=0 would make the lowest band a fan stop")
 	assert.Contains(t, err.Error(), "L0")
+	// The reason has to name the consequence, not merely that the value is
+	// unrecognised: 0 is in the duty whitelist, so an operator meeting it there
+	// needs to be told why it means something else in a curve.
+	assert.Contains(t, err.Error(), "stop")
 }
 
 func TestValidateRejectsLevelBelowFloorAndAboveCap(t *testing.T) {
@@ -238,6 +253,20 @@ func TestValidateRejectsLevelBelowFloorAndAboveCap(t *testing.T) {
 	require.NoError(t, err)
 	c.L5 = c.Cap + 1
 	assert.Error(t, c.Validate())
+}
+
+// TestValidateRejectsDutyAboveCapSeparatelyFromTheTrimTable pins the two band
+// rules apart. Every duty in the host's curve is inside the trim table, so
+// shrinking the cap below them is the only way the range check is the one that
+// fires; without this the range guard could be deleted unnoticed.
+func TestValidateRejectsDutyAboveCapSeparatelyFromTheTrimTable(t *testing.T) {
+	for _, cap := range []int{40, 50, 60, 69} {
+		c, err := ParseCurve(golden(t, "pfand.conf"))
+		require.NoError(t, err)
+		c.Cap = cap
+		err = c.Validate()
+		require.Errorf(t, err, "CAP=%d leaves duties above the cap while all stay in the trim table", cap)
+	}
 }
 
 // TestValidateRejectsBandsOutsideTheTrimTable covers a rule neither host

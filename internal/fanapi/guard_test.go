@@ -43,6 +43,8 @@ type fixture struct {
 	g   *Guard
 	now time.Time
 
+	confirm bool
+
 	temp    int
 	tempErr error
 
@@ -70,7 +72,7 @@ type fixture struct {
 }
 
 func newFixture(t *testing.T) *fixture {
-	f := &fixture{t: t, now: time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC), temp: 46}
+	f := &fixture{t: t, now: time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC), temp: 46, confirm: true}
 	c, err := plus.ParseCurve(goldenCurve)
 	require.NoError(t, err, "the golden curve must parse")
 	require.Equal(t, 80, c.Emerg, "the write guard is anchored on this edge")
@@ -132,6 +134,10 @@ func (f *fixture) getLevel() (int, error) {
 }
 
 func (f *fixture) advance(d time.Duration) { f.now = f.now.Add(d) }
+
+func (f *fixture) req() Request {
+	return Request{Confirm: f.confirm, Actor: "tester"}
+}
 
 // ---- confirm ----
 
@@ -289,14 +295,46 @@ func TestAFailedProbeReopensTheBreaker(t *testing.T) {
 
 func TestGuardRejectionsDoNotTripTheBreaker(t *testing.T) {
 	f := newFixture(t)
-	for i := 0; i < breakerThreshold*3; i++ {
-		f.temp = 80
-		_, err := f.g.SetManualLevel(70, confirmed)
-		require.ErrorIs(t, err, plus.ErrPackageTemperature)
+	// Every kind of "no" the guard can give, not just one: the invariant is that
+	// none of them is evidence of a broken device.
+	refuse := func(mark func()) {
+		mark()
+		_, err := f.g.SetManualLevel(70, f.req())
+		require.Error(t, err, "the write should have been refused")
+		_, err = f.g.SetManualLevel(73, f.req())
+		require.Error(t, err, "the duty is outside the whitelist")
 	}
-	f.temp = 46
-	_, err := f.g.SetManualLevel(70, confirmed)
+	for i := 0; i < breakerThreshold; i++ {
+		refuse(func() { f.confirm = false })
+		refuse(func() { f.pfand = true })
+		refuse(func() { f.temp = 80 })
+		refuse(func() { f.tempErr = errors.New("zone gone") })
+		refuse(func() { f.curveErr = errors.New("no curve") })
+	}
+	f.confirm, f.pfand, f.temp, f.tempErr, f.curveErr = true, false, 46, nil, nil
+	_, err := f.g.SetManualLevel(70, f.req())
 	assert.NoError(t, err, "a guard doing its job is not a broken control path")
+}
+
+func TestAManualDutyIsHeldForTenMinutes(t *testing.T) {
+	f := newFixture(t)
+	_, err := f.g.SetManualLevel(70, confirmed)
+	require.NoError(t, err)
+	// Spelled out rather than reusing the constant, so the value the product
+	// asked for is the thing under test and not a tautology.
+	assert.Equal(t, f.now.Add(10*time.Minute), f.g.PendingRegressAt(),
+		"a manual override is a temporary measure, and the window is part of the contract")
+}
+
+func TestAFurtherManualWriteRestartsTheTenMinuteWindow(t *testing.T) {
+	f := newFixture(t)
+	_, err := f.g.SetManualLevel(70, confirmed)
+	require.NoError(t, err)
+	f.advance(9 * time.Minute)
+	_, err = f.g.SetManualLevel(50, confirmed)
+	require.NoError(t, err)
+	assert.Equal(t, f.now.Add(10*time.Minute), f.g.PendingRegressAt(),
+		"the window restarts, otherwise the newest request would outlive its own term")
 }
 
 func openBreaker(t *testing.T) *fixture {

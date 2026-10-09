@@ -2,6 +2,7 @@ package fanapi
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,28 +14,28 @@ import (
 // goldenCurve is the curve this host runs: the six band duties the trim table
 // can address, and an emergency edge that coincides with the write guard.
 const goldenCurve = `IDLE=50
-L0=25
-T1=56
-L1=30
-T2=62
-L2=40
-T3=67
-L3=50
-T4=72
-L4=60
-T5=79
-L5=70
-EMERG=80
-E=100
-EMERG_REL=75
-CAP=70
-TRIM=6
-GAIN=1
-HYST=3
-DWELL=30
-DEAD=2
-IV=10
-`
+    L0=25
+    T1=56
+    L1=30
+    T2=62
+    L2=40
+    T3=67
+    L3=50
+    T4=72
+    L4=60
+    T5=79
+    L5=70
+    EMERG=80
+    E=100
+    EMERG_REL=75
+    CAP=70
+    TRIM=6
+    GAIN=1
+    HYST=3
+    DWELL=30
+    DEAD=2
+    IV=10
+    `
 
 var confirmed = Request{Confirm: true, Actor: "tester"}
 
@@ -64,8 +65,16 @@ type fixture struct {
 	curveErr   error
 	writeErr   error
 	// corruptAfterWrite lets a write land and then come back wrong, which is the
-	// only way to reach the restore branch of a curve edit.
+	// only way to reach the restore branch of a curve edit when the restore is
+	// itself broken.
 	corruptAfterWrite bool
+	// written records that a write got through, so a read-back can be told apart
+	// from the read that captured what was there before it.
+	written bool
+	// readBackAs is the curve a read-back sees once a write has landed. It is how
+	// a restore that *succeeds* is reached at all: the disk answers with a curve
+	// that is not the one written, and the write that undoes it works.
+	readBackAs string
 
 	writeCalls []int
 	events     []Event
@@ -94,6 +103,9 @@ func newFixture(t *testing.T) *fixture {
 			if f.curveErr != nil {
 				return nil, f.curveErr
 			}
+			if f.readBackAs != "" && f.written {
+				return []byte(f.readBackAs), nil
+			}
 			return append([]byte(nil), f.curveBytes...), nil
 		},
 		WriteCurveBytes: func(b []byte) error {
@@ -101,6 +113,7 @@ func newFixture(t *testing.T) *fixture {
 				return f.writeErr
 			}
 			f.curveBytes = append([]byte(nil), b...)
+			f.written = true
 			if f.corruptAfterWrite {
 				// The filesystem goes away between the write and the read-back, so
 				// both the verification and the restore have to cope with it.
@@ -138,6 +151,8 @@ func (f *fixture) advance(d time.Duration) { f.now = f.now.Add(d) }
 func (f *fixture) req() Request {
 	return Request{Confirm: f.confirm, Actor: "tester"}
 }
+
+func (f *fixture) lastEvent() Event { return f.events[len(f.events)-1] }
 
 // ---- confirm ----
 
@@ -228,20 +243,121 @@ func TestCurveEditStaysAvailableWhilePfandRuns(t *testing.T) {
 	assert.True(t, res.Applied)
 }
 
-// ---- circuit breaker ----
+// ---- every refusal is a refusal, and none of them is a fault ----
+//
+// Each case runs on its own fixture and asserts its own sentinel. A shared
+// fixture is what made the earlier version of this test cover one refusal while
+// claiming to cover five: the first case left a flag standing, and every later
+// case was short-circuited by it before it reached its own guard.
 
-func TestBreakerOpensAfterConsecutiveFailures(t *testing.T) {
+func TestGuardRejectionsDoNotTripTheBreaker(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		want  error
+		setup func(*fixture)
+		ask   func(*fixture) error
+		allow func(*fixture) error
+	}{
+		{
+			name:  "the write was not confirmed",
+			want:  ErrNotConfirmed,
+			setup: func(f *fixture) { f.confirm = false },
+			ask:   func(f *fixture) error { _, err := f.g.SetManualLevel(70, f.req()); return err },
+			allow: func(f *fixture) error { f.confirm = true; _, err := f.g.SetManualLevel(70, f.req()); return err },
+		},
+		{
+			name:  "the duty is outside the whitelist",
+			want:  plus.ErrFanLevelNotAllowed,
+			ask:   func(f *fixture) error { _, err := f.g.SetManualLevel(73, confirmed); return err },
+			allow: func(f *fixture) error { _, err := f.g.SetManualLevel(70, confirmed); return err },
+		},
+		{
+			name:  "the daemon owns the fan",
+			want:  plus.ErrPfandActive,
+			setup: func(f *fixture) { f.pfand = true },
+			ask:   func(f *fixture) error { _, err := f.g.SetManualLevel(70, confirmed); return err },
+			allow: func(f *fixture) error { f.pfand = false; _, err := f.g.SetManualLevel(70, confirmed); return err },
+		},
+		{
+			name:  "the package is at the emergency edge",
+			want:  plus.ErrPackageTemperature,
+			setup: func(f *fixture) { f.temp = 80 },
+			ask:   func(f *fixture) error { _, err := f.g.SetManualLevel(70, confirmed); return err },
+			allow: func(f *fixture) error { f.temp = 46; _, err := f.g.SetManualLevel(70, confirmed); return err },
+		},
+		{
+			name:  "the package temperature is unknown",
+			want:  ErrTemperatureUnknown,
+			setup: func(f *fixture) { f.tempErr = errors.New("zone gone") },
+			ask:   func(f *fixture) error { _, err := f.g.SetManualLevel(70, confirmed); return err },
+			allow: func(f *fixture) error { f.tempErr = nil; _, err := f.g.SetManualLevel(70, confirmed); return err },
+		},
+		{
+			name:  "the curve cannot be read",
+			want:  ErrTemperatureUnknown,
+			setup: func(f *fixture) { f.curveErr = errors.New("no such file") },
+			ask:   func(f *fixture) error { _, err := f.g.SetManualLevel(70, confirmed); return err },
+			allow: func(f *fixture) error { f.curveErr = nil; _, err := f.g.SetManualLevel(70, confirmed); return err },
+		},
+		{
+			name: "the curve is one the host would not run",
+			want: ErrCurveRejected,
+			ask: func(f *fixture) error {
+				c := mustCurve(f.t)
+				c.L3 = 80 // outside the trim table
+				_, err := f.g.WriteCurve(c, confirmed)
+				return err
+			},
+			allow: func(f *fixture) error {
+				c := mustCurve(f.t)
+				c.Trim = 9
+				_, err := f.g.WriteCurve(c, confirmed)
+				return err
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFixture(t)
+			if tc.setup != nil {
+				tc.setup(f)
+			}
+			// More refusals than it takes to open the breaker. If any of these
+			// counted as a fault the path would be latched by now, and the write
+			// that follows would be refused with ErrBreakerOpen instead of landing.
+			for i := 0; i < 4; i++ {
+				err := tc.ask(f)
+				require.ErrorIs(t, err, tc.want,
+					"refusal %d must be this refusal, not some other one short-circuiting it", i+1)
+			}
+			require.NoError(t, tc.allow(f),
+				"a guard doing its job is not a broken control path, so the breaker must still be closed")
+		})
+	}
+}
+
+// ---- circuit breaker ----
+//
+// The count and the window are spelled out rather than reused from the
+// constants, so a change to either shows up as a failure instead of quietly
+// re-deriving the expectations from the value under test.
+
+func TestBreakerOpensOnTheThirdConsecutiveFailure(t *testing.T) {
 	f := newFixture(t)
 	f.setErr = errors.New("device busy")
-	for i := 0; i < breakerThreshold; i++ {
+	for i := 0; i < 2; i++ {
 		_, err := f.g.SetManualLevel(70, confirmed)
 		require.Error(t, err)
-		require.NotErrorIs(t, err, ErrBreakerOpen, "the breaker has not opened yet on attempt %d", i+1)
+		require.NotErrorIs(t, err, ErrBreakerOpen, "two failures are not enough, this is failure %d", i+1)
 	}
-	callsBefore := len(f.writeCalls)
 	_, err := f.g.SetManualLevel(70, confirmed)
+	require.Error(t, err)
+	require.NotErrorIs(t, err, ErrBreakerOpen,
+		"the third failure is what the breaker trips on, and it is reported as the failure it is")
+
+	calls := len(f.writeCalls)
+	_, err = f.g.SetManualLevel(70, confirmed)
 	require.ErrorIs(t, err, ErrBreakerOpen)
-	assert.Len(t, f.writeCalls, callsBefore, "an open breaker must not reach the device")
+	assert.Len(t, f.writeCalls, calls, "an open breaker must not reach the device")
 }
 
 func TestBreakerClosesOnASuccessBeforeTheThreshold(t *testing.T) {
@@ -253,28 +369,28 @@ func TestBreakerClosesOnASuccessBeforeTheThreshold(t *testing.T) {
 	_, err = f.g.SetManualLevel(70, confirmed)
 	require.NoError(t, err)
 	f.setErr = errors.New("device busy")
-	for i := 0; i < breakerThreshold; i++ {
+	for i := 0; i < 3; i++ {
 		_, err := f.g.SetManualLevel(70, confirmed)
 		require.NotErrorIs(t, err, ErrBreakerOpen, "the run of failures restarted, so attempt %d still reaches the device", i+1)
 	}
 }
 
-func TestBreakerStaysOpenUntilTheCooldownElapses(t *testing.T) {
+func TestBreakerStaysShutUntilTheCooldownElapses(t *testing.T) {
 	f := openBreaker(t)
-	f.advance(breakerCooldown - time.Second)
+	f.advance(2*time.Minute - time.Second)
 	_, err := f.g.SetManualLevel(70, confirmed)
 	assert.ErrorIs(t, err, ErrBreakerOpen, "half a cooldown is not a probe")
 }
 
 func TestBreakerRecoversThroughAProbe(t *testing.T) {
 	f := openBreaker(t)
-	f.advance(breakerCooldown)
+	f.advance(2 * time.Minute)
 	f.setErr = nil
 	res, err := f.g.SetManualLevel(70, confirmed)
 	require.NoError(t, err, "the probe confirms the device works again")
 	assert.Equal(t, 70, res.Level)
 	f.setErr = errors.New("device busy")
-	for i := 0; i < breakerThreshold; i++ {
+	for i := 0; i < 3; i++ {
 		_, err := f.g.SetManualLevel(70, confirmed)
 		require.NotErrorIs(t, err, ErrBreakerOpen, "the breaker is closed again, so failure %d must reach the device", i+1)
 	}
@@ -282,7 +398,7 @@ func TestBreakerRecoversThroughAProbe(t *testing.T) {
 
 func TestAFailedProbeReopensTheBreaker(t *testing.T) {
 	f := openBreaker(t)
-	f.advance(breakerCooldown)
+	f.advance(2 * time.Minute)
 	_, err := f.g.SetManualLevel(70, confirmed)
 	require.Error(t, err, "the device is still broken")
 	require.NotErrorIs(t, err, ErrBreakerOpen, "the probe was admitted, it just failed")
@@ -293,37 +409,120 @@ func TestAFailedProbeReopensTheBreaker(t *testing.T) {
 	assert.Len(t, f.writeCalls, calls, "the second call must not reach the device")
 }
 
-func TestGuardRejectionsDoNotTripTheBreaker(t *testing.T) {
-	f := newFixture(t)
-	// Every kind of "no" the guard can give, not just one: the invariant is that
-	// none of them is evidence of a broken device.
-	refuse := func(mark func()) {
-		mark()
-		_, err := f.g.SetManualLevel(70, f.req())
-		require.Error(t, err, "the write should have been refused")
-		_, err = f.g.SetManualLevel(73, f.req())
-		require.Error(t, err, "the duty is outside the whitelist")
+// TestARefusalNeverConsumesTheHalfOpenProbe is the recovery half of C1. A guard
+// that refuses before the device is reached learned nothing about the device, so
+// it must not spend the probe that exists to find out whether the device works.
+// Each case is one early exit: a reservation that survived a refusal left the
+// breaker half-open with its probe already taken, and every caller after that —
+// including a caller whose guards were all satisfied and whose device was fine —
+// was refused forever, recoverable only by restarting the agent.
+func TestARefusalNeverConsumesTheHalfOpenProbe(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		want  error
+		setup func(*fixture)
+		ask   func(*fixture) error
+		allow func(*fixture) error
+	}{
+		{
+			name:  "pfand owns the fan",
+			want:  plus.ErrPfandActive,
+			setup: func(f *fixture) { f.pfand = true },
+			ask:   func(f *fixture) error { _, err := f.g.SetManualLevel(70, confirmed); return err },
+			allow: func(f *fixture) error { f.pfand = false; _, err := f.g.SetManualLevel(70, confirmed); return err },
+		},
+		{
+			name:  "the package is at the emergency edge",
+			want:  plus.ErrPackageTemperature,
+			setup: func(f *fixture) { f.temp = 80 },
+			ask:   func(f *fixture) error { _, err := f.g.SetManualLevel(70, confirmed); return err },
+			allow: func(f *fixture) error { f.temp = 46; _, err := f.g.SetManualLevel(70, confirmed); return err },
+		},
+		{
+			name:  "the package temperature is unknown",
+			want:  ErrTemperatureUnknown,
+			setup: func(f *fixture) { f.tempErr = errors.New("zone gone") },
+			ask:   func(f *fixture) error { _, err := f.g.SetManualLevel(70, confirmed); return err },
+			allow: func(f *fixture) error { f.tempErr = nil; _, err := f.g.SetManualLevel(70, confirmed); return err },
+		},
+		{
+			name:  "the write was not confirmed",
+			want:  ErrNotConfirmed,
+			setup: func(f *fixture) { f.confirm = false },
+			ask:   func(f *fixture) error { _, err := f.g.SetManualLevel(70, f.req()); return err },
+			allow: func(f *fixture) error { f.confirm = true; _, err := f.g.SetManualLevel(70, f.req()); return err },
+		},
+		{
+			name: "the curve is one the host would not run",
+			want: ErrCurveRejected,
+			ask: func(f *fixture) error {
+				c := mustCurve(f.t)
+				c.L3 = 80
+				_, err := f.g.WriteCurve(c, confirmed)
+				return err
+			},
+			allow: func(f *fixture) error {
+				c := mustCurve(f.t)
+				c.Trim = 9
+				_, err := f.g.WriteCurve(c, confirmed)
+				return err
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := openBreaker(t)
+			f.advance(2 * time.Minute)
+			f.setErr = nil // the device recovered; only the guard stands in the way
+			if tc.setup != nil {
+				tc.setup(f)
+			}
+
+			require.ErrorIs(t, tc.ask(f), tc.want)
+			// Twice, so a reservation leaked on one call cannot look like it was
+			// merely taken and then spent on the next one.
+			require.ErrorIs(t, tc.ask(f), tc.want)
+
+			require.NoError(t, tc.allow(f),
+				"the guard has stood down and the device is healthy, so the breaker owes a probe to this write")
+		})
 	}
-	for i := 0; i < breakerThreshold; i++ {
-		refuse(func() { f.confirm = false })
-		refuse(func() { f.pfand = true })
-		refuse(func() { f.temp = 80 })
-		refuse(func() { f.tempErr = errors.New("zone gone") })
-		refuse(func() { f.curveErr = errors.New("no curve") })
-	}
-	f.confirm, f.pfand, f.temp, f.tempErr, f.curveErr = true, false, 46, nil, nil
-	_, err := f.g.SetManualLevel(70, f.req())
-	assert.NoError(t, err, "a guard doing its job is not a broken control path")
+}
+
+// TestAGuardRefusalIsReportedAheadOfTheBreakerLocksDownThePrecedence. Admission
+// runs after the guards, so a caller whose guards refuse is told which guard it
+// was. The alternative ordering is defensible on its own terms — a latch is the
+// more persistent fact — so the choice is pinned here rather than left to
+// whichever order the code happens to be written in: an operator told "the
+// daemon owns the fan" stops the daemon and is then told the latch, which is two
+// round trips but loses no information either way.
+func TestAGuardRefusalIsReportedAheadOfTheBreaker(t *testing.T) {
+	f := openBreaker(t)
+	f.pfand = true
+	_, err := f.g.SetManualLevel(70, confirmed)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, plus.ErrPfandActive,
+		"the guard that stood in the way is the thing the caller has to act on")
+	assert.NotErrorIs(t, err, ErrBreakerOpen,
+		"and the latch is not what this attempt was refused for")
+
+	// With the guard gone, the same call now surfaces the latch, so nothing was
+	// hidden by reporting the guard first.
+	f.pfand = false
+	_, err = f.g.SetManualLevel(70, confirmed)
+	assert.ErrorIs(t, err, ErrBreakerOpen)
 }
 
 func TestAManualDutyIsHeldForTenMinutes(t *testing.T) {
 	f := newFixture(t)
-	_, err := f.g.SetManualLevel(70, confirmed)
+	res, err := f.g.SetManualLevel(70, confirmed)
 	require.NoError(t, err)
 	// Spelled out rather than reusing the constant, so the value the product
 	// asked for is the thing under test and not a tautology.
-	assert.Equal(t, f.now.Add(10*time.Minute), f.g.PendingRegressAt(),
+	want := f.now.Add(10 * time.Minute)
+	assert.Equal(t, want, f.g.PendingRegressAt(),
 		"a manual override is a temporary measure, and the window is part of the contract")
+	assert.Equal(t, want, res.RegressAt,
+		"the caller is told the deadline in the result it already has, not only through a second call")
 }
 
 func TestAFurtherManualWriteRestartsTheTenMinuteWindow(t *testing.T) {
@@ -331,17 +530,60 @@ func TestAFurtherManualWriteRestartsTheTenMinuteWindow(t *testing.T) {
 	_, err := f.g.SetManualLevel(70, confirmed)
 	require.NoError(t, err)
 	f.advance(9 * time.Minute)
-	_, err = f.g.SetManualLevel(50, confirmed)
+	res, err := f.g.SetManualLevel(50, confirmed)
 	require.NoError(t, err)
-	assert.Equal(t, f.now.Add(10*time.Minute), f.g.PendingRegressAt(),
+	want := f.now.Add(10 * time.Minute)
+	assert.Equal(t, want, f.g.PendingRegressAt(),
 		"the window restarts, otherwise the newest request would outlive its own term")
+	assert.Equal(t, want, res.RegressAt, "the result carries the same deadline the guard holds")
+}
+
+func TestARefusedWriteReportsNoDeadline(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		setup func(*fixture)
+		ask   func(*fixture) (Result, error)
+	}{
+		{"not confirmed", func(f *fixture) { f.confirm = false },
+			func(f *fixture) (Result, error) { return f.g.SetManualLevel(70, f.req()) }},
+		{"pfand owns the fan", func(f *fixture) { f.pfand = true },
+			func(f *fixture) (Result, error) { return f.g.SetManualLevel(70, confirmed) }},
+		{"at the emergency edge", func(f *fixture) { f.temp = 80 },
+			func(f *fixture) (Result, error) { return f.g.SetManualLevel(70, confirmed) }},
+		{"the write lost its race", func(f *fixture) {
+			other := 40
+			f.loseRaceTo = &other
+		},
+			func(f *fixture) (Result, error) { return f.g.SetManualLevel(70, confirmed) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFixture(t)
+			tc.setup(f)
+			res, err := tc.ask(f)
+			require.Error(t, err, "a write that did not land is not a write")
+			assert.True(t, res.RegressAt.IsZero(),
+				"nothing was programmed, so nothing is due to be handed back and no deadline may be promised")
+			assert.False(t, res.Applied)
+		})
+	}
+}
+
+func TestACurveEditPromisesNoDeadline(t *testing.T) {
+	f := newFixture(t)
+	c := mustCurve(t)
+	c.Trim = 9
+	res, err := f.g.WriteCurve(c, confirmed)
+	require.NoError(t, err)
+	assert.True(t, res.RegressAt.IsZero(),
+		"a curve edit schedules no handover: the curve is what the fan runs on")
+	assert.True(t, f.g.PendingRegressAt().IsZero())
 }
 
 func openBreaker(t *testing.T) *fixture {
 	t.Helper()
 	f := newFixture(t)
 	f.setErr = errors.New("device busy")
-	for i := 0; i < breakerThreshold; i++ {
+	for i := 0; i < 3; i++ {
 		_, err := f.g.SetManualLevel(70, confirmed)
 		require.Error(t, err)
 	}
@@ -401,6 +643,32 @@ func TestAFailedCurveRollbackIsReported(t *testing.T) {
 	assert.False(t, res.Applied, "a caller reading Applied would believe the old curve is back in force")
 }
 
+// TestACurveRollbackRestoresTheBytesNotARendering is the fixture that makes the
+// difference between the two visible. Here the read-back disagrees with what was
+// written *and* the restore works, so the bytes that end up on disk are
+// observable. They have to be the ones that were there, comment line and all:
+// re-rendering would substitute a file the daemon was never running.
+func TestACurveRollbackRestoresTheBytesNotARendering(t *testing.T) {
+	f := newFixture(t)
+	// An operator's file, with a comment Render would never emit and spacing it
+	// does not produce.
+	running := goldenCurve + "# tuned by hand for the 2019 chassis\n"
+	f.curveBytes = []byte(running)
+	// The disk answers the read-back with a different, valid curve, so the
+	// verification fails and the guard has to put the old file back.
+	f.readBackAs = strings.Replace(goldenCurve, "TRIM=6", "TRIM=8", 1)
+
+	c := mustCurve(t)
+	c.Trim = 9
+	res, err := f.g.WriteCurve(c, confirmed)
+	require.Error(t, err, "the curve on disk is not the one that was written")
+	assert.ErrorIs(t, err, ErrWriteUnconfirmed)
+	assert.NotErrorIs(t, err, ErrRollbackFailed, "the restore itself works here, which is the point")
+	assert.False(t, res.Applied)
+	assert.Equal(t, running, string(f.curveBytes),
+		"a restore must reproduce the bytes that were running, not a fresh rendering of them")
+}
+
 // ---- plan falsification: the guard must follow the real validator ----
 
 func TestCurveEditUsesTheRealValidatorNotAPlanLiteral(t *testing.T) {
@@ -444,7 +712,7 @@ func TestRegressDoesNotFireBeforeItsDeadline(t *testing.T) {
 	_, err := f.g.SetManualLevel(70, confirmed)
 	require.NoError(t, err)
 	f.writeCalls = nil
-	f.advance(RegressAfter - time.Second)
+	f.advance(10*time.Minute - time.Second)
 	did, err := f.g.Regress()
 	require.NoError(t, err)
 	assert.False(t, did, "the fan is still meant to hold the level it was given")
@@ -456,7 +724,7 @@ func TestRegressReturnsToAutoAtItsDeadline(t *testing.T) {
 	_, err := f.g.SetManualLevel(70, confirmed)
 	require.NoError(t, err)
 	f.writeCalls = nil
-	f.advance(RegressAfter)
+	f.advance(10 * time.Minute)
 	did, err := f.g.Regress()
 	require.NoError(t, err)
 	require.True(t, did)
@@ -469,7 +737,7 @@ func TestRegressYieldsWhenPfandHasTakenOver(t *testing.T) {
 	_, err := f.g.SetManualLevel(70, confirmed)
 	require.NoError(t, err)
 	f.writeCalls = nil
-	f.advance(RegressAfter)
+	f.advance(10 * time.Minute)
 	f.pfand = true
 	did, err := f.g.Regress()
 	require.NoError(t, err, "the daemon owns the fan now; a regress would fight it")
@@ -482,7 +750,7 @@ func TestRegressIsHeldBackWhileTheEmergencyEdgeIsReached(t *testing.T) {
 	_, err := f.g.SetManualLevel(70, confirmed)
 	require.NoError(t, err)
 	f.writeCalls = nil
-	f.advance(RegressAfter)
+	f.advance(10 * time.Minute)
 	f.temp = 80
 	did, err := f.g.Regress()
 	require.NoError(t, err)
@@ -501,7 +769,7 @@ func TestRegressIsHeldBackWhileTheTemperatureIsUnreadable(t *testing.T) {
 	_, err := f.g.SetManualLevel(70, confirmed)
 	require.NoError(t, err)
 	f.writeCalls = nil
-	f.advance(RegressAfter)
+	f.advance(10 * time.Minute)
 	f.tempErr = errors.New("zone gone")
 	did, err := f.g.Regress()
 	require.NoError(t, err)
@@ -513,14 +781,14 @@ func TestANewManualWriteExtendsTheRegressDeadline(t *testing.T) {
 	f := newFixture(t)
 	_, err := f.g.SetManualLevel(70, confirmed)
 	require.NoError(t, err)
-	f.advance(RegressAfter / 2)
+	f.advance(5 * time.Minute)
 	_, err = f.g.SetManualLevel(50, confirmed)
 	require.NoError(t, err)
-	f.advance(RegressAfter/2 + time.Second)
+	f.advance(5*time.Minute + time.Second)
 	did, err := f.g.Regress()
 	require.NoError(t, err)
 	assert.False(t, did, "the second write is what the deadline belongs to")
-	f.advance(RegressAfter)
+	f.advance(10 * time.Minute)
 	did, err = f.g.Regress()
 	require.NoError(t, err)
 	assert.True(t, did)
@@ -532,12 +800,12 @@ func TestAHeldBackRegressDoesNotBurnAHalfOpenProbe(t *testing.T) {
 	require.NoError(t, err)
 
 	f.setErr = errors.New("device busy")
-	for i := 0; i < breakerThreshold; i++ {
+	for i := 0; i < 3; i++ {
 		_, err := f.g.SetManualLevel(70, confirmed)
 		require.Error(t, err)
 	}
 	f.setErr = nil
-	f.advance(RegressAfter + breakerCooldown)
+	f.advance(10*time.Minute + 2*time.Minute)
 	f.temp = 80
 	did, err := f.g.Regress()
 	require.NoError(t, err)
@@ -564,7 +832,7 @@ func TestAFailedRegressStaysPending(t *testing.T) {
 	f := newFixture(t)
 	_, err := f.g.SetManualLevel(70, confirmed)
 	require.NoError(t, err)
-	f.advance(RegressAfter)
+	f.advance(10 * time.Minute)
 	f.setErr = errors.New("device busy")
 	did, err := f.g.Regress()
 	require.Error(t, err)
@@ -587,7 +855,74 @@ func TestEveryAttemptIsAudited(t *testing.T) {
 	assert.Equal(t, OpSetLevel, f.events[0].Op)
 	assert.Equal(t, OutcomeApplied, f.events[1].Outcome)
 	assert.Equal(t, "tester", f.events[1].Actor)
+	assert.Equal(t, 70, f.events[1].Level,
+		"a record of what was done has to say what was done to it")
 	assert.False(t, f.events[1].At.IsZero(), "an audit record with no time cannot be ordered against an incident")
+}
+
+// TestARegressThatDidNotWriteIsNotAuditedAsApplied separates "the fan went back
+// to its curve" from "a safety gate declined to send it there". Both return no
+// error, so an outcome that defaults to applied told an operator reading the log
+// that the handover had happened while the fan was still being held.
+func TestARegressThatDidNotWriteIsNotAuditedAsApplied(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		pending bool
+		setup   func(*fixture)
+		want    string
+	}{
+		{"nothing was pending", false, func(*fixture) {}, "no manual duty was pending"},
+		{"the daemon took over", true, func(f *fixture) { f.pfand = true }, "the daemon owns the fan"},
+		{"the emergency edge is reached", true, func(f *fixture) { f.temp = 80 }, "emergency edge"},
+		{"the temperature is unknown", true, func(f *fixture) { f.tempErr = errors.New("zone gone") }, "temperature"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFixture(t)
+			if tc.pending {
+				_, err := f.g.SetManualLevel(70, confirmed)
+				require.NoError(t, err)
+				f.advance(10 * time.Minute)
+			}
+			tc.setup(f)
+
+			did, err := f.g.Regress()
+			require.NoError(t, err, "declining to write is not a failure")
+			require.False(t, did)
+
+			e := f.lastEvent()
+			assert.Equal(t, OpRegress, e.Op)
+			assert.Equal(t, OutcomeRefused, e.Outcome,
+				"the write did not happen, and an applied outcome would say that it did")
+			assert.Contains(t, e.Reason, tc.want,
+				"an operator reading the log is owed which gate stood in the way")
+			assert.False(t, e.At.IsZero())
+		})
+	}
+}
+
+func TestASucceededRegressIsAuditedAsApplied(t *testing.T) {
+	f := newFixture(t)
+	_, err := f.g.SetManualLevel(70, confirmed)
+	require.NoError(t, err)
+	f.advance(10 * time.Minute)
+
+	did, err := f.g.Regress()
+	require.NoError(t, err)
+	require.True(t, did)
+	assert.Equal(t, OutcomeApplied, f.lastEvent().Outcome)
+}
+
+func TestAFailedRegressIsAuditedAsFailed(t *testing.T) {
+	f := newFixture(t)
+	_, err := f.g.SetManualLevel(70, confirmed)
+	require.NoError(t, err)
+	f.advance(10 * time.Minute)
+	f.setErr = errors.New("device busy")
+
+	did, err := f.g.Regress()
+	require.Error(t, err)
+	assert.False(t, did)
+	assert.Equal(t, OutcomeFailed, f.lastEvent().Outcome)
 }
 
 func mustCurve(t *testing.T) *plus.Curve {

@@ -1,9 +1,7 @@
-// Package fanapi guards every write that changes how the fan runs.
-//
-// agent/plus knows how to program a duty and how to validate a curve. This
-// package decides whether the write is allowed, proves it landed, puts the fan
-// back when it did not, and hands it back to the curve on a timer so a manual
-// override cannot outlive its reason.
+// Package fanapi guards every write that changes how the fan runs. agent/plus
+// knows how to program a duty and validate a curve; this package decides whether
+// the write is allowed, proves it landed, puts the fan back when it did not, and
+// hands it back to the curve on a timer.
 package fanapi
 
 import (
@@ -58,8 +56,8 @@ const (
 	OutcomeFailed  Outcome = "failed"
 )
 
-// Event is one audited attempt. Every path emits exactly one, including
-// refusals: a write that never happened is what an incident review needs.
+// Event is one audited attempt. Every path emits exactly one, refusals included:
+// a write that never happened is what an incident review needs.
 type Event struct {
 	Op      Op
 	Outcome Outcome
@@ -113,11 +111,11 @@ type breaker struct {
 	state    breakerState
 	failures int
 	openedAt time.Time
-	probing  bool
 }
 
-// Guard is the guardrail. The mutex is what stops a second caller slipping past
-// a half-open probe that is already in flight.
+// Guard is the guardrail. The mutex is the whole of the "one half-open probe at a
+// time" guarantee, which is why the breaker holds no reservation flag of its own:
+// see admit.
 type Guard struct {
 	d  Deps
 	mu sync.Mutex
@@ -157,13 +155,13 @@ func (g *Guard) setLevelLocked(level int, req Request, now time.Time) (Result, e
 	if err := plus.ValidateLevel(level); err != nil {
 		return Result{}, fmt.Errorf("%s: %w", err, plus.ErrFanLevelNotAllowed)
 	}
-	if err := g.admit(now); err != nil {
-		return Result{}, err
-	}
-	// The daemon rewrites the duty every interval, so a manual level programmed
-	// under it would be overwritten before anyone could act on the panel's claim
-	// that it was set. Refusing is honest; winning a race lost on the next tick
-	// is not.
+	// The daemon rewrites the duty whenever its own result moves the fan by more
+	// than its dead zone, so a manual level programmed under it would be undone a
+	// tick or two later — before anyone could act on the panel's claim that it was
+	// set. Refusing is honest; winning a race lost on the next tick is not. Its
+	// fail-safe reads a device candidate list, so a host whose list is unreadable
+	// has a daemon that logs and writes nothing at all: "the daemon is up" is the
+	// conservative reading, and being wrong that way costs a refused write.
 	if g.d.PfandUp() {
 		return Result{}, fmt.Errorf("duty %d: %w", level, plus.ErrPfandActive)
 	}
@@ -174,6 +172,10 @@ func (g *Guard) setLevelLocked(level int, req Request, now time.Time) (Result, e
 	if temp >= emerg {
 		return Result{}, fmt.Errorf("duty %d at %dC, emergency edge is %dC: %w",
 			level, temp, emerg, plus.ErrPackageTemperature)
+	}
+	// Admission last, before the first byte moves; see admit.
+	if err := g.admit(now); err != nil {
+		return Result{}, err
 	}
 
 	prev, err := g.d.GetLevel()
@@ -199,7 +201,7 @@ func (g *Guard) setLevelLocked(level int, req Request, now time.Time) (Result, e
 		}
 		return Result{}, unconfirmed
 	}
-	g.record(now)
+	g.record()
 	g.scheduleRegressLocked(now)
 	return Result{Applied: true, Level: level, RegressAt: g.regressAt}, nil
 }
@@ -229,12 +231,14 @@ func (g *Guard) writeCurveLocked(c *plus.Curve, req Request, now time.Time) (Res
 	if !req.Confirm {
 		return Result{}, ErrNotConfirmed
 	}
-	if err := g.admit(now); err != nil {
-		return Result{}, err
-	}
 	if err := c.Validate(); err != nil {
 		return Result{}, fmt.Errorf("%w: %v", ErrCurveRejected, err)
 	}
+	// Admission past the guards, as in setLevelLocked.
+	if err := g.admit(now); err != nil {
+		return Result{}, err
+	}
+
 	original, err := g.d.ReadCurveBytes()
 	if err != nil {
 		g.fail(now)
@@ -247,15 +251,14 @@ func (g *Guard) writeCurveLocked(c *plus.Curve, req Request, now time.Time) (Res
 	if err := g.verifyCurve(c); err != nil {
 		g.fail(now)
 		// The restore must reproduce the bytes, not re-render them: rendering
-		// regenerates comments, so a restore built that way would not be the file
-		// that was running a moment ago.
+		// regenerates comments, so the restored file would not be the one that ran.
 		if rerr := g.d.WriteCurveBytes(original); rerr != nil {
 			return Result{}, fmt.Errorf("%w, and %w: restoring the previous curve: %v",
 				err, ErrRollbackFailed, rerr)
 		}
 		return Result{}, err
 	}
-	g.record(now)
+	g.record()
 	return Result{Applied: true, NeedsPfandRestart: g.d.PfandUp()}, nil
 }
 
@@ -276,9 +279,8 @@ func (g *Guard) verifyCurve(want *plus.Curve) error {
 
 // temperature reads the package temperature and the emergency edge it is judged
 // against. The edge comes from the operator's own curve, so the guard cannot
-// drift away from the control law it protects. An unreadable sensor is not a
-// safe one: the daemon reacts to a failed read with full speed, and refusing
-// matches that posture instead of fighting it.
+// drift from the control law it protects. An unreadable sensor is not a safe one:
+// the daemon answers a failed read with full speed, and refusing matches that.
 func (g *Guard) temperature() (temp, emerg int, err error) {
 	c, err := g.d.ReadCurve()
 	if err != nil {
@@ -291,8 +293,12 @@ func (g *Guard) temperature() (temp, emerg int, err error) {
 	return t, c.Emerg, nil
 }
 
-// admit decides whether this attempt may reach the device, and reserves a
-// half-open probe if one is due.
+// admit decides whether this attempt may reach the device. It carries no
+// reservation to release: the flag used to have to be cleared by every admitted
+// path that returned without writing, one forgot, and it outlived the call —
+// after which admit refused every caller in perpetuity and only an agent restart
+// recovered. A reservation that outlives its call is a latch nothing owns, so
+// admission sits where a write must follow: past every guard.
 func (g *Guard) admit(now time.Time) error {
 	b := &g.brk
 	switch b.state {
@@ -300,12 +306,7 @@ func (g *Guard) admit(now time.Time) error {
 		if now.Sub(b.openedAt) < breakerCooldown {
 			return ErrBreakerOpen
 		}
-		b.state, b.probing = breakerHalfOpen, true
-	case breakerHalfOpen:
-		if b.probing {
-			return ErrBreakerOpen
-		}
-		b.probing = true
+		b.state = breakerHalfOpen
 	}
 	return nil
 }
@@ -314,8 +315,8 @@ func (g *Guard) admit(now time.Time) error {
 // is the one attempt that was allowed to prove the path still works.
 func (g *Guard) fail(now time.Time) {
 	b := &g.brk
-	if b.state == breakerHalfOpen || b.probing {
-		b.state, b.openedAt, b.probing, b.failures = breakerOpen, now, false, breakerThreshold
+	if b.state == breakerHalfOpen {
+		b.state, b.openedAt, b.failures = breakerOpen, now, breakerThreshold
 		return
 	}
 	b.failures++
@@ -324,59 +325,71 @@ func (g *Guard) fail(now time.Time) {
 	}
 }
 
-func (g *Guard) record(now time.Time) {
+func (g *Guard) record() {
 	g.brk = breaker{}
 }
 
 // Regress hands the fan back to the firmware curve once the manual duty has run
-// its course. The bool separates "returned to auto" from "nothing to return"
-// and from "declined to return".
+// its course. The bool separates "returned" from "nothing due" and "declined".
 func (g *Guard) Regress() (bool, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	now := g.d.Now()
 
-	did, err := g.regressLocked(now)
+	did, held, err := g.regressLocked(now)
+	if err == nil && !did {
+		// A safety gate stopped short of the device and nothing failed, so there is
+		// no error for audit to classify. Recording it as applied would tell an
+		// operator the fan went back to its curve when it is still held at a duty.
+		g.auditDeclined(OpRegress, "regress", held)
+		return did, nil
+	}
 	g.audit(OpRegress, Request{Actor: "regress"}, 0, 0, err)
 	return did, err
 }
 
-func (g *Guard) regressLocked(now time.Time) (bool, error) {
+// regressLocked also reports which gate declined, so a handover that did not
+// happen is still auditable.
+func (g *Guard) regressLocked(now time.Time) (bool, string, error) {
 	if g.regressAt.IsZero() || now.Before(g.regressAt) {
-		return false, nil
+		return false, "no manual duty was pending", nil
 	}
 	// Two things can have changed while the duty was held. If the daemon is up it
 	// owns the fan and our write would be undone on its next tick, so the pending
 	// regress is dropped rather than fought over.
 	if g.d.PfandUp() {
 		g.clearRegressLocked()
-		return false, nil
+		return false, "the daemon owns the fan", nil
 	}
 	// At or past the emergency edge the daemon is driving full speed. Returning
 	// control to the curve is harmless when they agree and harmful when they do
 	// not, so the regress stays pending rather than written and forgotten.
-	if temp, emerg, err := g.temperature(); err != nil || temp >= emerg {
-		return false, nil
+	temp, emerg, err := g.temperature()
+	if err != nil {
+		return false, "the package temperature could not be established", nil
 	}
-	// Admission comes last: a regress that declined to write never touched the
-	// device, and spending the probe here would leave the breaker waiting on a
-	// write that did not happen.
+	if temp >= emerg {
+		return false, fmt.Sprintf("held at %dC against an emergency edge of %dC", temp, emerg), nil
+	}
+	// Admission last: a regress that declined to write never touched the device,
+	// and letting it spend the probe would leave the breaker waiting for a write
+	// that did not happen.
 	if err := g.admit(now); err != nil {
-		return false, err
+		return false, "", err
 	}
 	if err := g.d.SetLevel(0); err != nil {
 		g.fail(now)
-		return false, fmt.Errorf("return the fan to its curve: %w", err)
+		return false, "", fmt.Errorf("return the fan to its curve: %w", err)
 	}
 	got, err := g.d.GetLevel()
 	if err != nil || got != 0 {
 		g.fail(now)
-		return false, fmt.Errorf("%w: asked for the curve, device reports %d (%v)",
+		return false, "", fmt.Errorf("%w: asked for the curve, device reports %d (%v)",
 			ErrWriteUnconfirmed, got, err)
 	}
-	g.record(now)
+	g.record()
 	g.clearRegressLocked()
-	return true, nil
+	return true, "", nil
 }
 
 func (g *Guard) scheduleRegressLocked(now time.Time) {
@@ -427,4 +440,10 @@ func (g *Guard) audit(op Op, req Request, level, got int, err error) {
 		e.Level = got
 	}
 	g.d.Audit(e)
+}
+
+// auditDeclined records an attempt that stopped short of the device without
+// failing. The caller still gets no error, but the event says no write happened.
+func (g *Guard) auditDeclined(op Op, actor, reason string) {
+	g.d.Audit(Event{Op: op, Outcome: OutcomeRefused, Actor: actor, Reason: reason, At: g.d.Now()})
 }

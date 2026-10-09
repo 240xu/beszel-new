@@ -75,7 +75,29 @@ func sectionsFor(s *plus.Stats) []section {
 			has:   func() bool { return len(s.FanSteps) > 0 },
 			print: func() { printFanSteps(s.FanSteps) },
 		},
+		{
+			name: "fanctl",
+			// Always shown. The other sections hide themselves when there is
+			// nothing to print, which is right for a collector that reads a file
+			// tree and wrong for one that talks to a device: an unreadable ACPI
+			// reply would then be indistinguishable from a machine without one.
+			has:   func() bool { return true },
+			print: func() { printFanControl() },
+		},
 	}
+}
+
+// printFanControl probes the ACPI fan surface against the live machine.
+//
+// Read-only by construction: _FST and EC88 are reads, and SetFanLevel is
+// deliberately not called -- changing this machine's duty is Task 14's job and
+// is not something a verification harness should do as a side effect.
+func printFanControl() {
+	lv, lvErr := plus.GetFanLevel()
+	fmt.Printf("  level: %d (%s) err: %v\n", lv, plus.LevelLabel(lv), lvErr)
+	ec, ecErr := plus.ReadEC76()
+	fmt.Printf("  ec76: %d err: %v\n", ec, ecErr)
+	fmt.Printf("  pfand active: %v\n", plus.PfandActive())
 }
 
 func main() {

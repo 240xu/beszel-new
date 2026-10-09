@@ -75,11 +75,28 @@ package plus
 //	TestCollectorPackagesAreLeaves no subdirectory, which none of the three
 //	                              above can see at any depth.
 //
+// TestCollectorUnixUseIsNamed is the exception, and it is worse than the rest.
+// R-62 unblocked agent/plus's use of x/sys/unix so the fan writer could reach
+// flock(2) and the device file, and it left the raw `syscall` package banned.
+// That split is deliberate: syscall is the legacy surface with the widest
+// platform drift, x/sys/unix is the maintained facade this file's own netlink
+// code already reached for.
+//
+// But it is the one rule here that had to degrade into a list. os/exec and
+// syscall can be judged by import alone because the import IS the capability.
+// A unix symbol is not: importing x/sys/unix for one constant is not the same act
+// as calling Flock, and there is no "entry point" to hang the stronger rule on
+// the way Task 7 hung it on the NVMe parse. So the rule falls back to naming
+// every symbol, exactly -- a new one shows up in a diff here rather than as one
+// more line of code, which is the same failure this file exists to make visible.
+// Anyone widening it should expect to argue for it in review.
+//
 // os/exec in a *_test.go file is out of scope for the production invariant --
 // running the test suite is not what ships -- so TestOnlyThisFileForksInTests
 // bounds that side separately rather than leaving it implicit.
 
 import (
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"io/fs"
@@ -87,6 +104,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -401,6 +419,102 @@ func subdirHasGoFile(dir string) (bool, error) {
 func contains(list []string, want string) bool {
 	for _, s := range list {
 		if s == want {
+			return true
+		}
+	}
+	return false
+}
+
+// R-62: agent/plus may call golang.org/x/sys/unix, and only these symbols.
+//
+// This list is a DEGRADED rule and the file says so above on purpose. Every other
+// rule here states an invariant with no exemption mechanism; this one cannot,
+// because unix has no "entry point" to hang the rule on. A raw syscall is a
+// capability, and a capability is named as a list, so the list is the minimum
+// honest form of the rule: a new syscall appears here, in one place, in the
+// diff, rather than slipping in as "one more line of code".
+//
+// It is exact equality rather than containment, for the reason Task 7 already
+// paid for: a containment assertion lets the list grow in silence.
+//
+// Nothing here weakens the bare `syscall` ban above. syscall and
+// golang.org/x/sys/unix are asserted apart on purpose -- syscall is the 1990s
+// legacy surface with the widest platform drift, while x/sys/unix is the
+// maintained facade Task 7 already reaches for netlink.
+var allowedUnixSymbols = []string{
+	"Close",
+	"EAGAIN",
+	"Flock",
+	"LOCK_EX",
+	"LOCK_NB",
+	"LOCK_UN",
+	"NL80211_ATTR_IFINDEX",
+	"NL80211_ATTR_MAC",
+	"NL80211_CMD_GET_STATION",
+	"NL80211_GENL_NAME",
+	"O_CLOEXEC",
+	"O_NONBLOCK",
+	"O_RDONLY",
+	"Open",
+	"Read",
+	"SEEK_END",
+	"Seek",
+}
+
+// TestCollectorUnixUseIsNamed holds the governor packages to that list.
+//
+// It walks the directory rather than the build, like TestOnlyThisFileForksInTests
+// and for the same reason: a rule that can be stepped around by a build tag is
+// not a rule. The dependency closure is deliberately untouched, which is a
+// different judgement from attribution -- see the header.
+func TestCollectorUnixUseIsNamed(t *testing.T) {
+	var found []string
+	seen := map[string]string{}
+	fset := token.NewFileSet()
+	for _, g := range governed(t) {
+		entries, err := os.ReadDir(g.dir)
+		require.NoError(t, err)
+		for _, e := range entries {
+			name := e.Name()
+			if e.IsDir() || filepath.Ext(name) != ".go" {
+				continue
+			}
+			path := filepath.Join(g.dir, name)
+			file, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
+			require.NoErrorf(t, err, "cannot parse %s", path)
+			if !importsUnix(file) {
+				continue
+			}
+			ast.Inspect(file, func(n ast.Node) bool {
+				sel, ok := n.(*ast.SelectorExpr)
+				if !ok {
+					return true
+				}
+				ident, ok := sel.X.(*ast.Ident)
+				if !ok || ident.Name != "unix" {
+					return true
+				}
+				if _, dup := seen[sel.Sel.Name]; !dup {
+					seen[sel.Sel.Name] = g.label + "/" + name
+					found = append(found, sel.Sel.Name)
+				}
+				return true
+			})
+		}
+	}
+	sort.Strings(found)
+	assert.Equal(t, allowedUnixSymbols, found,
+		"every golang.org/x/sys/unix symbol these packages use has to be named here. "+
+			"x/sys/unix is allowed per R-62 because it is the maintained facade, but it is "+
+			"still a raw syscall surface, so the list is what keeps it from growing unnoticed.")
+	for _, s := range found {
+		t.Logf("unix.%s used by %s", s, seen[s])
+	}
+}
+
+func importsUnix(file *ast.File) bool {
+	for _, imp := range file.Imports {
+		if imp.Path.Value == `"golang.org/x/sys/unix"` {
 			return true
 		}
 	}

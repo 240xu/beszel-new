@@ -447,6 +447,7 @@ func TestRejectReasonsAreDistinct(t *testing.T) {
 	seen := map[error]bool{}
 	for _, reason := range []error{
 		ErrFanLevelNotAllowed, ErrPfandActive, ErrPackageTemperature, ErrThermalProfileT4,
+		ErrFanControlUnsupported,
 	} {
 		assert.NotEmpty(t, reason.Error(), "an unnamed reason is not a reason")
 		assert.Falsef(t, seen[reason], "%v is a duplicate sentinel, so errors.Is cannot tell them apart", reason)
@@ -472,6 +473,8 @@ func TestSetFanLevelReportsAWriteFailure(t *testing.T) {
 	assert.Contains(t, err.Error(), "write device")
 	assert.NotErrorIs(t, err, ErrFanLevelNotAllowed,
 		"40 is on the whitelist, so this is an I/O failure and not a validation refusal")
+	assert.NotErrorIs(t, err, ErrFanControlUnsupported,
+		"this host implements fan control, so a write that failed is not a missing platform")
 	assert.Equal(t, "", f.written(), "nothing reached the device, so nothing may claim otherwise")
 }
 

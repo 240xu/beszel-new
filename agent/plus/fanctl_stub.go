@@ -3,7 +3,6 @@
 package plus
 
 import (
-	"fmt"
 	"os"
 	"time"
 )
@@ -42,15 +41,15 @@ func ProdFanPaths() FanPaths {
 	}
 }
 
-const unsupported = "ACPI fan control is only implemented on linux"
+// Every entry point below answers with ErrFanControlUnsupported rather than one of
+// the rejection reasons: nothing was refused here, the duty was never programmable.
+func AcpiEval(string, time.Duration) (string, error) { return "", ErrFanControlUnsupported }
 
-func AcpiEval(string, time.Duration) (string, error) { return "", fmt.Errorf(unsupported) }
+func SetFanLevel(int) error { return ErrFanControlUnsupported }
 
-func SetFanLevel(int) error { return fmt.Errorf(unsupported) }
+func GetFanLevel() (int, error) { return 0, ErrFanControlUnsupported }
 
-func GetFanLevel() (int, error) { return 0, fmt.Errorf(unsupported) }
-
-func ReadEC76() (int, error) { return 0, fmt.Errorf(unsupported) }
+func ReadEC76() (int, error) { return 0, ErrFanControlUnsupported }
 
 // PfandActive has no portable answer: systemctl would have to be run, and this
 // package may not fork. False means "not known to be running", which is the

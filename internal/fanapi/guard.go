@@ -58,12 +58,19 @@ const (
 
 // Event is one audited attempt. Every path emits exactly one, refusals included:
 // a write that never happened is what an incident review needs.
+//
+// Code and Message carry the refusal in the form a caller can act on. Reason
+// stays as untranslated text for a log: a reader of the trail must never have to
+// match English prose to learn why a write was refused, so the classification
+// happens here where the error is still in hand.
 type Event struct {
 	Op      Op
 	Outcome Outcome
 	Actor   string
 	Level   int
 	Reason  string
+	Code    string
+	Message string
 	At      time.Time
 }
 
@@ -429,6 +436,8 @@ func (g *Guard) audit(op Op, req Request, level, got int, err error) {
 	e := Event{Op: op, Outcome: OutcomeApplied, Actor: req.Actor, Level: level, At: g.d.Now()}
 	if err != nil {
 		e.Outcome, e.Reason = OutcomeFailed, err.Error()
+		e.Code = codeOf(err)
+		e.Message = messageOf(e.Code)
 		if errors.Is(err, ErrNotConfirmed) || errors.Is(err, ErrBreakerOpen) ||
 			errors.Is(err, ErrCurveRejected) || errors.Is(err, ErrTemperatureUnknown) ||
 			errors.Is(err, plus.ErrPfandActive) || errors.Is(err, plus.ErrPackageTemperature) ||
@@ -445,5 +454,9 @@ func (g *Guard) audit(op Op, req Request, level, got int, err error) {
 // auditDeclined records an attempt that stopped short of the device without
 // failing. The caller still gets no error, but the event says no write happened.
 func (g *Guard) auditDeclined(op Op, actor, reason string) {
-	g.d.Audit(Event{Op: op, Outcome: OutcomeRefused, Actor: actor, Reason: reason, At: g.d.Now()})
+	code, message := codeOfDecline(reason)
+	g.d.Audit(Event{
+		Op: op, Outcome: OutcomeRefused, Actor: actor,
+		Reason: reason, Code: code, Message: message, At: g.d.Now(),
+	})
 }

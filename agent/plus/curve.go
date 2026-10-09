@@ -228,6 +228,29 @@ func WriteCurveFile(path string, c *Curve) error {
 	return nil
 }
 
+// WriteCurveBytesFile replaces the curve file with bytes the caller has already
+// composed, keeping the atomic replace of WriteCurveFile.
+//
+// The guard needs this because it restores the bytes it read, not a re-render of
+// them: Render regenerates comments, so a restore by rendering would put back a
+// file that is not the one that ran. The bytes are parsed before they are
+// allowed near the disk, which is the rule WriteCurveFile applies to a Curve for
+// the same reason: the daemon's answer to a curve it dislikes is full speed.
+func WriteCurveBytesFile(path string, raw []byte) error {
+	if _, err := ParseCurve(string(raw)); err != nil {
+		return fmt.Errorf("refusing to write an invalid curve: %w", err)
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, raw, curveConfMode); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return nil
+}
+
 // ReadCurveFile reads and parses the curve file at path.
 func ReadCurveFile(path string) (*Curve, error) {
 	raw, err := os.ReadFile(path)

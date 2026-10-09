@@ -89,6 +89,10 @@ func (h *Hub) StartHub() error {
 		if err := h.registerCronJobs(e); err != nil {
 			return err
 		}
+		// register plus fan control routes
+		if err := h.registerPlusFanRoutes(e); err != nil {
+			return err
+		}
 		// start server
 		if err := h.startServer(e); err != nil {
 			return err

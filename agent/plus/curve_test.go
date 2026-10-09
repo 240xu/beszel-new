@@ -152,6 +152,27 @@ func TestParseCurveRefusesUnknownKey(t *testing.T) {
 	}
 }
 
+// TestParseCurveRefusesUnknownKeyInACompleteCurve isolates the unknown-key rule
+// from the missing-key rule, which is what every case above trips over instead:
+// replacing EMERG_REL with EMERG_RELX also deletes a required key, so a parser
+// that simply skipped unrecognised keys would still be caught by the missing-key
+// report and the unknown-key rule would look covered when nothing tests it.
+// Both bypasses -- skipping the line, and taking it as a default -- survive that
+// test and die here, because appending a key to a complete curve leaves every
+// required key present and only the unknown-key rule can refuse it.
+// The error has to name the key, since the daemon's symptom is a parameter
+// left on its compiled-in default with nothing to search the log for.
+func TestParseCurveRefusesUnknownKeyInACompleteCurve(t *testing.T) {
+	for _, extra := range []string{"EVIL=1", "PFAN_PRESET=fast", "emerg_rel=75"} {
+		key := strings.SplitN(extra, "=", 2)[0]
+		_, err := ParseCurve(golden(t, "pfand.conf") + extra + "\n")
+		require.Errorf(t, err, "a complete curve followed by %q must be refused", extra)
+		assert.Contains(t, err.Error(), "unknown key",
+			"the refusal has to be the unknown-key rule, not some later check")
+		assert.Containsf(t, err.Error(), key, "the refusal must name %s", key)
+	}
+}
+
 // TestParseCurveLastDuplicateWins keeps this parser aligned with both host
 // readers, which assign as they go and leave the later value in place.
 func TestParseCurveLastDuplicateWins(t *testing.T) {

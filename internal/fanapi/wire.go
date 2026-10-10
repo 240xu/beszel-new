@@ -9,8 +9,7 @@ import (
 )
 
 // The guard decides what happens to the fan; this file decides what the operator
-// is told happened. Keeping them apart lets the guard keep reporting "the bytes
-// reached the disk" truthfully while the response declines to call it applied.
+// is told happened, so the guard keeps reporting the disk truthfully.
 
 // Names rather than numbers, so a caller branching on one survives an edit that
 // moves it.
@@ -98,9 +97,8 @@ var classifications = []classification{
 		Message: "the curve is not one this host would run", sentinel: ErrCurveRejected},
 	{Status: http.StatusConflict, Code: "pfand_active",
 		Message: "the curve daemon owns the fan; stop it before setting a duty by hand", sentinel: plus.ErrPfandActive},
-	// These two share a status: neither is a fault in the request. They must
-	// not share a code or a message, because an operator told the first will
-	// cool a machine whose sensor is simply broken.
+	// These two share a status but never a code or a message: an operator told
+	// the first would cool a machine whose sensor is simply broken.
 	{Status: http.StatusServiceUnavailable, Code: "package_too_hot",
 		Message: "the package is at or above the emergency edge in your curve, so no duty was written", sentinel: plus.ErrPackageTemperature},
 	{Status: http.StatusServiceUnavailable, Code: "temperature_unknown",
@@ -126,8 +124,7 @@ func classify(err error) (Fault, bool) {
 	return Fault{}, false
 }
 
-// The event carries the code and its own text rather than the error, so that
-// classifying happens here where the error is in hand.
+// Classifying happens here, where the error is still in hand.
 func codeOf(err error) string {
 	if f, ok := classify(err); ok {
 		return f.Code

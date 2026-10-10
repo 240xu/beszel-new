@@ -209,7 +209,7 @@ func (fc *fanRoutes) level(e *core.RequestEvent) error {
 		return err
 	}
 	if !req.Confirm {
-		return e.BadRequestError("confirm is required", nil)
+		return confirmRequired(e)
 	}
 	// Absent is not zero: zero is the firmware curve and a legal answer, so a
 	// body that forgot the field would quietly hand the fan back to the curve.
@@ -236,7 +236,7 @@ func (fc *fanRoutes) mode(e *core.RequestEvent) error {
 		return err
 	}
 	if !req.Confirm {
-		return e.BadRequestError("confirm is required", nil)
+		return confirmRequired(e)
 	}
 	action := ""
 	switch req.Mode {
@@ -265,7 +265,7 @@ func (fc *fanRoutes) curve(e *core.RequestEvent) error {
 		return aerr
 	}
 	if !req.Confirm {
-		return e.BadRequestError("confirm is required", nil)
+		return confirmRequired(e)
 	}
 	res, err := fc.guard.WriteCurve(req.curve(), fanapi.Request{Confirm: true, Actor: actor(e)})
 	if err != nil {
@@ -289,6 +289,15 @@ func (fc *fanRoutes) fail(e *core.RequestEvent, what string, err error) error {
 	// "validation_invalid_value" and leave the panel with nothing to branch on.
 	apiErr := e.Error(fault.Status, fault.Message, nil)
 	apiErr.Data = map[string]any{"code": fault.Code}
+	return apiErr
+}
+
+// confirmRequired refuses a write that arrived unconfirmed. The code is taken
+// from the guard's own classification so one place names it, and Data is
+// assigned for the reason fail gives.
+func confirmRequired(e *core.RequestEvent) error {
+	apiErr := e.Error(http.StatusBadRequest, "confirm is required", nil)
+	apiErr.Data = map[string]any{"code": fanapi.Classify(fanapi.ErrNotConfirmed).Code}
 	return apiErr
 }
 

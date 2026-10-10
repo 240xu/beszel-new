@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import type { FanCurve, FanState, PlusStats } from "@/types"
+import type { FanCurve, FanState } from "@/types"
 import { buildCurvePayload, getFanState, isPendingRestart, saveCurve, setFanLevel, setFanMode } from "@/lib/plus-api"
 import { FAN_REJECT_CODES, FanApiError, readFanRefusal } from "@/lib/plus-refusals"
 
@@ -232,47 +232,5 @@ describe("fan state", () => {
 		expect(got.level).toBe(70)
 		expect(got.regress_pending).toBe(false)
 		expect(got.regress_at).toBeUndefined()
-	})
-})
-
-describe("telemetry wire", () => {
-	test("a record's plus payload parses into the declared shape", async () => {
-		const stats: PlusStats = {
-			dptf: { zones: { ACPI: 48.2 } },
-			cpufreq: {
-				cores: [{ idx: 0, freq_mhz: 2400, min_mhz: 800, max_mhz: 4800 }],
-				governor: "powersave",
-				epp: "balance_performance",
-				no_turbo: 0,
-				hwp_dynamic_boost: 1,
-				pstate_status: "active",
-			},
-			netall: { eth0: { rx_bytes: 1, tx_bytes: 2, rx_packets: 3, oper_state: "up", speed_mbit: 1000, mtu: 1500 } },
-			nvme: { model: "x", temp_c: 40, percentage_used_pct: 12, available_spare_pct: 100 },
-			wifi: { signal_dbm: -52, tx_mbit: 300, freq_mhz: 5180, retry: 0, iface: "wlan0" },
-			fan: {
-				set_level_pct: 0,
-				ec76_pct: 0,
-				rpm_est: 1180,
-				rpm_est_is_estimate: true,
-				gov: "curve",
-				temp_c: 45,
-				sample_ts_s: 1759500000,
-			},
-			fan_steps: [{ percent: 0, rpm_est: 0, noise_mdb: 0, power_mw: 0 }],
-		}
-		stubFetch([ok({ items: [stats] })])
-		const { getPlusStats } = await import("@/lib/plus-api")
-		const got = await getPlusStats("5m")
-		expect(got).toHaveLength(1)
-		expect(got[0].fan?.sample_ts_s).toBe(1759500000)
-		expect(got[0].fan_steps?.[0].power_mw).toBe(0)
-	})
-
-	test("a window that could break out of the filter is refused before it is sent", async () => {
-		const { calls } = stubFetch([ok({ items: [] })])
-		const { getPlusStats } = await import("@/lib/plus-api")
-		await expect(getPlusStats("5m'||1=1")).rejects.toThrow()
-		expect(calls).toHaveLength(0)
 	})
 })

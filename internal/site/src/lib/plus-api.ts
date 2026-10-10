@@ -1,4 +1,4 @@
-import type { FanAuditTrail, FanCurve, FanMode, FanModeResult, FanState, PlusStats } from "@/types"
+import type { FanAuditTrail, FanCurve, FanMode, FanModeResult, FanState } from "@/types"
 import { readFanRefusal } from "@/lib/plus-refusals"
 
 /** What a fan write reports back. `applied` means "in force now", never
@@ -97,19 +97,4 @@ export function saveCurve(curve: FanCurve, confirm: boolean): Promise<CurveSaveR
 		method: "POST",
 		body: JSON.stringify(buildCurvePayload(curve, confirm)),
 	})
-}
-
-const PLUS_STATS_PATH = "/api/collections/plus_stats/records"
-const WINDOW_FILTER = /^[A-Za-z0-9_-]{1,10}$/
-
-/** The window goes into a PocketBase filter as a quoted literal, and URL
- *  encoding does not escape a quote, so the value is whitelisted, not encoded. */
-export async function getPlusStats(window: string): Promise<PlusStats[]> {
-	if (!WINDOW_FILTER.test(window)) {
-		throw new Error("window is not a valid record filter value")
-	}
-	const res = await request<{ items?: PlusStats[] }>(
-		`${PLUS_STATS_PATH}?perPage=200&filter=${encodeURIComponent(`(window='${window}')`)}&sort=-created`
-	)
-	return res.items ?? []
 }

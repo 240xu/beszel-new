@@ -479,6 +479,8 @@ func TestEveryWriteRouteInsistsOnConfirm(t *testing.T) {
 			assert.Equal(t, http.StatusBadRequest, rec.Code)
 			assert.Contains(t, strings.ToLower(rec.Body.String()), "confirm is required",
 				"PocketBase capitalises the message, so the claim is matched case-insensitively")
+			assert.Equal(t, "confirm_required", faultCode(t, rec),
+				"the panel branches on this code, so the refusal must carry it")
 			assert.Empty(t, h.rig.writes(), "an unconfirmed request must not reach the device")
 			assert.Empty(t, h.rig.actions, "an unconfirmed request must not touch the daemon")
 			assert.Equal(t, string(h.rig.curve), testCurveSource,

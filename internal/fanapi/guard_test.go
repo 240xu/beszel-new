@@ -865,6 +865,9 @@ func TestEveryAttemptIsAudited(t *testing.T) {
 // error, so an outcome that defaults to applied told an operator reading the log
 // that the handover had happened while the fan was still being held.
 func TestARegressThatDidNotWriteIsNotAuditedAsApplied(t *testing.T) {
+	// The event carries the gate's code and its own text rather than the phrase
+	// regressLocked used to build, so a reader of the trail never has to match
+	// English prose to learn which gate stood in the way.
 	for _, tc := range []struct {
 		name    string
 		pending bool
@@ -893,8 +896,10 @@ func TestARegressThatDidNotWriteIsNotAuditedAsApplied(t *testing.T) {
 			assert.Equal(t, OpRegress, e.Op)
 			assert.Equal(t, OutcomeRefused, e.Outcome,
 				"the write did not happen, and an applied outcome would say that it did")
-			assert.Contains(t, e.Reason, tc.want,
-				"an operator reading the log is owed which gate stood in the way")
+			assert.Contains(t, e.Message, tc.want,
+				"an operator reading the trail is owed which gate stood in the way")
+			assert.NotEmpty(t, e.Code,
+				"a panel branches on the code; prose is for whoever reads the log")
 			assert.False(t, e.At.IsZero())
 		})
 	}

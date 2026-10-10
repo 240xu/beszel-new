@@ -147,3 +147,62 @@ func TestClassifyFollowsTheGuardPrecedence(t *testing.T) {
 	assert.Equal(t, "pfand_active", Classify(guarded).Code)
 	assert.Equal(t, "breaker_open", Classify(ErrBreakerOpen).Code)
 }
+
+// TestEveryDeclineIsCoded is the test the guard.go comment names. Every gate a
+// regress can decline at must carry a code and its own text, so an audit entry
+// never leaves a panel matching English prose: a phrase reworded for clarity
+// would otherwise silently become a code nothing branches on.
+func TestEveryDeclineIsCoded(t *testing.T) {
+	for code, message := range declineMessages {
+		assert.NotEmpty(t, code)
+		assert.NotEmpty(t, message,
+			"a code with no text is a code the trail reports and no one can read")
+	}
+	for _, code := range []string{
+		DeclineNone, DeclineDaemon, DeclineUnreadable, DeclineAtEmergency,
+	} {
+		assert.Contains(t, declineMessages, code,
+			"a gate regressLocked can name must have text, or the trail says only that it declined")
+	}
+}
+
+// TestTheDeclineTextsAreDistinct keeps a reworded gate from quietly becoming the
+// same sentence as another one, which would put two codes on one sentence and
+// make the trail's claim ambiguous.
+func TestTheDeclineTextsAreDistinct(t *testing.T) {
+	seen := map[string]string{}
+	for code, message := range declineMessages {
+		if other, dup := seen[message]; dup {
+			t.Errorf("%s and %s share the text %q", code, other, message)
+		}
+		seen[message] = code
+	}
+}
+
+// TestEveryClassificationCarriesBothHalves: a code with no status would answer
+// 200 with a refusal body, and a status with no code would leave the panel with
+// nothing to branch on.
+func TestEveryClassificationCarriesBothHalves(t *testing.T) {
+	for _, c := range classifications {
+		assert.NotEmpty(t, c.Code, "%v", c.sentinel)
+		assert.NotEmpty(t, c.Message, "%v", c.sentinel)
+		assert.True(t, c.Status >= 400, "%s answered %d, which reads as success", c.Code, c.Status)
+	}
+}
+
+// TestEveryCodeIsReachable pins that each classification is named by an error the
+// guard can actually produce. A row naming a sentinel nothing returns is a code
+// no panel will ever see, and it reads as coverage.
+func TestEveryCodeIsReachable(t *testing.T) {
+	for _, c := range classifications {
+		t.Run(c.Code, func(t *testing.T) {
+			wrapped := fmt.Errorf("a real attempt: %w", c.sentinel)
+			f := Classify(wrapped)
+			assert.Equal(t, c.Code, f.Code)
+			assert.Equal(t, c.Status, f.Status)
+			assert.Equal(t, c.Message, f.Message)
+			assert.Equal(t, c.Code, codeOf(wrapped),
+				"the audit event and the response must name the refusal identically")
+		})
+	}
+}

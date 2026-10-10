@@ -58,11 +58,8 @@ const (
 
 // Event is one audited attempt. Every path emits exactly one, refusals included:
 // a write that never happened is what an incident review needs.
-//
-// Code and Message carry the refusal in the form a caller can act on. Reason
-// stays as untranslated text for a log: a reader of the trail must never have to
-// match English prose to learn why a write was refused, so the classification
-// happens here where the error is still in hand.
+// Code and Message carry the refusal in the form a caller can act on; Reason
+// stays untranslated for a log.
 type Event struct {
 	Op      Op
 	Outcome Outcome
@@ -192,8 +189,6 @@ func (g *Guard) setLevelLocked(level int, req Request, now time.Time) (Result, e
 	}
 	if err := g.d.SetLevel(level); err != nil {
 		g.fail(now)
-		// Wrapped so the wire can tell a device that refused the program from
-		// one that took it and then disagreed about the result.
 		return Result{}, fmt.Errorf("program duty %d: %w: %v", level, ErrWriteFailed, err)
 	}
 	got, err := g.d.GetLevel()
@@ -357,28 +352,28 @@ func (g *Guard) Regress() (bool, error) {
 	return did, err
 }
 
-// regressLocked also reports which gate declined, so a handover that did not
+// regressLocked also names which gate declined, so a handover that did not
 // happen is still auditable.
 func (g *Guard) regressLocked(now time.Time) (bool, string, error) {
 	if g.regressAt.IsZero() || now.Before(g.regressAt) {
-		return false, "no manual duty was pending", nil
+		return false, DeclineNone, nil
 	}
 	// Two things can have changed while the duty was held. If the daemon is up it
 	// owns the fan and our write would be undone on its next tick, so the pending
 	// regress is dropped rather than fought over.
 	if g.d.PfandUp() {
 		g.clearRegressLocked()
-		return false, "the daemon owns the fan", nil
+		return false, DeclineDaemon, nil
 	}
 	// At or past the emergency edge the daemon is driving full speed. Returning
 	// control to the curve is harmless when they agree and harmful when they do
 	// not, so the regress stays pending rather than written and forgotten.
 	temp, emerg, err := g.temperature()
 	if err != nil {
-		return false, "the package temperature could not be established", nil
+		return false, DeclineUnreadable, nil
 	}
 	if temp >= emerg {
-		return false, fmt.Sprintf("held at %dC against an emergency edge of %dC", temp, emerg), nil
+		return false, DeclineAtEmergency, nil
 	}
 	// Admission last: a regress that declined to write never touched the device,
 	// and letting it spend the probe would leave the breaker waiting for a write
@@ -453,12 +448,27 @@ func (g *Guard) audit(op Op, req Request, level, got int, err error) {
 	g.d.Audit(e)
 }
 
+// The gates a regress can decline at, named rather than phrased so an audit
+// entry never carries prose a panel would have to match.
+const (
+	DeclineNone        = "regress_nothing_pending"
+	DeclineDaemon      = "regress_daemon_owns_fan"
+	DeclineUnreadable  = "regress_temperature_unreadable"
+	DeclineAtEmergency = "regress_at_emergency_edge"
+)
+
+var declineMessages = map[string]string{
+	DeclineNone:        "no manual duty was pending",
+	DeclineDaemon:      "the daemon owns the fan",
+	DeclineUnreadable:  "the package temperature could not be established",
+	DeclineAtEmergency: "the package is at or above the emergency edge",
+}
+
 // auditDeclined records an attempt that stopped short of the device without
 // failing. The caller still gets no error, but the event says no write happened.
-func (g *Guard) auditDeclined(op Op, actor, reason string) {
-	code, message := codeOfDecline(reason)
+func (g *Guard) auditDeclined(op Op, actor, code string) {
 	g.d.Audit(Event{
 		Op: op, Outcome: OutcomeRefused, Actor: actor,
-		Reason: reason, Code: code, Message: message, At: g.d.Now(),
+		Code: code, Message: declineMessages[code], At: g.d.Now(),
 	})
 }

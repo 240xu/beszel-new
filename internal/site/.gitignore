@@ -22,3 +22,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+# lingui compile output; the tracked translation sources are the .po files
+src/locales/**/*.ts

@@ -1,5 +1,6 @@
 import type { RecordModel } from "pocketbase"
 import type { Unit, Os, BatteryState, HourFormat, ConnectionType, ServiceStatus, ServiceSubState } from "@/lib/enums"
+import type { FanRejectCode } from "@/lib/plus-refusals"
 
 // global window properties
 declare global {
@@ -91,6 +92,8 @@ export interface SystemInfo {
 	rdn?: string
 	/** pending package updates [total, security] (security omitted if unknown) */
 	pu?: [number, number?]
+	/** Beszelplus snapshot. The cached copy every stats record is filled from. */
+	pl?: PlusStats
 }
 
 export interface SystemStats {
@@ -174,6 +177,9 @@ export interface SystemStats {
 	wf?: Record<string, number>
 	/** network interfaces [upload bytes, download bytes, total upload bytes, total download bytes] */
 	ni?: Record<string, [number, number, number, number]>
+	/** Beszelplus snapshot, copied from info.pl, so both carry the same reading.
+	 *  Prefer this one; the cache is there for the agent's own bookkeeping. */
+	plus?: PlusStats
 }
 
 export interface GPUData {
@@ -744,4 +750,172 @@ export interface NetworkMonitorStatsRecord {
 	type?: string
 	stats: Record<string, MonitorStats>
 	created: number // unix timestamp (ms) for Recharts xAxis
+}
+
+// ---------------------------------------------------------------------------
+// Beszelplus: mirrors agent/plus. A Go field without `omitempty` is required
+// here; one with it is optional. Collapsing the two is how a missing reading
+// becomes a zero, so the required set is exactly the no-omitempty fields.
+// ---------------------------------------------------------------------------
+
+export interface DPTFStats {
+	zones?: Record<string, number>
+}
+
+/** `idx` is the cpu<N> number parsed from sysfs, NOT the array position: a core
+ *  whose frequency is unreadable is skipped, so the positions shift. */
+export interface CpufreqCore {
+	idx: number
+	freq_mhz: number
+	min_mhz: number
+	max_mhz: number
+}
+
+/** Governor, EPP and pstate are single global values (last core read wins)
+ *  though the kernel reports them per core. */
+export interface CpufreqStats {
+	cores?: CpufreqCore[]
+	governor?: string
+	epp?: string
+	no_turbo?: number
+	hwp_dynamic_boost?: number
+	pstate_status?: string
+}
+
+/** Cumulative and unsigned, so difference them yourself and read a decrease as a wrap or a counter reset, never as negative traffic. Bytes are always written; packets are omitted when zero and so disappear. */
+export interface NetIfaceStats {
+	rx_bytes: number
+	tx_bytes: number
+	rx_packets?: number
+	tx_packets?: number
+	oper_state?: string
+	speed_mbit?: number
+	mtu?: number
+}
+
+export interface NvmeStats {
+	model?: string
+	temp_c?: number
+	available_spare_pct?: number
+	percentage_used_pct?: number
+	data_units_read?: number
+	data_units_written?: number
+	power_on_hours?: number
+	power_cycles?: number
+	unsafe_shutdowns?: number
+	media_errors?: number
+	controller_busy_min?: number
+	critical_comp_time_min?: number
+}
+
+export interface WiFiStats {
+	signal_dbm?: number
+	tx_mbit?: number
+	freq_mhz?: number
+	retry?: number
+	iface?: string
+}
+
+/** `rpm_est` is a duty-derived estimate, not a tachometer reading, and `rpm_est_is_estimate` is present so a consumer can assert it is labelled.
+ *  `set_level_pct` and `ec76_pct` are tri-state: a recorded NULL is not zero. */
+export interface FanStats {
+	set_level_pct?: number
+	ec76_pct?: number
+	rpm_est?: number
+	rpm_est_is_estimate: boolean
+	gov?: string
+	temp_c?: number
+	/** Unix SECONDS, and the only staleness signal a consumer gets: the
+	 *  collector reports whatever was last recorded and never checks the clock,
+	 *  so age this against your own. Dropping it turns an hours-old reading
+	 *  into a live one. */
+	sample_ts_s: number
+}
+
+export interface FanSpeedStep {
+	percent: number
+	rpm_est: number
+	noise_mdb: number
+	power_mw: number
+}
+
+export interface PlusStats {
+	dptf?: DPTFStats
+	cpufreq?: CpufreqStats
+	netall?: Record<string, NetIfaceStats>
+	nvme?: NvmeStats
+	wifi?: WiFiStats
+	fan?: FanStats
+	fan_steps?: FanSpeedStep[]
+}
+
+/** The fan control law. Every field is required: the server rejects unknown fields and refuses a curve with any field missing, because zeroing an absent one produces a curve the host will run and nobody wrote. */
+export interface FanCurve {
+	idle: number
+	l0: number
+	t1: number
+	l1: number
+	t2: number
+	l2: number
+	t3: number
+	l3: number
+	t4: number
+	l4: number
+	t5: number
+	l5: number
+	emerg: number
+	e: number
+	emerg_rel: number
+	cap: number
+	trim: number
+	gain: number
+	hyst: number
+	dwell: number
+	dead: number
+	iv: number
+}
+
+export type FanMode = "auto" | "manual"
+
+/** Bypasses the guard: a failed daemon restart answers with a code-less 500. */
+export interface FanModeResult {
+	mode: FanMode
+	pfand_active: boolean
+}
+
+/** Each reading arrives with whether it was readable, because zero is a legal
+ *  duty and a legal temperature and an absent reading must not borrow either.
+ *
+ *  `regress_pending` says whether a deadline is on record, and it is ambiguous
+ *  on purpose: a manual level left in force by an agent restart looks exactly
+ *  like one that was never set. No field tells those apart, so when it is false
+ *  a panel shows no countdown and must not claim the level expires. */
+export interface FanState {
+	pfand_active: boolean
+	level_read: boolean
+	level: number | null
+	/** Absent when the level was unreadable. Zero reads "auto", never "off". */
+	level_label?: string
+	pkg_temp_read: boolean
+	pkg_temp_c: number | null
+	regress_pending: boolean
+	regress_at?: string
+	/** Rides along, so an editor cannot be built against a stale curve. */
+	curve: FanCurve | null
+}
+
+export interface FanAuditEntry {
+	op: string
+	outcome: string
+	level: number
+	/** RFC3339. */
+	at: string
+	actor?: string
+	/** The refusal identifier, absent when the attempt was applied. */
+	code?: FanRejectCode
+	message?: string
+}
+
+export interface FanAuditTrail {
+	items: FanAuditEntry[]
 }

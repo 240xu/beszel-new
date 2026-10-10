@@ -199,8 +199,15 @@ type fanHarness struct {
 // newFanHarness builds a hub whose fan routes are faked. The seam is replaced
 // before the serve event fires, so the routes these tests exercise are the same
 // handlers production registers, not a re-implementation.
+// seamMu serialises the harness. fanDeps and pfandAction are package-level, so
+// two harnesses alive at once would hand each other's requests to each other's
+// fake. t.Parallel is not used anywhere in this file for the same reason.
+var seamMu sync.Mutex
+
 func newFanHarness(t *testing.T) *fanHarness {
 	t.Helper()
+	seamMu.Lock()
+	t.Cleanup(seamMu.Unlock)
 	// GetHubWithUser is the path the hub's own api tests use; it initialises the
 	// system manager and runs migrations, which is what makes the users
 	// collection addressable below.
@@ -529,18 +536,25 @@ func TestLevelRefusalsAreDistinguishable(t *testing.T) {
 // panel would tell an operator with a broken sensor to cool a machine that was
 // never hot.
 func TestTheTwoTemperatureFactsAreNotOneMessage(t *testing.T) {
-	hot := readLevelFault(t, func(r *fanRig) { r.temp = 85 })
-	cold := readLevelFault(t, func(r *fanRig) { r.tempErr = errors.New("sensor gone") })
+	h := newFanHarness(t)
+
+	h.rig.temp = 85
+	hot := levelFault(t, h)
+
+	h.rig.tempErr = errors.New("sensor gone")
+	cold := levelFault(t, h)
 
 	assert.Equal(t, "package_too_hot", hot)
 	assert.Equal(t, "temperature_unknown", cold)
 	assert.NotEqual(t, hot, cold)
 }
 
-func readLevelFault(t *testing.T, setup func(*fanRig)) string {
+// levelFault asks for a duty the harness must refuse and returns the code it
+// refused with. The harness is taken rather than built: two seams alive at once
+// is what seamMu exists to prevent, and a helper that built its own would wait on
+// the lock the first one is still holding until the test ends.
+func levelFault(t *testing.T, h *fanHarness) string {
 	t.Helper()
-	h := newFanHarness(t)
-	setup(h.rig)
 	rec := h.do(t, "admin", http.MethodPost, "/api/plus/fan/level",
 		map[string]any{"level": 70, "confirm": true})
 	require.NotEqual(t, http.StatusOK, rec.Code, rec.Body.String())

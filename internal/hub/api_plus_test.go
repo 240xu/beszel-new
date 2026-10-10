@@ -539,26 +539,29 @@ func TestTheTwoTemperatureFactsAreNotOneMessage(t *testing.T) {
 	h := newFanHarness(t)
 
 	h.rig.temp = 85
-	hot := levelFault(t, h)
+	hotCode, hotMsg := levelFault(t, h)
 
 	h.rig.tempErr = errors.New("sensor gone")
-	cold := levelFault(t, h)
+	coldCode, coldMsg := levelFault(t, h)
 
-	assert.Equal(t, "package_too_hot", hot)
-	assert.Equal(t, "temperature_unknown", cold)
-	assert.NotEqual(t, hot, cold)
+	assert.Equal(t, "package_too_hot", hotCode)
+	assert.Equal(t, "temperature_unknown", coldCode)
+	assert.NotEqual(t, hotCode, coldCode)
+	assert.NotEqual(t, hotMsg, coldMsg,
+		"a shared text tells an operator with a broken sensor to cool a machine that was never hot")
 }
 
-// levelFault asks for a duty the harness must refuse and returns the code it
-// refused with. The harness is taken rather than built: two seams alive at once
-// is what seamMu exists to prevent, and a helper that built its own would wait on
-// the lock the first one is still holding until the test ends.
-func levelFault(t *testing.T, h *fanHarness) string {
+// levelFault asks for a duty the harness must refuse and returns the code and
+// the prose it refused with. The harness is taken rather than built: two seams
+// alive at once is what seamMu exists to prevent, and a helper that built its own
+// would wait on the lock the first one is still holding until the test ends.
+func levelFault(t *testing.T, h *fanHarness) (code, message string) {
 	t.Helper()
 	rec := h.do(t, "admin", http.MethodPost, "/api/plus/fan/level",
 		map[string]any{"level": 70, "confirm": true})
 	require.NotEqual(t, http.StatusOK, rec.Code, rec.Body.String())
-	return faultCode(t, rec)
+	text, _ := decodeBody(t, rec)["message"].(string)
+	return faultCode(t, rec), text
 }
 
 // TestARefusedWriteDoesNotTripTheBreakerIntoAFalseLockout: three refusals leave

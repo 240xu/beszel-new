@@ -206,3 +206,31 @@ func TestEveryCodeIsReachable(t *testing.T) {
 		})
 	}
 }
+
+// TestTheTwoTemperatureCodesAreNotOneMessage: the reachability test above reads
+// the table back through itself, so it cannot see two rows merged into one
+// sentence. These two share a status on purpose and nothing else, because one
+// says the machine is too hot and the other says the sensor cannot be read.
+func TestTheTwoTemperatureCodesAreNotOneMessage(t *testing.T) {
+	hot := Classify(plus.ErrPackageTemperature)
+	cold := Classify(ErrTemperatureUnknown)
+
+	assert.Equal(t, hot.Status, cold.Status, "neither is a fault in the request")
+	assert.NotEqual(t, hot.Code, cold.Code)
+	assert.NotEqual(t, hot.Message, cold.Message,
+		"an operator told the machine is hot will cool a machine whose sensor is broken")
+	assert.NotEmpty(t, hot.Message)
+	assert.NotEmpty(t, cold.Message)
+}
+
+// TestEveryClassificationCarriesItsOwnText keeps a row from borrowing another's
+// sentence, which is the same fault as sharing a code wearing a different name.
+func TestEveryClassificationCarriesItsOwnText(t *testing.T) {
+	seen := map[string]string{}
+	for _, c := range classifications {
+		if other, dup := seen[c.Message]; dup {
+			t.Errorf("%s and %s share the text %q", c.Code, other, c.Message)
+		}
+		seen[c.Message] = c.Code
+	}
+}

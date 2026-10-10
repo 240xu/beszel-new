@@ -14,11 +14,15 @@ import {
 	fmtCount,
 	fmtCelsius,
 	fmtPct,
+	fmtSpan,
 	fmtText,
+	formatSpan,
 	latestPlus,
 	netRows,
 	nvmeRows,
 	plusAvailable,
+	previewRows,
+	STATIC_LABEL_KEYS,
 	UNKNOWN,
 	wifiRows,
 	wifiSignal,
@@ -77,15 +81,69 @@ const FULL: PlusStats = {
 	fan_steps: [{ percent: 65, rpm_est: 2450, noise_mdb: 32, power_mw: 4100 }],
 }
 
-test("a reading the agent never reported renders as unknown, never as zero", () => {
-	expect(fmtCount(undefined)).toBe(UNKNOWN)
-	expect(fmtCount(null)).toBe(UNKNOWN)
-	expect(fmtCount(Number.NaN)).toBe(UNKNOWN)
-	expect(fmtPct(undefined)).toBe(UNKNOWN)
-	expect(fmtCelsius(undefined)).toBe(UNKNOWN)
-	expect(fmtBytes(undefined)).toBe(UNKNOWN)
+// --- the rendered strings, pinned as literals ---------------------------------
+//
+// Everything below this block asserts against these literals rather than against
+// the constants they came from. Comparing a constant to itself is true whatever
+// it is set to, so every such assertion was previously vacuous: renaming
+// UNKNOWN to "0" turned every unreported field into a confident zero and left
+// the suite green. These are the only places the strings are written out, and
+// the rest of the file is free to go on comparing against the constants.
+
+test("the unreadable placeholder is the em dash, not a zero and not a blank", () => {
+	expect(UNKNOWN).toBe("—")
+	expect(UNKNOWN).not.toBe("0")
+	expect(UNKNOWN.trim()).not.toBe("")
+})
+
+test("an estimate is marked estimated and never as a measurement", () => {
+	expect(FAN_ESTIMATE_NOTE).toBe("estimated")
+	expect(FAN_ESTIMATE_NOTE).not.toMatch(/measured|actual|exact|real|observed/i)
+})
+
+test("a stale reading is marked stale and never as fresh or live", () => {
+	expect(FAN_STALE_NOTE).toBe("stale")
+	expect(FAN_STALE_NOTE).not.toMatch(/fresh|live|current/i)
+})
+
+test("the staleness window is 300 seconds", () => {
+	expect(FAN_STALE_AFTER_S).toBe(300)
+	expect(FAN_STALE_AFTER_S).toBeGreaterThan(0)
+})
+
+test("the firmware nominal flags are on, so the sheet says so", () => {
+	expect(FAN_POWER_IS_NOMINAL).toBe(true)
+	expect(FAN_STEP_RPM_IS_ESTIMATE).toBe(true)
+})
+
+// --- absence is never a number, whatever the placeholder is spelled ----------
+
+test("no formatter turns an unreported reading into anything numeric", () => {
+	const formatters = [fmtCount, fmtPct, fmtCelsius, fmtBytes]
+	for (const format of formatters) {
+		for (const absent of [undefined, null, Number.NaN]) {
+			const rendered = format(absent)
+			expect(rendered).toBe(UNKNOWN)
+			// The invariant, independent of the glyph: an absent reading must not
+			// carry a digit, a sign or a decimal point.
+			expect(rendered).not.toMatch(/[\d]/)
+			expect(rendered).not.toMatch(/[-+]/)
+			expect(rendered).not.toContain(".")
+		}
+	}
 	expect(fmtText(undefined)).toBe(UNKNOWN)
 	expect(fmtText("")).toBe(UNKNOWN)
+	expect(fmtText(undefined)).not.toMatch(/[\d]/)
+})
+
+test("an unreported reading is distinguishable from a reported zero", () => {
+	// Stated as behaviour rather than as a string: this holds for any placeholder
+	// that is not itself the digit zero, so it survives a change of glyph.
+	expect(fmtCount(undefined)).not.toBe(fmtCount(0))
+	expect(fmtPct(undefined)).not.toBe(fmtPct(0))
+	expect(fmtBytes(undefined)).not.toBe(fmtBytes(0))
+	expect(fmtCelsius(undefined)).not.toBe(fmtCelsius(0))
+	expect(fmtText(undefined)).not.toBe(fmtText("0"))
 })
 
 test("a real zero is a reading and is rendered as one", () => {
@@ -226,28 +284,39 @@ test("a virtual interface has no meaningful link rate so none is shown", () => {
 test("rpm is labelled an estimate because the platform has no tachometer", () => {
 	const rows = fanRows(at(FULL), FAN.sample_ts_s)
 	expect(value(rows, "fan.rpm_est")).toBe("1180 rpm")
-	expect(notes(rows, "fan.rpm_est")).toContain(FAN_ESTIMATE_NOTE)
-	expect(FAN_STEP_RPM_IS_ESTIMATE).toBe(true)
+	expect(notes(rows, "fan.rpm_est")).toContain("estimated")
 })
 
 test("the estimate label follows the flag the agent sends", () => {
 	const rows = fanRows(at({ fan: { rpm_est: 1180, rpm_est_is_estimate: false, sample_ts_s: 1759500000 } }), 1759500000)
-	expect(notes(rows, "fan.rpm_est")).not.toContain(FAN_ESTIMATE_NOTE)
+	expect(notes(rows, "fan.rpm_est")).not.toContain("estimated")
 })
 
 test("a fan reading older than the staleness window is marked stale", () => {
 	const rows = fanRows(at(FULL), FAN.sample_ts_s + FAN_STALE_AFTER_S + 1)
-	expect(notes(rows, "fan.rpm_est")).toContain(FAN_STALE_NOTE)
+	expect(notes(rows, "fan.rpm_est")).toContain("stale")
 })
 
 test("a fan reading inside the staleness window is not marked stale", () => {
 	const rows = fanRows(at(FULL), FAN.sample_ts_s + FAN_STALE_AFTER_S)
-	expect(notes(rows, "fan.rpm_est")).not.toContain(FAN_STALE_NOTE)
+	expect(notes(rows, "fan.rpm_est")).not.toContain("stale")
 })
 
 test("a fan snapshot from the future is not stale", () => {
 	const rows = fanRows(at(FULL), FAN.sample_ts_s - 10_000)
-	expect(notes(rows, "fan.rpm_est")).not.toContain(FAN_STALE_NOTE)
+	expect(notes(rows, "fan.rpm_est")).not.toContain("stale")
+})
+
+test("a qualifier is never attached to a reading that was not reported", () => {
+	// The stale mark used to hang off the collector's clock alone, so an absent
+	// speed rendered as "— (stale)": stale about a number nobody published.
+	const old = FAN.sample_ts_s + FAN_STALE_AFTER_S + 1
+	const absent = fanRows(at({ fan: { rpm_est_is_estimate: true, sample_ts_s: FAN.sample_ts_s } }), old)
+	expect(value(absent, "fan.rpm_est")).toBe(UNKNOWN)
+	expect(notes(absent, "fan.rpm_est")).toEqual([])
+	// Same instant, same flags, but a reported speed keeps both marks.
+	const present = fanRows(at(FULL), old)
+	expect(notes(present, "fan.rpm_est")).toEqual(["estimated", "stale"])
 })
 
 test("an unreadable fan level is unknown while a programmed level of 0 is a reading", () => {
@@ -281,5 +350,124 @@ test("the firmware noise column is not presented as a measurement", () => {
 	const rows = fanStepRows(at(FULL))
 	expect(Object.keys(rows[0]).some((key) => /noise/i.test(key))).toBe(false)
 	expect(rows[0].rpm).toBe("2450")
-	expect(FAN_POWER_IS_NOMINAL).toBe(true)
+})
+
+// --- the retry row names the interval it covers ------------------------------
+
+test("a retry difference says how long it spans", () => {
+	const rows = wifiRows([...at({ wifi: { retry: 10 } }, 0), ...at({ wifi: { retry: 64 } }, 3600_000)])
+	expect(value(rows, "wifi.retry_delta")).toBe("54")
+	expect(notes(rows, "wifi.retry_delta")).toEqual(["over 1h"])
+})
+
+test("the same difference over a short window is labelled with the short window", () => {
+	const rows = wifiRows([...at({ wifi: { retry: 10 } }, 0), ...at({ wifi: { retry: 64 } }, 12_000)])
+	expect(value(rows, "wifi.retry_delta")).toBe("54")
+	expect(notes(rows, "wifi.retry_delta")).toEqual(["over 12s"])
+})
+
+test("a span is not claimed when no difference exists to qualify", () => {
+	const single = wifiRows(at({ wifi: { retry: 1146 } }))
+	expect(value(single, "wifi.retry_delta")).toBe(UNKNOWN)
+	expect(notes(single, "wifi.retry_delta")).toEqual([])
+	const backwards = wifiRows([...at({ wifi: { retry: 2000 } }, 0), ...at({ wifi: { retry: 1000 } }, 5000)])
+	expect(value(backwards, "wifi.retry_delta")).toBe(UNKNOWN)
+	expect(notes(backwards, "wifi.retry_delta")).toEqual([])
+})
+
+test("two records sharing a timestamp span no interval, so no span is claimed", () => {
+	const rows = wifiRows([...at({ wifi: { retry: 10 } }, 1000), ...at({ wifi: { retry: 64 } }, 1000)])
+	expect(value(rows, "wifi.retry_delta")).toBe("54")
+	expect(notes(rows, "wifi.retry_delta")).toEqual([])
+})
+
+test("a created value that cannot be parsed leaves the span unknown", () => {
+	const records = [
+		{ system: "s", stats: { plus: { wifi: { retry: 10 } } }, created: "not-a-time" } as SystemStatsRecord,
+		{ system: "s", stats: { plus: { wifi: { retry: 64 } } }, created: 3600_000 } as SystemStatsRecord,
+	]
+	expect(value(wifiRows(records), "wifi.retry_delta")).toBe("54")
+	expect(notes(wifiRows(records), "wifi.retry_delta")).toEqual([])
+})
+
+test("spans read in the largest unit that keeps them whole", () => {
+	expect(formatSpan(12)).toBe("12s")
+	expect(formatSpan(59)).toBe("59s")
+	expect(formatSpan(60)).toBe("1m")
+	expect(formatSpan(300)).toBe("5m")
+	expect(formatSpan(3540)).toBe("59m")
+	expect(formatSpan(3600)).toBe("1h")
+	expect(formatSpan(7200)).toBe("2h")
+	expect(formatSpan(86_400)).toBe("24h")
+})
+
+test("the span formatter is the one that produces the note", () => {
+	// Guards the copy/paste that would otherwise leave two formatters drifting.
+	expect(`over ${formatSpan(3600)}`).toBe(fmtSpan(3600))
+	expect(`over ${formatSpan(12)}`).toBe(fmtSpan(12))
+})
+
+// --- the collapsed card never renders empty ----------------------------------
+
+test("the preview carries the fan and the zones when the snapshot has both", () => {
+	const rows = previewRows(at(FULL), FAN.sample_ts_s)
+	expect(rows.map((row) => row.key)).toEqual([
+		"fan.rpm_est",
+		"fan.set_level_pct",
+		"fan.ec76_pct",
+		"fan.temp_c",
+		"fan.gov",
+		"ACPI",
+		"BXU",
+	])
+})
+
+test("a snapshot with no fan and no zones previews another section instead of nothing", () => {
+	const rows = previewRows(at({ nvme: { model: "CFQV8-1" } }), 1)
+	expect(rows.length).toBeGreaterThan(0)
+	expect(rows[0].key).toBe("nvme.model")
+	expect(rows[0].value).toBe("CFQV8-1")
+})
+
+test("a snapshot carrying only the firmware table still previews something", () => {
+	const rows = previewRows(at({ fan_steps: [{ percent: 30, rpm_est: 3000, noise_mdb: 20, power_mw: 400 }] }), 1)
+	expect(rows.length).toBeGreaterThan(0)
+	expect(value(rows, "fan_steps.count")).toBe("1")
+})
+
+test("no snapshot and an empty one both preview nothing", () => {
+	expect(previewRows(at(undefined), 1)).toEqual([])
+	expect(previewRows([], 1)).toEqual([])
+	expect(previewRows(at({}), 1)).toEqual([])
+	expect(previewRows(at({ dptf: { zones: {} } }), 1)).toEqual([])
+})
+
+// --- every static row key is one the sheet can translate --------------------
+
+test("every row a snapshot emits has a key the sheet can either translate or name", () => {
+	// The sheet holds `LABELS: Record<StaticLabelKey, string>` and falls back to
+	// `row.label` for anything else. A new fixed-term row that skips this list
+	// would still render, in English, in every locale — so the emitted keys are
+	// checked against the list here rather than left to review.
+	const emitted = [
+		...nvmeRows(at(FULL)),
+		...cpufreqRows(at(FULL)),
+		...wifiRows(at(FULL)),
+		...fanRows(at(FULL), FAN.sample_ts_s),
+	]
+	const staticKeys = new Set<string>(STATIC_LABEL_KEYS)
+	const deviceKeyed = (key: string) => !key.includes(".")
+	for (const row of emitted) {
+		if (staticKeys.has(row.key) || deviceKeyed(row.key)) continue
+		expect(`${row.key} is neither a static label key nor device-named`).toBe("static label key")
+	}
+	// The reverse direction: nothing listed is dead weight.
+	const emittedKeys = new Set(emitted.map((row) => row.key))
+	for (const key of STATIC_LABEL_KEYS) {
+		expect(emittedKeys.has(key)).toBe(true)
+	}
+})
+
+test("the static label keys are unique", () => {
+	expect(new Set(STATIC_LABEL_KEYS).size).toBe(STATIC_LABEL_KEYS.length)
 })

@@ -1,10 +1,18 @@
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { expect, test } from "bun:test"
+import { STATIC_LABEL_KEYS } from "./plus-metrics"
 
+/** The sheet cannot be imported here: `@lingui/core/macro` resolves to a babel
+ *  plugin that needs `babel-plugin-macros`, which this project does not
+ *  install, and `t` is a compile-time macro rather than a function. Rather than
+ *  assert against a copy of the module, the render decisions that a pure module
+ *  cannot own are pinned against the source text of the file that owns them.
+ *  Every rule below is a claim about what the component must still contain. */
 const read = async (relative: string) => readFileSync(fileURLToPath(new URL(relative, import.meta.url)), "utf8")
 
-const SOURCES = ["../lib/plus-metrics.ts", "../components/routes/system/plus-sheet.tsx"]
+const METRICS = "../lib/plus-metrics.ts"
+const SHEET = "../components/routes/system/plus-sheet.tsx"
 
 const occurrences = (source: string, pattern: RegExp) =>
 	source
@@ -19,7 +27,7 @@ const occurrences = (source: string, pattern: RegExp) =>
  * it renders a confident zero forever. No such fallback belongs in these files.
  */
 test("no plus reading falls back to zero", async () => {
-	for (const source of SOURCES) {
+	for (const source of [METRICS, SHEET]) {
 		const text = await read(source)
 		expect(occurrences(text, /\?\?\s*0\b/)).toEqual([])
 		expect(occurrences(text, /\|\|\s*0\b/)).toEqual([])
@@ -29,11 +37,59 @@ test("no plus reading falls back to zero", async () => {
 /** The firmware scales the duty byte by a fixed constant to publish noise, so a
  *  noise column restates the duty and invites reading as a measurement. */
 test("the sheet never renders the firmware noise column", async () => {
-	expect(occurrences(await read(SOURCES[1]), /noise/i)).toEqual([])
+	expect(occurrences(await read(SHEET), /noise/i)).toEqual([])
 })
 
 /** plus rides along on the stats record. The retired collection read is not a
  *  data source this sheet may fall back to. */
 test("the sheet does not read a plus collection", async () => {
-	expect(occurrences(await read(SOURCES[1]), /getPlusStats|plus_stats/)).toEqual([])
+	expect(occurrences(await read(SHEET), /getPlusStats|plus_stats/)).toEqual([])
+})
+
+/** The qualifier spans are what tell a reader that a number is a derived or an
+ *  aged one. Deleting the block that draws them leaves every other test green:
+ *  the notes are still produced by the module, they are just never shown. */
+test("the sheet draws the qualifiers the rows carry", async () => {
+	const text = await read(SHEET)
+	expect(occurrences(text, /row\.notes/)).not.toEqual([])
+	expect(occurrences(text, /\(\{note\}\)/)).not.toEqual([])
+})
+
+/** The two table headers whose text changes with the flags. Dropping either one
+ *  removes a caveat about the firmware rather than a piece of decoration. */
+test("the firmware fan table keeps both caveats in its headers", async () => {
+	const text = await read(SHEET)
+	expect(occurrences(text, /FAN_STEP_RPM_IS_ESTIMATE \? t`Speed \(estimated\)`/)).not.toEqual([])
+	expect(occurrences(text, /FAN_POWER_IS_NOMINAL \? t`Power \(firmware nominal\)`/)).not.toEqual([])
+})
+
+/** A label is looked up by key so it can be translated. A component that went
+ *  back to rendering `row.label` would still be correct in English. */
+test("row labels are resolved through the translation map", async () => {
+	const text = await read(SHEET)
+	expect(occurrences(text, /const LABELS: Record<StaticLabelKey, string>/)).not.toEqual([])
+	expect(occurrences(text, /LABELS\[row\.key as StaticLabelKey\] \?\? row\.label/)).not.toEqual([])
+})
+
+/** A sheet whose only content is the collapsed card must not draw that card
+ *  over nothing, which is what every other chart on the page avoids. */
+test("the collapsed card is withheld when the preview is empty", async () => {
+	const text = await read(SHEET)
+	expect(occurrences(text, /!plusAvailable\(records\) \|\| rows\.length === 0/)).not.toEqual([])
+})
+
+/** Every key the map declares has to be one the module can emit, or the map has
+ *  grown an entry for a row that no longer exists and the label silently stops
+ *  being used. */
+test("the translation map covers exactly the declared static keys", async () => {
+	const text = await read(SHEET)
+	const declared = [...text.matchAll(/^\t"([a-z]+\.[a-z0-9_]+)": t`/gm)].map((match) => match[1])
+	expect(declared.length).toBeGreaterThan(0)
+	expect([...declared].sort()).toEqual([...STATIC_LABEL_KEYS].sort())
+})
+
+/** `created` is the only record clock available to the retry row. The qualifier
+ *  is built by the module so the copy lives with the value it describes. */
+test("the sheet renders the retry span the module formats", async () => {
+	expect(occurrences(await read(METRICS), /fmtSpan\(window\)/)).not.toEqual([])
 })

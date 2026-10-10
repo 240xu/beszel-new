@@ -16,18 +16,57 @@ import {
 	netRows,
 	nvmeRows,
 	plusAvailable,
+	previewRows,
 	wifiRows,
 	type MetricRow,
+	type StaticLabelKey,
 } from "@/lib/plus-metrics"
 import type { ChartData } from "@/types"
 import { ChartCard } from "./chart-card"
+
+/** Translated labels for the rows whose key names a fixed term. `row.key` is the
+ *  only discriminator a row needs: rows keyed by a device name — a zone, an
+ *  interface, a cpu number — are absent here and fall back to that name. Typed
+ *  against `StaticLabelKey`, so a key the sheet fails to cover is a build error
+ *  rather than an English string that quietly survives a locale. */
+const LABELS: Record<StaticLabelKey, string> = {
+	"nvme.model": t`Model`,
+	"nvme.temp_c": t`Temperature`,
+	"nvme.percentage_used_pct": t`Percentage Used`,
+	"nvme.available_spare_pct": t`Available Spare`,
+	"nvme.unsafe_shutdowns": t`Unsafe Shutdowns`,
+	"nvme.media_errors": t`Media Errors`,
+	"nvme.power_on_hours": t`Power On Hours`,
+	"nvme.power_cycles": t`Power Cycles`,
+	"nvme.controller_busy_min": t`Controller Busy (min)`,
+	"nvme.critical_comp_time_min": t`Critical Comp Time (min)`,
+	"nvme.data_units_read": t`Data Read (cumulative)`,
+	"nvme.data_units_written": t`Data Written (cumulative)`,
+	"cpufreq.governor": t`Governor`,
+	"cpufreq.epp": t`EPP`,
+	"cpufreq.pstate_status": t`P-State`,
+	"cpufreq.no_turbo": t`No Turbo`,
+	"cpufreq.hwp_dynamic_boost": t`HWP Dynamic Boost`,
+	"wifi.iface": t`Interface`,
+	"wifi.signal_dbm": t`Signal`,
+	"wifi.freq_mhz": t`Frequency`,
+	"wifi.tx_mbit": t`Transmit Rate`,
+	"wifi.retry_delta": t`Retry since previous sample`,
+	"fan.rpm_est": t`Speed`,
+	"fan.set_level_pct": t`Programmed Level`,
+	"fan.ec76_pct": t`Applied Duty`,
+	"fan.temp_c": t`Temperature`,
+	"fan.gov": t`Mode`,
+}
+
+const labelFor = (row: MetricRow): string => LABELS[row.key as StaticLabelKey] ?? row.label
 
 function MetricGrid({ rows }: { rows: MetricRow[] }) {
 	return (
 		<div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
 			{rows.map((row) => (
 				<div key={row.key}>
-					<span className="text-muted-foreground">{row.label}: </span>
+					<span className="text-muted-foreground">{labelFor(row)}: </span>
 					<span className="font-mono">{row.value}</span>
 					{row.notes?.map((note) => (
 						<span key={note} className="ms-1 text-xs text-muted-foreground">
@@ -189,8 +228,13 @@ const PlusSheet = memo(function PlusSheet({ chartData, grid }: { chartData: Char
 export default PlusSheet
 
 export function PlusChart({ chartData, grid }: { chartData: ChartData; grid: boolean }) {
-	const fan = fanRows(chartData.systemStats, Math.floor(Date.now() / 1000))
-	const dptf = dptfRows(chartData.systemStats)
+	const records = chartData.systemStats
+	const rows = previewRows(records, Math.floor(Date.now() / 1000))
+	// No snapshot, or a snapshot with nothing in it: a card with a title and no
+	// content. The other charts on this page return null rather than draw one.
+	if (!plusAvailable(records) || rows.length === 0) {
+		return null
+	}
 
 	return (
 		<ChartCard
@@ -200,7 +244,7 @@ export function PlusChart({ chartData, grid }: { chartData: ChartData; grid: boo
 			description={t`Thermal zones, per core frequency, NVMe health, WiFi and fan`}
 			cornerEl={<PlusSheet chartData={chartData} grid={grid} />}
 		>
-			<MetricGrid rows={[...fan, ...dptf]} />
+			<MetricGrid rows={rows} />
 		</ChartCard>
 	)
 }

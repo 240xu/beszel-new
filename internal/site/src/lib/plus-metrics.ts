@@ -94,7 +94,11 @@ export function nvmeRows(records: SystemStatsRecord[]): MetricRow[] {
 		{ key: "nvme.power_on_hours", label: "Power On Hours", value: fmtCount(nvme.power_on_hours) },
 		{ key: "nvme.power_cycles", label: "Power Cycles", value: fmtCount(nvme.power_cycles) },
 		{ key: "nvme.controller_busy_min", label: "Controller Busy (min)", value: fmtCount(nvme.controller_busy_min) },
-		{ key: "nvme.critical_comp_time_min", label: "Critical Comp Time (min)", value: fmtCount(nvme.critical_comp_time_min) },
+		{
+			key: "nvme.critical_comp_time_min",
+			label: "Critical Comp Time (min)",
+			value: fmtCount(nvme.critical_comp_time_min),
+		},
 		{ key: "nvme.data_units_read", label: "Data Read (cumulative)", value: fmtCount(nvme.data_units_read) },
 		{ key: "nvme.data_units_written", label: "Data Written (cumulative)", value: fmtCount(nvme.data_units_written) },
 	]

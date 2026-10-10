@@ -23,15 +23,26 @@ import {
 	wifiRows,
 	wifiSignal,
 } from "./plus-metrics"
-import type { PlusStats, SystemStatsRecord } from "@/types"
+import type { FanStats, PlusStats, SystemStatsRecord } from "@/types"
 
 const at = (plus?: PlusStats, created = 1): SystemStatsRecord[] => [
-	({ system: "s", stats: plus ? { plus } : {}, created }) as SystemStatsRecord,
+	{ system: "s", stats: plus ? { plus } : {}, created } as SystemStatsRecord,
 ]
 
 const value = (rows: { key: string; value: string }[], key: string) => rows.find((row) => row.key === key)?.value
-const notes = (rows: { key: string; notes?: string[] }[], key: string) => rows.find((row) => row.key === key)?.notes ?? []
+const notes = (rows: { key: string; notes?: string[] }[], key: string) =>
+	rows.find((row) => row.key === key)?.notes ?? []
 const coreKeys = (rows: { key: string }[]) => rows.filter((row) => /^\d+$/.test(row.key)).map((row) => row.key)
+
+const FAN: FanStats = {
+	set_level_pct: 0,
+	ec76_pct: 30,
+	rpm_est: 1180,
+	rpm_est_is_estimate: true,
+	gov: "curve",
+	temp_c: 44,
+	sample_ts_s: 1759500000,
+}
 
 const FULL: PlusStats = {
 	dptf: { zones: { ACPI: 47.5, BXU: 41 } },
@@ -62,15 +73,7 @@ const FULL: PlusStats = {
 		critical_comp_time_min: 0,
 	},
 	wifi: { signal_dbm: -47, tx_mbit: 433, freq_mhz: 5180, retry: 1146, iface: "wlp0s20f3" },
-	fan: {
-		set_level_pct: 0,
-		ec76_pct: 30,
-		rpm_est: 1180,
-		rpm_est_is_estimate: true,
-		gov: "curve",
-		temp_c: 44,
-		sample_ts_s: 1759500000,
-	},
+	fan: FAN,
 	fan_steps: [{ percent: 65, rpm_est: 2450, noise_mdb: 32, power_mw: 4100 }],
 }
 
@@ -221,29 +224,29 @@ test("a virtual interface has no meaningful link rate so none is shown", () => {
 })
 
 test("rpm is labelled an estimate because the platform has no tachometer", () => {
-	const rows = fanRows(at(FULL), FULL.fan!.sample_ts_s)
+	const rows = fanRows(at(FULL), FAN.sample_ts_s)
 	expect(value(rows, "fan.rpm_est")).toBe("1180 rpm")
 	expect(notes(rows, "fan.rpm_est")).toContain(FAN_ESTIMATE_NOTE)
 	expect(FAN_STEP_RPM_IS_ESTIMATE).toBe(true)
 })
 
 test("the estimate label follows the flag the agent sends", () => {
-	const rows = fanRows(at({ fan: { ...FULL.fan, rpm_est_is_estimate: false } }), FULL.fan!.sample_ts_s)
+	const rows = fanRows(at({ fan: { rpm_est: 1180, rpm_est_is_estimate: false, sample_ts_s: 1759500000 } }), 1759500000)
 	expect(notes(rows, "fan.rpm_est")).not.toContain(FAN_ESTIMATE_NOTE)
 })
 
 test("a fan reading older than the staleness window is marked stale", () => {
-	const rows = fanRows(at(FULL), FULL.fan!.sample_ts_s + FAN_STALE_AFTER_S + 1)
+	const rows = fanRows(at(FULL), FAN.sample_ts_s + FAN_STALE_AFTER_S + 1)
 	expect(notes(rows, "fan.rpm_est")).toContain(FAN_STALE_NOTE)
 })
 
 test("a fan reading inside the staleness window is not marked stale", () => {
-	const rows = fanRows(at(FULL), FULL.fan!.sample_ts_s + FAN_STALE_AFTER_S)
+	const rows = fanRows(at(FULL), FAN.sample_ts_s + FAN_STALE_AFTER_S)
 	expect(notes(rows, "fan.rpm_est")).not.toContain(FAN_STALE_NOTE)
 })
 
 test("a fan snapshot from the future is not stale", () => {
-	const rows = fanRows(at(FULL), FULL.fan!.sample_ts_s - 10_000)
+	const rows = fanRows(at(FULL), FAN.sample_ts_s - 10_000)
 	expect(notes(rows, "fan.rpm_est")).not.toContain(FAN_STALE_NOTE)
 })
 

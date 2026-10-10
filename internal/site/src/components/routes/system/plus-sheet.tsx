@@ -1,0 +1,206 @@
+import { t } from "@lingui/core/macro"
+import { MoreHorizontalIcon } from "lucide-react"
+import { memo, useRef, useState } from "react"
+import ChartTimeSelect from "@/components/charts/chart-time-select"
+import { Button } from "@/components/ui/button"
+import { DialogTitle } from "@/components/ui/dialog"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+	cpufreqRows,
+	dptfRows,
+	FAN_POWER_IS_NOMINAL,
+	FAN_STEP_RPM_IS_ESTIMATE,
+	fanRows,
+	fanStepRows,
+	netRows,
+	nvmeRows,
+	plusAvailable,
+	wifiRows,
+	type MetricRow,
+} from "@/lib/plus-metrics"
+import type { ChartData } from "@/types"
+import { ChartCard } from "./chart-card"
+
+function MetricGrid({ rows }: { rows: MetricRow[] }) {
+	return (
+		<div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+			{rows.map((row) => (
+				<div key={row.key}>
+					<span className="text-muted-foreground">{row.label}: </span>
+					<span className="font-mono">{row.value}</span>
+					{row.notes?.map((note) => (
+						<span key={note} className="ms-1 text-xs text-muted-foreground">
+							({note})
+						</span>
+					))}
+				</div>
+			))}
+		</div>
+	)
+}
+
+function FanStepTable({ rows }: { rows: ReturnType<typeof fanStepRows> }) {
+	return (
+		<Table>
+			<TableHeader>
+				<TableRow>
+					<TableHead>{t`Duty`}</TableHead>
+					<TableHead>{FAN_STEP_RPM_IS_ESTIMATE ? t`Speed (estimated)` : t`Speed`}</TableHead>
+					<TableHead>{FAN_POWER_IS_NOMINAL ? t`Power (firmware nominal)` : t`Power`}</TableHead>
+				</TableRow>
+			</TableHeader>
+			<TableBody>
+				{rows.map((row) => (
+					<TableRow key={row.key}>
+						<TableCell className="font-mono">{row.duty}</TableCell>
+						<TableCell className="font-mono">{row.rpm}</TableCell>
+						<TableCell className="font-mono">{row.power}</TableCell>
+					</TableRow>
+				))}
+			</TableBody>
+		</Table>
+	)
+}
+
+const PlusSheet = memo(function PlusSheet({ chartData, grid }: { chartData: ChartData; grid: boolean }) {
+	const [open, setOpen] = useState(false)
+	const hasOpened = useRef(false)
+
+	if (open && !hasOpened.current) {
+		hasOpened.current = true
+	}
+
+	if (!plusAvailable(chartData.systemStats)) {
+		return null
+	}
+
+	const records = chartData.systemStats
+	const nowSeconds = Math.floor(Date.now() / 1000)
+	const fan = fanRows(records, nowSeconds)
+	const dptf = dptfRows(records)
+	const cpufreq = cpufreqRows(records)
+	const nvme = nvmeRows(records)
+	const wifi = wifiRows(records)
+	const netall = netRows(records)
+	const steps = hasOpened.current ? fanStepRows(records) : []
+
+	return (
+		<Sheet open={open} onOpenChange={setOpen}>
+			<DialogTitle className="sr-only">{t`Beszelplus`}</DialogTitle>
+			<SheetTrigger asChild>
+				<Button title={t`View more`} variant="outline" size="icon" className="shrink-0">
+					<MoreHorizontalIcon />
+				</Button>
+			</SheetTrigger>
+			{hasOpened.current && (
+				<SheetContent aria-describedby={undefined} className="overflow-auto w-200 !max-w-full p-4 sm:p-6">
+					<ChartTimeSelect className="w-[calc(100%-2em)] bg-card" agentVersion={chartData.agentVersion} />
+
+					{dptf.length > 0 && (
+						<ChartCard
+							key="plus-dptf"
+							grid={grid}
+							className="min-h-auto"
+							title={t`Thermal Zones`}
+							description={t`Intel DPTF sensors. A zone the collector could not read is left out rather than shown as zero.`}
+						>
+							<MetricGrid rows={dptf} />
+						</ChartCard>
+					)}
+
+					{cpufreq.length > 0 && (
+						<ChartCard
+							key="plus-cpufreq"
+							grid={grid}
+							className="min-h-auto"
+							title={t`CPU Frequency`}
+							description={t`Per core, named by cpu number, plus the active tuning policy`}
+						>
+							<MetricGrid rows={cpufreq} />
+						</ChartCard>
+					)}
+
+					{nvme.length > 0 && (
+						<ChartCard
+							key="plus-nvme"
+							grid={grid}
+							className="min-h-auto"
+							title={t`NVMe Health`}
+							description={t`SMART log. A field the drive omits reads as unknown, not as zero.`}
+						>
+							<MetricGrid rows={nvme} />
+						</ChartCard>
+					)}
+
+					{wifi.length > 0 && (
+						<ChartCard
+							key="plus-wifi"
+							grid={grid}
+							className="min-h-auto"
+							title={t`WiFi`}
+							description={t`Radio link. Retry is a difference between two samples, not a counter reading.`}
+						>
+							<MetricGrid rows={wifi} />
+						</ChartCard>
+					)}
+
+					{netall.length > 0 && (
+						<ChartCard
+							key="plus-netall"
+							grid={grid}
+							className="min-h-auto"
+							title={t`All Interfaces`}
+							description={t`Cumulative counters, including veth pairs and docker bridges`}
+						>
+							<MetricGrid rows={netall} />
+						</ChartCard>
+					)}
+
+					{fan.length > 0 && (
+						<ChartCard
+							key="plus-fan"
+							grid={grid}
+							className="min-h-auto"
+							title={t`Fan`}
+							description={t`Speed is derived from the duty byte; this platform reports no tachometer.`}
+						>
+							<MetricGrid rows={fan} />
+						</ChartCard>
+					)}
+
+					{steps.length > 0 && (
+						<ChartCard
+							key="plus-fan-steps"
+							grid={grid}
+							className="min-h-auto"
+							title={t`Firmware Fan Table`}
+							description={t`The steps the firmware itself publishes. Power is the duty scaled by a fixed constant.`}
+						>
+							<FanStepTable rows={steps} />
+						</ChartCard>
+					)}
+				</SheetContent>
+			)}
+		</Sheet>
+	)
+})
+
+export default PlusSheet
+
+export function PlusChart({ chartData, grid }: { chartData: ChartData; grid: boolean }) {
+	const fan = fanRows(chartData.systemStats, Math.floor(Date.now() / 1000))
+	const dptf = dptfRows(chartData.systemStats)
+
+	return (
+		<ChartCard
+			grid={grid}
+			className="min-h-auto"
+			title={t`Beszelplus`}
+			description={t`Thermal zones, per core frequency, NVMe health, WiFi and fan`}
+			cornerEl={<PlusSheet chartData={chartData} grid={grid} />}
+		>
+			<MetricGrid rows={[...fan, ...dptf]} />
+		</ChartCard>
+	)
+}

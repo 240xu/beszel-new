@@ -15,6 +15,11 @@ const read = async (relative: string) => readFileSync(fileURLToPath(new URL(rela
 
 const TAB = "../components/routes/system/plus-fan-tab.tsx"
 
+/** The body of the regress line, which is the only place allowed to decide what
+ *  an operator is told about a hand-set duty. */
+const regressArm = (source: string) =>
+	source.slice(source.indexOf("function RegressLine"), source.indexOf("function CurveEditor"))
+
 const occurrences = (source: string, pattern: RegExp) =>
 	source
 		.split("\n")
@@ -128,7 +133,12 @@ test("a countdown exists only where a deadline produced one", async () => {
 	expect(occurrences(source, /regress_at/)).toEqual([])
 	expect(occurrences(source, /fanRegressView\(/)).not.toEqual([])
 	expect(occurrences(source, /regress\.kind === "counting_down"/)).not.toEqual([])
-	expect(occurrences(source, /regress\.kind === "none"\)\s*return null/)).not.toEqual([])
+	// Nothing on record, and a deadline lost to an agent restart, are the same
+	// bytes -- and a duty set before that restart is still in force, because it
+	// lives in the firmware and not in the agent. The arm that rendered nothing
+	// therefore left a possibly-held duty invisible, which is the whole failure.
+	expect(occurrences(regressArm(source), /return null/)).toEqual([])
+	expect(occurrences(source, /cannot see it/)).not.toEqual([])
 	// A regress with no deadline is not a thing this panel cannot act on: writing
 	// the duty again starts a fresh countdown, which guard.go schedules on every
 	// accepted level write.

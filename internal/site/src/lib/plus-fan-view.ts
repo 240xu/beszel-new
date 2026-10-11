@@ -208,7 +208,9 @@ function formatCountdown(milliseconds: number): string {
 
 /** `regress_pending` is false both when no regress is on record and when one was
  *  lost to an agent restart; nothing on the wire separates them, so this does not
- *  pretend to. An unreadable deadline yields no countdown. */
+ *  pretend to. An unreadable deadline yields no countdown. The `none` arm is
+ *  still a state the panel renders rather than drops -- a duty set before that
+ *  restart keeps driving the fan, and silence would hide the possibility. */
 export function fanRegressView(state: FanState, nowMs: number): RegressView {
 	if (!state.regress_pending) return { kind: "none", countdown: null }
 	const at = state.regress_at === undefined ? Number.NaN : Date.parse(state.regress_at)

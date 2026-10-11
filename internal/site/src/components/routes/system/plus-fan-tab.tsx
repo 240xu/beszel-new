@@ -206,7 +206,6 @@ function ConfirmPanel({
 
 function RegressLine({ state }: { state: FanState }) {
 	const regress = fanRegressView(state, Date.now())
-	if (regress.kind === "none") return null
 	if (regress.kind === "counting_down") {
 		return (
 			<p className="mt-2 text-xs text-muted-foreground">
@@ -214,9 +213,21 @@ function RegressLine({ state }: { state: FanState }) {
 			</p>
 		)
 	}
+	if (regress.kind === "no_deadline") {
+		return (
+			<p className="mt-2 text-xs text-muted-foreground">
+				{t`A hand-set duty is on record with no deadline. Writing that duty again now starts a fresh countdown to the curve.`}
+			</p>
+		)
+	}
+	// Nothing on record and a deadline lost to an agent restart are the same bytes,
+	// and a duty set before that restart keeps driving the fan, because it lives
+	// in the firmware and not in the agent. This arm used to render nothing, which
+	// left that possibility invisible. It claims neither way on purpose: it says
+	// the two cannot be told apart rather than guessing which one is true.
 	return (
 		<p className="mt-2 text-xs text-muted-foreground">
-			{t`A hand-set duty is on record with no deadline. Writing that duty again now starts a fresh countdown to the curve.`}
+			{t`No hand-set duty is on record. One set before an agent restarted would still be driving the fan, and this panel cannot see it; setting a duty again starts a fresh countdown to the curve.`}
 		</p>
 	)
 }

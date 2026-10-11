@@ -72,6 +72,24 @@ var realFanStates = map[int]string{
 	11: "100:not-defined:12000:50000:5000",
 }
 
+// acpiDevices is the sysfs directory the collector discovers devices under.
+func acpiDevices(root string) string {
+	return filepath.Join(root, "bus", "acpi", "devices")
+}
+
+// writeDevice lays one ACPI device directory under a root and fills it with a state
+// table. A nil or empty map lays the directory with no table at all, which is the shape
+// this host's INT3404:01 has: a description and a modalias, and nothing to read.
+func writeDevice(t *testing.T, root, name string, states map[int]string) {
+	t.Helper()
+	dir := filepath.Join(acpiDevices(root), name)
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	for step, line := range states {
+		name := filepath.Join(dir, "state"+strconv.Itoa(step))
+		require.NoError(t, os.WriteFile(name, []byte(line+"\n"), 0o644))
+	}
+}
+
 // writeFanFixture lays a state table under a fresh temp root and returns the root,
 // so the collector's own path resolution is exercised rather than stubbed.
 //
@@ -81,14 +99,24 @@ var realFanStates = map[int]string{
 func writeFanFixture(t *testing.T, states map[int]string) string {
 	t.Helper()
 	root := t.TempDir()
-	dir := filepath.Join(root, "bus", "acpi", "devices", "INT3404:00")
-	require.NoError(t, os.MkdirAll(dir, 0o755))
-	for step, line := range states {
-		name := filepath.Join(dir, "state"+strconv.Itoa(step))
-		require.NoError(t, os.WriteFile(name, []byte(line+"\n"), 0o644))
-	}
+	writeDevice(t, root, "INT3404:00", states)
 	return root
 }
+
+// Two short tables whose duty cycles and speeds share no value, so "which device was
+// read" is answerable from the payload alone. Asserting on a device's rows rather than
+// on its name keeps these assertions spelling-independent: a rename of the device
+// directory, or of the constant naming it, cannot fail or pass them.
+var (
+	tableFan1 = map[int]string{
+		1: "25:not-defined:1111:11:11",
+		2: "50:not-defined:2222:22:22",
+	}
+	tableFan2 = map[int]string{
+		1: "30:not-defined:3333:33:33",
+		2: "70:not-defined:4444:44:44",
+	}
+)
 
 func percentsOf(steps []FanSpeedStep) []int {
 	out := make([]int, 0, len(steps))
@@ -136,13 +164,6 @@ func TestCollectFanStepsDropsAutoPlaceholder(t *testing.T) {
 		"25% is the lowest level the firmware accepts; if state0 survived it would be 0")
 }
 
-// TestCollectFanStepsIsNilWithoutATable keeps the absent case honest: an unreadable
-// or absent table must leave fan_steps out of the payload entirely rather than
-// publishing an empty slice, so the JSON key's absence still means "unknown".
-func TestCollectFanStepsIsNilWithoutATable(t *testing.T) {
-	assert.Nil(t, collectFanSteps(t.TempDir()))
-}
-
 // TestCollectFanStepsSkipsStateWithUnparsableBody checks one bad file costs only
 // that step. A truncated or padded state file is a firmware quirk this collector
 // should step over, not a reason to drop the eleven good rows around it.
@@ -171,23 +192,143 @@ func TestCollectFanStepsIgnoresNonNumericStateFiles(t *testing.T) {
 	assert.Equal(t, []int{25}, percentsOf(collectFanSteps(root)))
 }
 
-// TestCollectFanStepsIgnoresOtherFanInstances pins the single-instance scope.
+// TestCollectFanStepsReportsOneTableWhenTwoPublish is the no-merge rule.
 //
-// This host publishes INT3404:01 alongside INT3404:00, both described "Fan 1", and
-// FanSpeedStep carries no instance field. Reading :01 as well would append its rows
-// to :00's with nothing to tell the two apart, so the second fan's numbers would be
-// served as the first fan's. The fixture gives :01 a table with a value no row of
-// :00 has, so a collector that merged would be caught by the length alone.
-func TestCollectFanStepsIgnoresOtherFanInstances(t *testing.T) {
-	root := writeFanFixture(t, realFanStates)
-	other := filepath.Join(root, "bus", "acpi", "devices", "INT3404:01")
-	require.NoError(t, os.MkdirAll(other, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(other, "state1"), []byte("25:not-defined:9999:7:7\n"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(other, "state2"), []byte("30:not-defined:8888:8:8\n"), 0o644))
+// Two devices holding tables is a case this host does not have but another may, and
+// FanSpeedStep carries no instance field. Concatenating the tables would append the
+// second fan's rows to the first's with nothing to tell them apart, so the second fan's
+// numbers would be served as the first's -- a silent lie, where the absent key an absent
+// table leaves is merely uninformative. The fixture gives each device a table sharing no
+// duty or speed value, so both the row count and the values themselves catch a merge.
+func TestCollectFanStepsReportsOneTableWhenTwoPublish(t *testing.T) {
+	root := t.TempDir()
+	writeDevice(t, root, "INT3404:00", tableFan1)
+	writeDevice(t, root, "INT3404:01", tableFan2)
 
 	steps := collectFanSteps(root)
-	require.Len(t, steps, 11, "a second instance's rows must not be appended to the first's")
-	assert.Equal(t, uint16(3200), steps[0].RPMEst, "row 1 belongs to INT3404:00, not :01")
+	require.Len(t, steps, 2, "the second device's rows must not be appended to the first's")
+	assert.Equal(t, []int{25, 50}, percentsOf(steps))
+	assert.Equal(t, uint16(1111), steps[0].RPMEst)
+	assert.Equal(t, uint16(2222), steps[1].RPMEst)
+}
+
+// TestCollectFanStepsReportsLowestInstanceAmongSeveral is the other half: when several
+// devices publish a table, which one is reported. The lowest instance wins because it is
+// the enumeration order the firmware itself uses, and because it is the instance this host
+// published its fan under, so the choice is the least surprising one available.
+//
+// The loser is given values no row of the winner has, so a collector that took the last
+// device, or the second, or merged, is caught by the payload rather than by a device name.
+func TestCollectFanStepsReportsLowestInstanceAmongSeveral(t *testing.T) {
+	root := t.TempDir()
+	writeDevice(t, root, "INT3404:00", tableFan1)
+	writeDevice(t, root, "INT3404:01", tableFan2)
+	writeDevice(t, root, "INT3404:02", tableFan2)
+
+	steps := collectFanSteps(root)
+	require.Len(t, steps, 2, "exactly one device's rows, not three devices' worth")
+	assert.Equal(t, []int{25, 50}, percentsOf(steps), "instance 00 holds tableFan1 and must be the one read")
+	assert.Equal(t, uint16(1111), steps[0].RPMEst)
+}
+
+// TestCollectFanStepsIgnoresDeviceWithoutATable is this host's own shape: a sibling
+// device directory published under the same device ID, described as a fan, that carries
+// no state table at all. It must be stepped over, and the device that does have a table
+// reported -- which is what keeps this host's eleven rows appearing.
+//
+// A sibling with a table is the opposite case and lives in
+// TestCollectFanStepsReportsOneTableWhenTwoPublish; together they pin both directions of
+// the same predicate, so a collector that inverted it cannot pass one and fail nothing.
+func TestCollectFanStepsIgnoresDeviceWithoutATable(t *testing.T) {
+	root := t.TempDir()
+	writeDevice(t, root, "INT3404:00", realFanStates)
+	// The table-less sibling, plus the cooler and thermal IDs this host also publishes,
+	// none of which carries an _FPS table. A collector that required "instance :00", or
+	// that stopped at the first directory it found, would return nothing here.
+	writeDevice(t, root, "INT3404:01", nil)
+	writeDevice(t, root, "INT3403:00", nil)
+	writeDevice(t, root, "INT3403:07", nil)
+	writeDevice(t, root, "INT3406:00", nil)
+
+	steps := collectFanSteps(root)
+	require.Len(t, steps, 11)
+	assert.Equal(t, []int{25, 30, 40, 50, 60, 70, 80, 85, 90, 95, 100}, percentsOf(steps),
+		"the table-less siblings must leave the one real table untouched")
+	assert.Equal(t, uint16(3200), steps[0].RPMEst)
+}
+
+// TestCollectFanStepsFindsTableOffInstanceZero is the portability case the fixed path
+// could not express: the only device publishing a table is not instance :00. Pinning
+// instance :00 would have returned nothing at all here, silently dropping fan_steps from
+// the payload on any machine whose firmware numbered its fan differently.
+func TestCollectFanStepsFindsTableOffInstanceZero(t *testing.T) {
+	root := t.TempDir()
+	writeDevice(t, root, "INT3404:00", nil)
+	writeDevice(t, root, "INT3404:01", nil)
+	writeDevice(t, root, "INT3404:02", tableFan1)
+
+	steps := collectFanSteps(root)
+	require.Len(t, steps, 2, "the only device holding a table has to be found, whatever its instance")
+	assert.Equal(t, []int{25, 50}, percentsOf(steps))
+	assert.Equal(t, uint16(2222), steps[1].RPMEst)
+}
+
+// TestCollectFanStepsOrdersInstancesNumericallyNotLexically pins the instance ordering
+// where the two disagree. Glob returns names lexically, so "INT3404:10" precedes
+// "INT3404:2" and the lowest instance would be the wrong device.
+//
+// The fixture deliberately uses an unpadded instance because that is the only spelling
+// where the two orders part company: sysfs formats an ACPI instance as a zero-padded
+// two-digit number, which lexically happens to agree with the numeric order. The
+// property asserted here is that the ordering is by parsed number and not by the
+// directory name, and that agreement on padded names is a consequence rather than the
+// mechanism. A collector sorting the names would read :10 and return its rows.
+func TestCollectFanStepsOrdersInstancesNumericallyNotLexically(t *testing.T) {
+	root := t.TempDir()
+	writeDevice(t, root, "INT3404:10", tableFan2)
+	writeDevice(t, root, "INT3404:2", tableFan1)
+
+	steps := collectFanSteps(root)
+	require.Len(t, steps, 2)
+	assert.Equal(t, []int{25, 50}, percentsOf(steps),
+		"instance 2 is the lowest number here; globbed lexically \"INT3404:10\" sorts first")
+	assert.Equal(t, uint16(1111), steps[0].RPMEst)
+}
+
+// TestCollectFanStepsSkipsDevicesOutsideInt340 scopes the discovery glob itself. A table
+// under any other device ID is not read, so a cooler or thermal device that happened to
+// publish one cannot displace a fan's -- _FPS is a property of the ACPI Fan object, whose
+// HID is INT3404, and this collector resolves a fan rather than a thermal device.
+//
+// The lone table-bearing device here is deliberately outside the glob, so the assertion is
+// that the collector finds nothing rather than which of two it preferred.
+func TestCollectFanStepsSkipsDevicesOutsideInt340(t *testing.T) {
+	root := t.TempDir()
+	writeDevice(t, root, "INT3404:00", nil)
+	writeDevice(t, root, "INT3420:00", tableFan1)
+	writeDevice(t, root, "INT346F:00", tableFan2)
+
+	assert.Nil(t, collectFanSteps(root),
+		"a table outside INT340* is not a fan table and must leave the key absent")
+}
+
+// TestCollectFanStepsIsNilWithoutATable covers the graceful degradation from both ends: a
+// root with no ACPI devices directory at all, and one whose devices are all table-less.
+// Either way the key stays out of the payload, so its absence still reads as "unknown"
+// rather than as "a fan with no steps".
+func TestCollectFanStepsIsNilWithoutATable(t *testing.T) {
+	assert.Nil(t, collectFanSteps(t.TempDir()), "no ACPI devices directory at all")
+
+	tables := t.TempDir()
+	writeDevice(t, tables, "INT3404:00", nil)
+	writeDevice(t, tables, "INT3404:01", nil)
+	writeDevice(t, tables, "INT3403:00", nil)
+	// A state file with no step number is not a table either: it matches "state*" and
+	// carries nothing a step could be read from.
+	require.NoError(t, os.WriteFile(
+		filepath.Join(acpiDevices(tables), "INT3404:00", "state_default"),
+		[]byte("50:not-defined:9999:7:7\n"), 0o644))
+	assert.Nil(t, collectFanSteps(tables), "devices present but no numeric state file anywhere")
 }
 
 // TestParseFpsLineAcceptsTrailingNewline pins the trimming at the parse boundary

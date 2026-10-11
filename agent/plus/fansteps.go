@@ -1,6 +1,7 @@
 package plus
 
 import (
+	"log/slog"
 	"math"
 	"path/filepath"
 	"sort"
@@ -8,7 +9,7 @@ import (
 	"strings"
 )
 
-// unnumberedState ranks a state<N> file with a non-numeric suffix; stateOrder parses it out of a ".../state<N>" match.
+// unnumberedState ranks a state<N> with a non-numeric suffix, and a device whose instance will not parse; both sort last rather than being dropped, since an unrecognised name is still a real entry.
 const unnumberedState = math.MaxInt
 
 func stateOrder(match string) int {
@@ -19,17 +20,81 @@ func stateOrder(match string) int {
 	return n
 }
 
-// collectFanSteps reads the firmware's own fan speed table from INT3404:00, the duty
-// levels it publishes as state1..state11 beside a state0 auto placeholder, under the
-// injected sysfs root. Only INT3404:00, though this host also publishes INT3404:01 as
-// "Fan 1": FanSpeedStep has no instance field, so its rows cannot be attributed to a
-// fan, while an absent key reads as unknown. Covering all instances is a schema change.
+// deviceOrder parses the instance out of an "INT3404:07" directory name, because Glob is
+// lexical and puts ":10" before ":02" -- the ordering that misplaces state10 below state1.
+func deviceOrder(name string) int {
+	_, instance, ok := strings.Cut(filepath.Base(name), ":")
+	if !ok {
+		return unnumberedState
+	}
+	n, err := strconv.Atoi(instance)
+	if err != nil {
+		return unnumberedState
+	}
+	return n
+}
+
+// fanTableDir returns the one ACPI device directory that publishes a numeric state table,
+// or "" when none does. Three layers where there was one literal path: this host's fan is
+// INT3404:00 and nothing guarantees that elsewhere, so naming it emptied fan_steps on a
+// machine that numbered its fan differently, with nothing reporting the loss.
+// Several qualifying devices still yield exactly one -- lowest instance, glob's lexical
+// order breaking a tie. FanSpeedStep has no instance field, so concatenating tables would
+// serve one fan's numbers as another's, and that lie is worse than the absent key an
+// absent table leaves. Ordering picks a winner; it never licenses reporting both.
+func fanTableDir(root string) string {
+	devices, err := filepath.Glob(filepath.Join(root, "bus", "acpi", "devices", "INT340*"))
+	if err != nil {
+		return ""
+	}
+	var candidates []string
+	best := ""
+	for _, device := range devices {
+		if !publishesFanTable(device) {
+			continue
+		}
+		candidates = append(candidates, filepath.Base(device))
+		if best == "" || deviceOrder(device) < deviceOrder(best) {
+			best = device
+		}
+	}
+	// Reachable on hardware this has not run on, so it is logged rather than left to a comment.
+	if len(candidates) > 1 {
+		slog.Debug("fan_steps: several ACPI devices publish a table; reporting one",
+			"candidates", candidates, "chosen", filepath.Base(best))
+	}
+	return best
+}
+
+// publishesFanTable reports whether dir holds at least one state file with a numeric
+// suffix -- the predicate is the table's existence, never the device's instance number or
+// description. This host publishes INT3404:01 described "Fan 1" holding no state file at
+// all, so a name or index test guesses at firmware intent where this asks.
+// The "state*" glob alone is not the test either: it also matches siblings such as
+// state_default, which carry no step number and are dropped further down.
+func publishesFanTable(dir string) bool {
+	matches, err := filepath.Glob(filepath.Join(dir, "state*"))
+	if err != nil {
+		return false
+	}
+	for _, match := range matches {
+		if stateOrder(match) != unnumberedState {
+			return true
+		}
+	}
+	return false
+}
+
+// collectFanSteps reads the duty levels published as state1..state11 beside a state0 auto placeholder, from whichever device fanTableDir settles on; the sort re-parses each suffix because Glob puts state10 between state1 and state2.
 func collectFanSteps(root string) []FanSpeedStep {
-	matches, err := filepath.Glob(filepath.Join(root, "bus", "acpi", "devices", "INT3404:00", "state*"))
+	dir := fanTableDir(root)
+	if dir == "" {
+		return nil
+	}
+	matches, err := filepath.Glob(filepath.Join(dir, "state*"))
 	if err != nil || len(matches) == 0 {
 		return nil
 	}
-	// Glob returns lexical order, where state10 lands between state1 and state2; the 12 files here make that live.
 	sort.SliceStable(matches, func(i, j int) bool {
 		return stateOrder(matches[i]) < stateOrder(matches[j])
 	})

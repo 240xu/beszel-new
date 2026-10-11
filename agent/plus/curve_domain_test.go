@@ -12,10 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Parsing and validating are different gates, and only one of them used to stand
-// on the byte path. The guard restores captured bytes through that path, so a
-// restore refused for a value-domain reason was reported to it as a failed
-// control path -- and the breaker counts those.
+// Parsing and validating are different gates and only one stood on the byte path,
+// so a restore refused on values was reported as a failed control path.
 func TestWriteCurveBytesFileRefusesBytesOutsideTheValueDomain(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "pfand.conf")
 	require.NoError(t, os.WriteFile(path, []byte(golden(t, "pfand.conf")), curveConfMode))

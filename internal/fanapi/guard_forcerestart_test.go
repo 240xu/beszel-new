@@ -9,13 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// A curve reaches the disk before anything runs it, and that is true of both
-// daemon states. Running, the daemon is holding the configuration it sourced at
-// start rather than this one. Stopped, there is no daemon at all, so nothing
-// reads the file until one starts. Neither state is the curve just written.
-// Reporting either as in force tells the operator their change is cooling the
-// machine when it is not -- and the stopped case is the recommended workflow, so
-// it is the one most likely to be believed.
+// A curve reaches the disk before anything runs it, whichever way the daemon is
+// running: up, it holds the configuration it sourced at start; down, nothing reads
+// the file at all. Reporting either as in force says the change is cooling the
+// machine when it is not, and stopping the daemon first is the recommended
+// workflow, so that is the arm most likely to be believed.
 func TestACurveIsNeverReportedAsInForceBeforeADaemonHasReadIt(t *testing.T) {
 	for _, tc := range []struct {
 		name    string

@@ -16,11 +16,7 @@ import (
 // RegressAfter is how long a manual duty outlives the request that asked for it.
 const RegressAfter = 10 * time.Minute
 
-// How long after a gate declines the fan is looked at again. It grows because
-// the reasons a gate declines -- an unreadable sensor, a package parked at the
-// emergency edge, a device that is refusing writes -- are the ones that take
-// time rather than resolve themselves, and it stops growing because a poll that
-// keeps slowing is a duty held for good wearing a retry's name.
+// How long after a gate declines the fan is looked at again: it grows, then stops.
 const (
 	regressRetryBase = 15 * time.Second
 	regressRetryMax  = 5 * time.Minute
@@ -112,9 +108,7 @@ type Deps struct {
 
 	Audit func(Event)
 
-	// AfterFunc is the timer seam. The regress retry is a policy -- how long to
-	// wait before looking again -- and a policy the tests cannot observe is a
-	// policy that cannot be checked for the one thing that matters about it.
+	// AfterFunc is the timer seam: a retry policy the tests cannot see
 	AfterFunc func(time.Duration, func()) *time.Timer
 }
 
@@ -142,9 +136,7 @@ type Guard struct {
 	brk       breaker
 	regressAt time.Time
 	timer     *time.Timer
-	// declines counts the gates that have turned this regress away in a row, so
-	// the wait between attempts can grow without any of them having to say how
-	// long they expect to last.
+	// declines counts consecutive refusals, so the wait can grow
 	declines int
 }
 
@@ -272,9 +264,7 @@ func (g *Guard) writeCurveLocked(c *plus.Curve, req Request, now time.Time) (Res
 		return Result{}, fmt.Errorf("read the curve to restore: %w", err)
 	}
 	if err := g.d.WriteCurveBytes([]byte(c.Render())); err != nil {
-		// A curve this stack refused is the guard working, not a control path that
-		// broke. Charging the latch for it would take away a correction the operator
-		// is entitled to make, and show them a refusal they cannot act on.
+		// A curve this stack refused is the guard working, not a path that broke.
 		if errors.Is(err, plus.ErrCurveInvalid) {
 			return Result{}, fmt.Errorf("%w: %v", ErrCurveRejected, err)
 		}
@@ -292,14 +282,9 @@ func (g *Guard) writeCurveLocked(c *plus.Curve, req Request, now time.Time) (Res
 		return Result{}, err
 	}
 	g.record()
-	// The daemon sources its configuration once at start, so a curve reaches the
-	// disk strictly before it reaches the fan, and that is true whichever way the
-	// daemon is running: up, it is holding the file it read at start; down, there
-	// is nothing to read this one until a daemon starts. Reading the daemon's
-	// state here reported "no restart needed" in exactly the case where the curve
-	// is most inert -- no daemon at all -- and a panel told applied renders saved,
-	// over a control law the machine is not running. The field means what its
-	// name says; a curve write is simply never in force at the moment it lands.
+	// The daemon sources its configuration once at start, so a curve reaches the disk
+	// before the fan either way: up, it holds the file it read at start; down, nothing
+	// will read this one. Reading its state claimed "no restart needed" when inertest.
 	return Result{Applied: true, NeedsPfandRestart: true}, nil
 }
 
@@ -398,10 +383,9 @@ func (g *Guard) Regress() (bool, error) {
 	return did, err
 }
 
-// holdEmergencyLocked puts the fan on the duty the curve itself commands at this
-// temperature, and proves it landed the way every other write here does. It runs
-// only at or past the emergency edge, so the direction it fails in is the one
-// that matters: a refusal leaves the previous duty in place and is reported.
+// holdEmergencyLocked puts the fan on the duty the curve itself commands here, and
+// proves it landed. Only runs at or past the edge, so a refusal leaves the previous
+// duty standing, reported.
 func (g *Guard) holdEmergencyLocked(now time.Time, duty int) error {
 	if err := g.admit(now); err != nil {
 		return err
@@ -437,15 +421,9 @@ func (g *Guard) regressLocked(now time.Time) (bool, string, error) {
 	if err != nil {
 		return false, DeclineUnreadable, nil
 	}
-	// At or past the emergency edge the answer is the curve's emergency duty, and
-	// this gate has to command it rather than decline. It used to decline, on the
-	// stated grounds that the daemon was driving full speed -- but the check above
-	// returns as soon as a daemon is up, so by this point none is, and nothing was
-	// driving the fan anywhere. Declining left it on whatever duty an operator had
-	// set once, at the one temperature the curve says must not be reached that way.
-	// Handing control back is not the alternative either: with no daemon, that
-	// returns the fan to the firmware's curve, which is a different law from the
-	// one on disk. The handover waits for the edge to clear.
+	// At or past the emergency edge the answer is the curve's emergency duty, so this
+	// gate commands it rather than declining. It used to decline on the grounds that the
+	// daemon was driving full speed, but the check above returns if one is up, so none is.
 	if temp >= c.Emerg {
 		return false, DeclineAtEmergency, g.holdEmergencyLocked(now, c.E)
 	}
@@ -478,10 +456,8 @@ func (g *Guard) scheduleRegressLocked(now time.Time, delay time.Duration) {
 	g.timer = g.d.AfterFunc(delay, func() { _, _ = g.Regress() })
 }
 
-// retryLocked hands the decision on after a gate declined. The regress has one
-// caller and it used to be a one-shot timer, so a handover that stopped short
-// stayed stopped: the fan on a hand-set duty, and no timer left to bring it
-// back. Nothing re-arms it, so the retry has to be scheduled here or not at all.
+// retryLocked hands the decision on after a gate declined: one-shot timers meant a
+// handover that stopped short stayed stopped for good.
 func (g *Guard) retryLocked(now time.Time) {
 	g.scheduleRegressLocked(now, regressRetryDelay(g.declines))
 	g.declines++

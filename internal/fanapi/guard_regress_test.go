@@ -11,10 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// A gate that declined is not the last word. The regress has exactly one caller
-// and it used to be a one-shot timer, so a duty declined at a gate stayed held
-// for the life of the agent -- the fan on a hand-set duty, and an operator with
-// nothing on screen to tell them so.
+// A gate that declined is not the last word. The regress has one caller and it
+// used to be a one-shot timer, so a duty declined at a gate stayed held for the
+// life of the agent, with nothing on screen to say so.
 func TestADeclinedRegressIsLookedAtAgain(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -79,12 +78,10 @@ func TestTheRegressRetryWaitsAndThenWaitsLonger(t *testing.T) {
 	assert.Greater(t, seen[len(seen)-1], seen[0],
 		"a gate that keeps declining has to stop being retried at a fixed rate")
 
-	// Both ends of the curve, because either one alone is satisfiable by a
-	// backoff that never had them: a wait short enough to be a busy loop still
-	// grows, and one that grows without a ceiling still starts out reasonable.
-	// One second is the floor that keeps this from becoming a spin: every attempt
-	// takes the shared control lock, reads a sensor file and may write the fan,
-	// and none of those return faster than that.
+	// Both ends, because either alone is satisfiable by a backoff that never had
+	// them: a wait short enough to be a busy loop still grows, and one that grows
+	// without a ceiling still starts out reasonable. One second is the floor: every
+	// attempt takes the control lock, reads a sensor file and may write the fan.
 	assert.GreaterOrEqual(t, seen[0], time.Second,
 		"the first retry has to be long enough not to be a loop")
 	plateau := false
@@ -97,22 +94,19 @@ func TestTheRegressRetryWaitsAndThenWaitsLonger(t *testing.T) {
 		"the wait has to stop growing; a retry that doubles forever is a duty held "+
 			"for good wearing the name of a retry")
 
-	// The ceiling itself. The loop already refuses to keep doubling once the wait
-	// is long, so growth stops either way and a plateau on its own cannot tell a
-	// capped backoff from an uncapped one -- only the value can. Five minutes is
-	// the point past which the wait has stopped being a retry, and it is written
-	// out here rather than read back from the constant so that the number in the
-	// policy is the number under test.
+	// The ceiling itself. The loop already stops doubling once the wait is long, so
+	// growth stops either way and a plateau alone cannot tell a capped backoff from
+	// an uncapped one -- only the value can. Five minutes is the point past which the
+	// wait stops being a retry, written out here rather than read back from the
+	// constant so the number in the policy is the number under test.
 	assert.LessOrEqual(t, seen[len(seen)-1], 5*time.Minute,
 		"the wait stops at a ceiling instead of doubling until it stops happening")
 }
 
-// At or past the emergency edge the curve's own answer is its emergency duty.
-// The premise this gate used to be justified on -- that the daemon is driving
-// full speed -- is false by the time it is reached, because the daemon check
-// above returns first. So with no daemon running, declining here leaves the fan
-// on whatever duty an operator set once, which may be the minimum, at the one
-// temperature the curve says it must not be.
+// At or past the emergency edge the curve's own answer is its emergency duty. The
+// premise this gate used to be justified on -- that the daemon is driving full speed
+// -- is false here, because the daemon check above returns first. Declining left the
+// fan on a duty an operator set once, at the temperature the curve forbids.
 func TestAtTheEmergencyEdgeTheFanIsNotLeftOnTheDutyAnOperatorSet(t *testing.T) {
 	f := newFixture(t)
 	lowest, err := f.g.SetManualLevel(25, confirmed)

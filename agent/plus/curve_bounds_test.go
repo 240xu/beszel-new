@@ -9,11 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The bounds in Validate are stated behaviourally here on purpose. A test that
-// compared a field against the constant that bounds it would pass when the bound
-// moves, which is the tautology this package has been bitten by before. Each
-// test below sweeps a field and pins the set of values that survive, so a bound
-// that drifts shows up as a different set -- which is the claim itself.
+// The bounds are stated behaviourally here on purpose: a test comparing a field
+// against the constant that bounds it would pass when the bound moves. Each test
+// sweeps a field and pins the set of values that survive, which is the claim.
 
 // accepted reports which values of one field this validator admits.
 func accepted(t *testing.T, lo, hi int, mutate func(*Curve, int)) map[int]bool {
@@ -50,10 +48,9 @@ func lowest(got map[int]bool, lo, hi int) int {
 	return -1
 }
 
-// TestACurveThatCanNeverAskForMoreCoolingIsRefused is the audit's curve intact:
-// an emergency edge no temperature can reach, a ceiling one point above the
-// bands, every band on the same duty. Nothing in it contradicts anything else,
-// which is why only an absolute bound can refuse it.
+// TestACurveThatCanNeverAskForMoreCoolingIsRefused is the audit's curve intact: an
+// emergency edge no temperature can reach, and every band on the same duty. Nothing
+// in it contradicts anything else, which is why only an absolute bound refuses it.
 func TestACurveThatCanNeverAskForMoreCoolingIsRefused(t *testing.T) {
 	c, err := ParseCurve(golden(t, "pfand.conf"))
 	require.NoError(t, err)
@@ -69,9 +66,8 @@ func TestACurveThatCanNeverAskForMoreCoolingIsRefused(t *testing.T) {
 }
 
 // TestTheEmergencyEdgeStopsAtTheTemperatureTheHostCanSurvive pins the ceiling.
-// Above it the platform throttles or shuts the core down on its own schedule and
-// the curve no longer decides anything, so an edge beyond it is not a late
-// emergency -- it is an unreachable one.
+// Above it the platform shuts the core down on its own schedule, so an edge beyond
+// it is not a late emergency -- it is an unreachable one.
 func TestTheEmergencyEdgeStopsAtTheTemperatureTheHostCanSurvive(t *testing.T) {
 	got := accepted(t, 80, 260, func(c *Curve, v int) { c.Emerg = v })
 	assert.Equal(t, 100, highest(got, 80, 260),
@@ -81,9 +77,9 @@ func TestTheEmergencyEdgeStopsAtTheTemperatureTheHostCanSurvive(t *testing.T) {
 		"one past the ceiling is still past it, so the boundary is not off by a step")
 }
 
-// TestTheEmergencyEdgeIsReachable pins the other side of the same bound. A low
-// edge is not a safety problem -- it pins the fan at its maximum -- but it does
-// have to clear the rest of the ladder, which the sweep above cannot show.
+// TestTheEmergencyEdgeIsReachable pins the other side of the same bound. A low edge
+// is not a safety problem -- it pins the fan at maximum -- but it must still clear
+// the rest of the ladder, which the sweep above cannot show.
 func TestTheEmergencyEdgeIsReachable(t *testing.T) {
 	c, err := ParseCurve(golden(t, "pfand.conf"))
 	require.NoError(t, err)
@@ -93,19 +89,19 @@ func TestTheEmergencyEdgeIsReachable(t *testing.T) {
 	assert.Greater(t, c.Emerg, c.Idle)
 }
 
-// TestTheCurveThisHostRunsStillPasses guards the direction a false rejection
-// takes: nothing is written, the previous curve keeps cooling, and the operator
-// is left guessing. The shipping file is the only evidence of what is legal.
+// TestTheCurveThisHostRunsStillPasses guards the direction a false rejection takes:
+// nothing is written and the operator is left guessing. The shipping file is the
+// only evidence of what is legal.
 func TestTheCurveThisHostRunsStillPasses(t *testing.T) {
 	c, err := ParseCurve(golden(t, "pfand.conf"))
 	require.NoError(t, err)
 	assert.NoError(t, c.Validate(), "the bounds must admit the curve in the field")
 }
 
-// TestTheEmergencyDutyMustClearTheHardCap pins the direction against the
-// daemon, which refuses a curve whose emergency duty is not strictly above the
-// hard ceiling. Equal is the case that matters: the panel would take it and the
-// daemon would fail safe to full speed and exit, leaving no control loop at all.
+// TestTheEmergencyDutyMustClearTheHardCap pins the direction against the daemon,
+// which refuses an emergency duty that is not strictly above the ceiling. Equal is
+// the case that matters: the panel would take it and the daemon would fail safe to
+// full speed and exit, leaving no control loop at all.
 func TestTheEmergencyDutyMustClearTheHardCap(t *testing.T) {
 	base, err := ParseCurve(golden(t, "pfand.conf"))
 	require.NoError(t, err)
@@ -117,18 +113,17 @@ func TestTheEmergencyDutyMustClearTheHardCap(t *testing.T) {
 	assert.NoError(t, c.Validate(), "one above the ceiling is the narrowest emergency that still clears it")
 }
 
-// TestTheEmergencyDutyStaysOnTheFanScale pins the top of the duty scale. The
-// value is written to the firmware as a percentage; anything above full speed is
-// not a stronger fan, it is an uncommandable one.
+// TestTheEmergencyDutyStaysOnTheFanScale pins the top of the duty scale: above full
+// speed is not a stronger fan, it is an uncommandable one.
 func TestTheEmergencyDutyStaysOnTheFanScale(t *testing.T) {
 	got := accepted(t, 95, 400, func(c *Curve, v int) { c.E = v })
 	assert.Equal(t, 100, highest(got, 95, 400),
 		"100% is the whole range of the control the fan exposes")
 }
 
-// TestTheHardCeilingStaysOnTheFanScale pins the same scale on the cap. It is
-// stated as a pair of points rather than a sweep because the cap's ceiling is
-// currently an accident of the emergency duty, not a bound of its own.
+// TestTheHardCeilingStaysOnTheFanScale pins the same scale on the cap, as a pair
+// of points: its ceiling is currently an accident of the emergency duty, not a
+// bound of its own.
 func TestTheHardCeilingStaysOnTheFanScale(t *testing.T) {
 	got := accepted(t, 70, 400, func(c *Curve, v int) { c.Cap = v })
 	assert.True(t, got[99],
@@ -139,10 +134,9 @@ func TestTheHardCeilingStaysOnTheFanScale(t *testing.T) {
 			"an uncommandable one")
 }
 
-// TestTheDebounceTuningsCannotBeNegative is the parse-layer agreement, seen from
-// the validation side. A negative survives Validate today and is then refused by
-// the parser on the way to disk, which is a refusal the write path charges to
-// the breaker.
+// TestTheDebounceTuningsCannotBeNegative is the parse-layer agreement from the
+// validation side: a negative survives here and is then refused on the way to
+// disk, which the write path charges to the breaker.
 func TestTheDebounceTuningsCannotBeNegative(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -168,10 +162,9 @@ func TestTheDebounceTuningsCannotBeNegative(t *testing.T) {
 	}
 }
 
-// TestTheOutputDeadBandCannotSwallowABandChange pins the one tuning whose
-// failure is not loud. The daemon writes a duty only when the change clears the
-// dead band, so a band wide enough to cover the gap between two duties stops
-// the skeleton from ever being written and leaves the fan wherever it was.
+// TestTheOutputDeadBandCannotSwallowABandChange pins the one tuning whose failure
+// is not loud: the daemon writes a duty only when the change clears the band, so a
+// band covering the gap between two duties leaves the fan wherever it was.
 func TestTheOutputDeadBandCannotSwallowABandChange(t *testing.T) {
 	got := accepted(t, 0, 40, func(c *Curve, v int) { c.Dead = v })
 	assert.Equal(t, 5, highest(got, 0, 40),
@@ -179,10 +172,9 @@ func TestTheOutputDeadBandCannotSwallowABandChange(t *testing.T) {
 			"wider than that and the loop stops correcting")
 }
 
-// TestTheSampleIntervalCannotOutliveTheEmergencyItExistsToCatch pins the other
-// tuning with a quiet failure. The daemon re-reads the temperature once per
-// interval, so a long interval is a long stretch of stale duty after the package
-// has already crossed the emergency edge.
+// TestTheSampleIntervalCannotOutliveTheEmergencyItExistsToCatch pins the other quiet
+// failure: the daemon re-reads the temperature once per interval, so a long interval
+// is a long stretch of stale duty past the edge.
 func TestTheSampleIntervalCannotOutliveTheEmergencyItExistsToCatch(t *testing.T) {
 	// Dwell rides along: the residence time must clear the sample interval, so
 	// holding it at the shipped value would mask this bound with that one.

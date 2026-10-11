@@ -22,39 +22,19 @@ const (
 	curveMaxDuty  = 100
 )
 
-// curveMaxTempC caps every temperature the curve names.
-//
-// The failure directions are not symmetric, which is what fixes the value. A
-// ceiling set too high leaves the emergency edge above every temperature the
-// platform can reach, so the curve's emergency duty and the guard's own
-// over-temperature interlock both become unreachable: the machine then cools on
-// the top band alone with nothing left to escalate to, and the operator is
-// told a guard exists. A ceiling set too low only refuses the write -- nothing
-// moves, the curve already on disk keeps cooling, the refusal is visible. A
-// bound that can fail in only one of those directions belongs at the narrowest
-// value that still admits a curve worth writing, and no wider for comfort.
-//
-// That value is the platform's thermal ceiling. Past the CPU's rated junction
-// temperature the core throttles and then shuts itself down on its own schedule,
-// and the fan curve no longer decides what happens to the machine, so an edge
-// beyond that point is not a late emergency but an unreachable one. The
-// platform's own exposed critical trip is the tempting alternative and the wrong
-// one: it sits above the envelope the curve exists to protect, which would
-// arm the interlock where it still does not fire.
+// curveMaxTempC caps every temperature the curve names. Too high and the emergency
+// edge sits above every reachable temperature, leaving the emergency duty and the
+// guard's interlock on it both unreachable; too low only refuses the write, which
+// is safe. The value is the platform's thermal ceiling: past the CPU's rated
+// junction temperature the core shuts itself down and the curve stops deciding.
 const curveMaxTempC = 100
 
-// ErrCurveInvalid marks a curve this package refused to put on disk. It is kept
-// apart from a write that failed because the two are opposite events for the
-// caller: one is the validator working, the other is the control path breaking.
-// A guard that cannot tell them charges its latch for its own carefulness.
+// ErrCurveInvalid marks a curve refused on its values. A guard that cannot tell
+// that from a failed write charges its breaker for its own carefulness.
 var ErrCurveInvalid = errors.New("the curve is not one this host would run")
 
-// curveMaxDead is the widest output dead band that still lets the skeleton
-// reach the fan. The daemon writes a duty only when the change clears the band,
-// so a band as wide as the gap between two adjacent duties stops the ladder
-// from ever being written and leaves the fan wherever the handshake left it --
-// silent, and with no log line. Derived from the duty set rather than stated,
-// because that set is the host's and a literal here would quietly outlive it.
+// curveMaxDead is the widest dead band that still lets the skeleton reach the fan:
+// the daemon writes only when the change clears the band. Derived, not stated.
 var curveMaxDead = narrowestBandStep()
 
 func narrowestBandStep() int {
@@ -193,10 +173,8 @@ func curveDigits(s string) bool {
 // narrower, so anything accepted here is also accepted there: the rules below cover
 // every case it re-checks.
 func (c *Curve) Validate() error {
-	// The parser reads unsigned integers, so a negative this accepts is a curve
-	// that is refused on the way to disk -- after the write path has charged the
-	// breaker for a refusal it caused itself. The two layers have to agree on the
-	// value domain, so the check is made here rather than left to the parser.
+	// The parser reads unsigned integers, so a negative accepted here is refused
+	// on the way to disk, after the breaker was charged for our own refusal.
 	for _, f := range curveFields(c) {
 		if *f.dst < 0 {
 			return fmt.Errorf("%s=%d must not be negative", f.key, *f.dst)
@@ -217,8 +195,7 @@ func (c *Curve) Validate() error {
 	if c.EmergRel >= c.Emerg {
 		return fmt.Errorf("EMERG_REL=%d must be below EMERG=%d", c.EmergRel, c.Emerg)
 	}
-	// Above this the emergency branch is code that no temperature can reach, and
-	// the guard's interlock on the same edge stops being one.
+	// Above this the emergency branch, and the guard's interlock, are unreachable.
 	if c.Emerg > curveMaxTempC {
 		return fmt.Errorf("EMERG=%d is above %dC, past which this platform throttles "+
 			"or shuts down on its own and the curve no longer decides anything",
@@ -240,10 +217,7 @@ func (c *Curve) Validate() error {
 			return fmt.Errorf("%s=%d is not a duty the daemon's trim table can band on", l.name, l.val)
 		}
 	}
-	// Strictly above, not at: the daemon refuses a curve whose emergency duty does
-	// not clear the ceiling, and a duty equal to it is not an emergency. Taking
-	// it and then having the daemon fail safe leaves the fan at full speed with no
-	// control loop, which is the shape of failure this package exists to prevent.
+	// Strictly above, not at: the daemon refuses one that only equals the ceiling.
 	if c.E <= c.Cap {
 		return fmt.Errorf("E=%d must exceed CAP=%d, or the emergency duty is clamped "+
 			"below full speed and the daemon refuses the curve outright", c.E, c.Cap)
@@ -255,9 +229,7 @@ func (c *Curve) Validate() error {
 	if c.IV < curveMinIV {
 		return fmt.Errorf("IV=%d must be at least %ds", c.IV, curveMinIV)
 	}
-	// The loop re-reads the temperature once per interval, so this is also the
-	// longest stretch the machine can spend on a stale duty after crossing the
-	// emergency edge.
+	// The longest stretch the machine can spend on a stale duty past the edge.
 	if c.IV > curveMaxIV {
 		return fmt.Errorf("IV=%d must be at most %ds, or the emergency edge is polled too "+
 			"rarely to catch the crossing", c.IV, curveMaxIV)
@@ -318,11 +290,9 @@ func WriteCurveFile(path string, c *Curve) error {
 	return nil
 }
 
-// ValidateBytes is the single gate for a curve on its way to disk, whichever
-// shape it arrives in: bytes captured from a file to be restored, or rendered
-// from a Curve. Parsing and validating used to be separate and only one of them
-// stood on this path, so a curve could clear one layer and be dropped by the
-// other after the caller had already charged a failure for it.
+// ValidateBytes is the one gate for a curve on its way to disk, in either shape:
+// captured bytes, or rendered. Only parsing stood here before, so a curve could
+// clear it and be dropped by the other layer after being charged.
 func ValidateBytes(raw []byte) error {
 	c, err := ParseCurve(string(raw))
 	if err != nil {

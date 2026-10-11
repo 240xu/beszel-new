@@ -57,8 +57,11 @@ func TestTheRegressRetryWaitsAndThenWaitsLonger(t *testing.T) {
 	f.advance(10 * time.Minute)
 	f.tempErr = errors.New("no such device")
 
+	// Enough rounds for the doubling to reach its ceiling, so the plateau is
+	// observed rather than assumed: a backoff that only ever grows has not been
+	// shown to stop growing.
 	var seen []time.Duration
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 8; i++ {
 		before := len(f.waits)
 		_, err := f.g.Regress()
 		require.NoError(t, err)
@@ -75,6 +78,24 @@ func TestTheRegressRetryWaitsAndThenWaitsLonger(t *testing.T) {
 	}
 	assert.Greater(t, seen[len(seen)-1], seen[0],
 		"a gate that keeps declining has to stop being retried at a fixed rate")
+
+	// Both ends of the curve, because either one alone is satisfiable by a
+	// backoff that never had them: a wait short enough to be a busy loop still
+	// grows, and one that grows without a ceiling still starts out reasonable.
+	// One second is the floor that keeps this from becoming a spin: every attempt
+	// takes the shared control lock, reads a sensor file and may write the fan,
+	// and none of those return faster than that.
+	assert.GreaterOrEqual(t, seen[0], time.Second,
+		"the first retry has to be long enough not to be a loop")
+	plateau := false
+	for i := 1; i < len(seen); i++ {
+		if seen[i] == seen[i-1] {
+			plateau = true
+		}
+	}
+	assert.True(t, plateau,
+		"the wait has to stop growing; a retry that doubles forever is a duty held "+
+			"for good wearing the name of a retry")
 }
 
 // At or past the emergency edge the curve's own answer is its emergency duty.

@@ -11,8 +11,7 @@ import (
 // The guard decides what happens to the fan; this file decides what the operator
 // is told happened, so the guard keeps reporting the disk truthfully.
 
-// Names rather than numbers, so a caller branching on one survives an edit that
-// moves it.
+// Names rather than numbers, so a caller branching on one survives an edit that moves it.
 const (
 	StatusApplied        = "applied"
 	StatusPendingRestart = "pending_restart"
@@ -21,9 +20,8 @@ const (
 	ActionRestartPfand = "restart_pfand"
 )
 
-// Description is the wire form of a Result. Applied is deliberately not
-// Result.Applied: a curve no daemon has read is not in force, and a panel told
-// "applied" renders "saved".
+// Description is the wire form of a Result. Applied is deliberately not Result.Applied:
+// a curve no daemon has read is not in force, and a panel told "applied" renders "saved".
 type Description struct {
 	Applied           bool       `json:"applied"`
 	Level             int        `json:"level"`
@@ -60,15 +58,25 @@ type Fault struct {
 	Message string `json:"message"`
 }
 
-// Classify maps an error onto the wire, in the guard's order: the guard that
-// stood in the way is the answer, and the latch only shows once the guards are
-// out of the way. Reordering would send an operator to wait out a cooldown when
-// the answer is already in front of them.
+// Classify maps an error onto the wire, in the guard's order: the guard that stood in
+// the way is the answer, and the latch only shows once the guards are out of the way.
+// Reordering would send an operator to wait out a cooldown when the answer is in front.
 func Classify(err error) Fault {
 	if f, ok := classify(err); ok {
 		return f
 	}
-	return internalFault
+	return InternalFault
+}
+
+// Codes is every refusal code this package publishes: the classifications in
+// classify's order, then the catch-all. A fresh slice per call, because a caller able
+// to edit this list would be editing the pin its mirror is checked against.
+func Codes() []string {
+	codes := make([]string, 0, len(classifications)+1)
+	for _, c := range classifications {
+		codes = append(codes, c.Code)
+	}
+	return append(codes, InternalFault.Code)
 }
 
 // A device that refused the program outright, rather than one that took the write
@@ -109,7 +117,11 @@ var classifications = []classification{
 		Message: "fan control is only implemented on linux", sentinel: plus.ErrFanControlUnsupported},
 }
 
-var internalFault = Fault{
+// InternalFault is the catch-all Classify falls back to. A hub refusing for a
+// reason the guard never classified borrows this rather than naming a reason it
+// cannot support: a borrowed specific code sends the operator after the wrong
+// fault, which is worse than being told the server did not say.
+var InternalFault = Fault{
 	Status:  http.StatusInternalServerError,
 	Code:    "internal",
 	Message: "the write did not complete",

@@ -9,19 +9,24 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/henrygd/beszel/internal/fanapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// The refusal codes fanapi publishes, closed. A code outside this set cannot be
-// read by plus-refusals.ts, so it reaches a panel as "this build does not know":
-// visible, but not actionable. The list is written out here rather than imported
-// because its purpose is to be a second copy that can disagree.
-var fanWireCodes = map[string]bool{
-	"rollback_failed": true, "write_unconfirmed": true, "write_failed": true,
-	"confirm_required": true, "level_not_allowed": true, "curve_rejected": true,
-	"pfand_active": true, "package_too_hot": true, "temperature_unknown": true,
-	"breaker_open": true, "unsupported": true, "internal": true,
+// fanapi's closed set in lookup form: a code outside it cannot be read by plus-refusals.ts,
+// so it reaches a panel as "this build does not know".
+//
+// Derived rather than written out: a hand-kept copy was checked only for codes these routes
+// happen to emit, so an entry nothing triggered was never read. The mirror test watches it.
+var fanWireCodes = codeSet(fanapi.Codes())
+
+func codeSet(codes []string) map[string]bool {
+	set := make(map[string]bool, len(codes))
+	for _, c := range codes {
+		set[c] = true
+	}
+	return set
 }
 
 // postRaw issues a body verbatim, so the paths a JSON encoder cannot reach —

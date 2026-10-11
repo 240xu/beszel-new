@@ -1,8 +1,8 @@
-/** The only reliable discriminator on a fan refusal. PocketBase's envelope is
- *  `{status, message, data}` and carries no `error` field, so a client reading
- *  `.error` can never branch on a refusal. `message` is no substitute: it is
- *  capitalised and given a period, so the wire text is not the table's text and
- *  is unsafe as a translation key. */
+/** The only reliable discriminator on a fan refusal: PocketBase's envelope is
+ *  `{status, message, data}`, carries no `error` field, and capitalises `message`, so
+ *  neither of the others can branch or key a translation. A hand-written mirror of
+ *  fanapi's closed set, not a second source: both languages check its literal text
+ *  against internal/fanapi/wire.go. */
 export const FAN_REJECT_CODES = [
 	"rollback_failed",
 	"write_unconfirmed",

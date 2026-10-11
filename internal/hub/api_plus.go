@@ -249,14 +249,13 @@ func (fc *fanRoutes) mode(e *core.RequestEvent) error {
 	}
 	if err := fc.pfand(action); err != nil {
 		slog.Error("fan mode change failed", "mode", req.Mode, "err", err)
-		// Coded, because this is the one refusal on this surface that happens after
-		// the daemon has been asked to act. A code-less refusal can only say "the
-		// server named no reason", and an operator told that about a failed restart
-		// is sent looking for a request that was never read rather than for a
-		// systemd job that failed. `internal` is the same catch-all the guard falls
-		// back to for a write it could not classify, and it is truthful here.
+		// Coded, because this is the one refusal on this surface that happens after the daemon
+		// has been asked to act. A code-less refusal can only say "the server named no reason",
+		// and an operator told that about a failed restart is sent looking for a request that
+		// was never read rather than for a systemd job that failed. The catch-all is the one
+		// the guard itself falls back to, and it is truthful here.
 		return coded(e, http.StatusInternalServerError,
-			"could not change the curve daemon's state", "internal")
+			"could not change the curve daemon's state", fanapi.InternalFault.Code)
 	}
 	return e.JSON(http.StatusOK, map[string]any{
 		"mode":         req.Mode,
@@ -285,32 +284,28 @@ func (fc *fanRoutes) auditList(e *core.RequestEvent) error {
 	return e.JSON(http.StatusOK, map[string]any{"items": fc.trail.entries()})
 }
 
-// fail turns a guard error into a wire response. The error is logged and never
-// returned: it names the lock, the device and the curve file, and none of those
-// belong in a body any account can read.
+// fail turns a guard error into a wire response. The error is logged and never returned: it
+// names the lock, the device and the curve file, none of which belong in a readable body.
 func (fc *fanRoutes) fail(e *core.RequestEvent, what string, err error) error {
 	fault := fanapi.Classify(err)
 	slog.Warn("fan write refused", "op", what, "code", fault.Code, "actor", actor(e), "err", err)
 	return coded(e, fault.Status, fault.Message, fault.Code)
 }
 
-// confirmRequired refuses a write that arrived unconfirmed. The code is taken
-// from the guard's own classification so one place names it, and Data is
-// assigned for the reason fail gives.
+// confirmRequired refuses a write that arrived unconfirmed. The code comes from the
+// guard's own classification, and Data is assigned here for the reason fail gives.
 func confirmRequired(e *core.RequestEvent) error {
 	return coded(e, http.StatusBadRequest, "confirm is required",
 		fanapi.Classify(fanapi.ErrNotConfirmed).Code)
 }
 
-// coded is the one way this file puts a refusal code on the wire. Data is
-// assigned after the error is built rather than passed as errData: PocketBase
-// rewrites a map errData into validation codes, which would replace the refusal
-// with "validation_invalid_value" and leave the panel with nothing to branch on.
+// coded is the one way this file puts a refusal code on the wire. Data is assigned after
+// the error is built rather than passed as errData: PocketBase rewrites a map errData into
+// validation codes, replacing the refusal with "validation_invalid_value".
 //
-// Only codes fanapi already publishes may be used here. A refusal the guard never
-// classified has no member of that closed set to borrow, and a borrowed one that
-// misdescribes the failure is worse than none: a panel told "the curve failed
-// validation" about an unreadable body goes looking for a bad curve.
+// Every code here is borrowed from fanapi rather than written out. A refusal the guard never
+// classified has no member of that closed set to borrow, and a borrowed one that misdescribes
+// it is worse than none: a panel told "the curve failed validation" goes looking for a curve.
 func coded(e *core.RequestEvent, status int, message, code string) error {
 	apiErr := e.Error(status, message, nil)
 	apiErr.Data = map[string]any{"code": code}
@@ -319,18 +314,16 @@ func coded(e *core.RequestEvent, status int, message, code string) error {
 
 // decodeBody reads a request body strictly.
 //
-// Unknown fields are refused. Every field in these bodies is a physical
-// instruction, and a name the panel misspells would otherwise be dropped in
-// silence while the operator believes it was applied. The parser in agent/plus
-// takes the same position about the curve file, for the same reason.
+// Unknown fields are refused. Every field in these bodies is a physical instruction, and
+// a name the panel misspells would be dropped in silence while the operator believes it
+// was applied. The parser in agent/plus takes the same position about the curve file.
 //
-// These two refusals carry no code, and that is the deliberate remainder: the
-// closed set fanapi publishes has no member meaning "this body could not be read"
-// for a duty or a mode, and every member that could be borrowed would misdescribe
-// it. A code-less refusal is answered by a panel that says only what it knows —
-// that the server named no reason — which is true, where "the request was refused
-// before it reached the fan" was true by accident and not by construction. Every
-// such path is listed in TestFanRefusalsEitherCarryACodeOrAreOnThisList.
+// These two refusals carry no code, and that is the deliberate remainder: the closed set
+// fanapi publishes has no member meaning "this body could not be read" for a duty or a mode,
+// and every member that could be borrowed would misdescribe it. A code-less refusal is
+// answered by a panel that says only what it knows, which is true, where "the request was
+// refused before it reached the fan" was true by accident. Every such path is listed in
+// TestFanRefusalsEitherCarryACodeOrAreOnThisList.
 func decodeBody(e *core.RequestEvent, dst any) error {
 	body, err := readFanBody(e)
 	if err != nil {
@@ -374,9 +367,8 @@ func strictJSON(body []byte, dst any) error {
 	return nil
 }
 
-// curveRequest mirrors plus.Curve by pointer so an absent field is not a zero
-// one. Every field is required: a curve is a whole control law, and zeroing a
-// missing one produces a curve the host will run and the operator did not write.
+// curveRequest mirrors plus.Curve by pointer so an absent field is not a zero one. Every
+// field is required: zeroing a missing one produces a curve the host will run unasked.
 type curveRequest struct {
 	Idle     *int `json:"idle"`
 	L0       *int `json:"l0"`
@@ -418,20 +410,19 @@ func (r *curveRequest) values() [22]*int {
 
 func decodeCurveRequest(e *core.RequestEvent) (*curveRequest, error) {
 	var req curveRequest
-	// A body this route cannot read is a curve it rejected before anything was
-	// written, which is what curve_rejected already means, so it is named rather
-	// than left for the panel to guess from the status.
+	// A body this route cannot read is a curve it rejected before anything was written,
+	// which is what curve_rejected already means, so it is named rather than guessed at.
 	body, err := readFanBody(e)
 	if err != nil {
-		return nil, coded(e, http.StatusBadRequest, "invalid body", "curve_rejected")
+		return nil, coded(e, http.StatusBadRequest, "invalid body", fanapi.Classify(fanapi.ErrCurveRejected).Code)
 	}
 	if err := strictJSON(body, &req); err != nil {
-		return nil, coded(e, http.StatusBadRequest, "invalid body", "curve_rejected")
+		return nil, coded(e, http.StatusBadRequest, "invalid body", fanapi.Classify(fanapi.ErrCurveRejected).Code)
 	}
 	for i, v := range req.values() {
 		if v == nil {
 			return nil, coded(e, http.StatusBadRequest,
-				fmt.Sprintf("curve is missing %s", curveFieldNames[i]), "curve_rejected")
+				fmt.Sprintf("curve is missing %s", curveFieldNames[i]), fanapi.Classify(fanapi.ErrCurveRejected).Code)
 		}
 	}
 	return &req, nil

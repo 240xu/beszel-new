@@ -128,21 +128,14 @@ describe("refusal reading", () => {
 		expect(err.status).toBe(502)
 	})
 
-	test("the known set is exactly the classified refusals, with no unclassified entry", () => {
-		expect([...FAN_REJECT_CODES].sort()).toEqual([
-			"breaker_open",
-			"confirm_required",
-			"curve_rejected",
-			"internal",
-			"level_not_allowed",
-			"package_too_hot",
-			"pfand_active",
-			"rollback_failed",
-			"temperature_unknown",
-			"unsupported",
-			"write_failed",
-			"write_unconfirmed",
-		])
+	test("every published code reads back as itself", () => {
+		// What this list is made of is checked against fanapi in the drift test;
+		// what it is for is this: a code that survived the mirror but not the
+		// lookup would silently degrade every refusal carrying it.
+		for (const code of FAN_REJECT_CODES) {
+			const err = readFanRefusal(400, JSON.stringify({ message: "m", data: { code } }))
+			expect(err.code).toBe(code)
+		}
 	})
 })
 

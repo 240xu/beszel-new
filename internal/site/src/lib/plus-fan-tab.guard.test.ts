@@ -25,6 +25,14 @@ const occurrences = (source: string, pattern: RegExp) =>
 /** Wording that asserts the change is already cooling the machine. */
 const CLAIMS_IN_FORCE = /saved|applied|in force|running now|生效|已保存|已生效/i
 
+/** The two outcome tables are the only place a claim that something is running
+ *  may be written down, and only for the applied arm. */
+const stripOutcomeTables = (source: string) =>
+	source.replace(/const OUTCOME_TEXT[^=]*= \{[^}]*\}/, "").replace(/const OUTCOME_BADGE[^=]*= \{[^}]*\}/, "")
+
+const tableBody = (source: string, table: string): string =>
+	source.match(new RegExp(`const ${table}[^=]*= \\{([^}]*)\\}`))?.[1] ?? ""
+
 const tableEntry = (source: string, table: string, key: string): string => {
 	const block = source.match(new RegExp(`const ${table}[^=]*= \\{([^}]*)\\}`))?.[1] ?? ""
 	const entry = block.match(new RegExp(`${key}:\\s*(t\`[^\`]*\`|"[^"]*")`))?.[1] ?? ""
@@ -63,9 +71,7 @@ test("a hot package and an unreadable sensor do not share a sentence", async () 
 
 test("every refusal the server can raise has a sentence of its own", async () => {
 	const source = await read(TAB)
-	const keys = new Set(
-		[...source.matchAll(/^\t([a-z_]+):\s*t`/gm)].map((m) => m[1])
-	)
+	const keys = new Set([...source.matchAll(/^\t([a-z_]+):\s*t`/gm)].map((m) => m[1]))
 	for (const code of FAN_REJECT_CODES) {
 		expect(keys.has(code)).toBe(true)
 	}
@@ -120,4 +126,20 @@ test("the armed panel always has a way out", async () => {
 	const source = await read(TAB)
 	expect(occurrences(source, /onCancel=\{\(\) => setArmed\(null\)\}/).length).toBeGreaterThanOrEqual(2)
 	expect(occurrences(source, /onCancel:\s*\(\) => void/)).not.toEqual([])
+})
+
+test("no wording that claims a write is running exists outside the two outcome tables", async () => {
+	// Without this, a ternary can hand the in-force badge to the pending arm
+	// while both tables still read correctly.
+	expect(occurrences(stripOutcomeTables(await read(TAB)), CLAIMS_IN_FORCE)).toEqual([])
+})
+
+test("no two refusals share a sentence in this panel either", async () => {
+	const values = [...tableBody(await read(TAB), "REFUSAL_TEXT").matchAll(/t`([^`]*)`/g)].map((m) => m[1])
+	expect(values).toHaveLength(14)
+	expect(new Set(values).size).toBe(values.length)
+})
+
+test("the panel never names a write route, so a confirm flag cannot be chosen at a call site", async () => {
+	expect(occurrences(await read(TAB), /\bsetFanLevel\b|\bsetFanMode\b|\bsaveCurve\b/)).toEqual([])
 })

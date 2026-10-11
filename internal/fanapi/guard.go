@@ -249,6 +249,12 @@ func (g *Guard) writeCurveLocked(c *plus.Curve, req Request, now time.Time) (Res
 		return Result{}, fmt.Errorf("read the curve to restore: %w", err)
 	}
 	if err := g.d.WriteCurveBytes([]byte(c.Render())); err != nil {
+		// A curve this stack refused is the guard working, not a control path that
+		// broke. Charging the latch for it would take away a correction the operator
+		// is entitled to make, and show them a refusal they cannot act on.
+		if errors.Is(err, plus.ErrCurveInvalid) {
+			return Result{}, fmt.Errorf("%w: %v", ErrCurveRejected, err)
+		}
 		g.fail(now)
 		return Result{}, fmt.Errorf("write curve: %w", err)
 	}

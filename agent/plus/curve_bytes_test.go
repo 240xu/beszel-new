@@ -23,8 +23,10 @@ func TestWriteCurveBytesFilePutsBackExactlyWhatItWasGiven(t *testing.T) {
 	captured, err := os.ReadFile(path)
 	require.NoError(t, err)
 
-	// A write that must land, then a restore of the capture.
-	edited := []byte(strings.ReplaceAll(golden(t, "pfand.conf"), "CAP=70", "CAP=60"))
+	// A write that must land, then a restore of the capture. The edit has to be
+	// one this host would run: the byte path now holds the same value-domain gate
+	// as the Curve path, so a curve the daemon refuses no longer lands here.
+	edited := []byte(strings.ReplaceAll(golden(t, "pfand.conf"), "TRIM=6", "TRIM=8"))
 	require.NotEqual(t, string(captured), string(edited))
 	require.NoError(t, WriteCurveBytesFile(path, edited))
 	require.NoError(t, WriteCurveBytesFile(path, captured))

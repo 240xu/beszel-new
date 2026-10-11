@@ -13,6 +13,7 @@ package plus
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strconv"
@@ -39,6 +40,30 @@ const (
 	fanKmsgEnv   = "PFAN_KMSG"
 )
 
+// Seam names for the two configuration files, same PFAN_ prefix.
+const (
+	platformConfEnv  = "PFAN_PLATFORM_CONF"
+	fanCandidatesEnv = "PFAN_CANDIDATES"
+)
+
+// The wiring this fork shipped with, used only when the host has no platform
+// file. As data rather than literals, one test can prove that wiring the four
+// keys changed nothing here.
+const (
+	chassisECRoot    = `\_SB.PCI0.LPCB.EC0`
+	chassisFanDevice = `\_SB.PCI0.LPCB.EC0.TFN1`
+	chassisECMethod  = "EC88"
+	chassisECCmd     = 0xB5
+)
+
+// ec88LeadingArg is the fixed first argument of the EC88 signature. pfand sends
+// 4 on every call; it is not a count of what we send, and is the same both ways.
+const ec88LeadingArg = 4
+
+// ecFanDutyReg is the register pfanel.py reads; a property of the firmware, not
+// of the backend that reaches it.
+const ecFanDutyReg = 0x76
+
 // FanPaths is the injectable triple, threaded the way Collect threads its root.
 type FanPaths struct {
 	Device string
@@ -46,7 +71,14 @@ type FanPaths struct {
 	Kmsg   string
 }
 
-// ProdFanPaths resolves the seams; an empty one falls back to production.
+// fanEnv is one fan operation's whole world. Resolved together on purpose: the
+// device and the ACPI object must come from the same read of the config.
+type fanEnv struct {
+	Paths FanPaths
+	EC    ECConf
+}
+
+// ProdFanPaths resolves the seams; empty falls back to production.
 func ProdFanPaths() FanPaths {
 	return FanPaths{
 		Device: envOr(fanDeviceEnv, ProdFanDevice),
@@ -62,6 +94,88 @@ func envOr(name, fallback string) string {
 	return fallback
 }
 
+// firstNonEmpty walks in order, which is pfand's own precedence.
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// chassisECConf is the wiring of a host that was never configured.
+func chassisECConf() ECConf {
+	return ECConf{
+		ECRoot:    chassisECRoot,
+		FANDevice: chassisFanDevice,
+		Dev:       ProdFanDevice,
+		Cmd:       chassisECCmd,
+		Backend:   ECBackendACPI,
+	}
+}
+
+// loadCandidates returns the host's pairing list, or none. The only caller asks
+// whether a pairing is backed, and "could not check" must not read as "fine".
+func loadCandidates() []FanCandidate {
+	raw, err := os.ReadFile(envOr(fanCandidatesEnv, ProdFanCandidates))
+	if err != nil {
+		return nil
+	}
+	cands, err := ParseFanCandidates(string(raw))
+	if err != nil {
+		return nil
+	}
+	return cands
+}
+
+// loadECConf reads the machine's wiring. An absent file is not a
+// misconfiguration: there is no operator intent to honour. One that exists and
+// cannot be used is refused, because falling back would reproduce the bug this
+// fixes -- an operator's edit silently ignored.
+func loadECConf() (ECConf, error) {
+	path := envOr(platformConfEnv, ProdPlatformConf)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return chassisECConf(), nil
+		}
+		return ECConf{}, fmt.Errorf("read platform config %s: %w", path, err)
+	}
+	p, err := ParsePlatformConf(string(raw))
+	if err != nil {
+		return ECConf{}, err
+	}
+	conf, err := p.EC()
+	if err != nil {
+		return ECConf{}, err
+	}
+	// The chassis's pairing hangs under its own root, so it needs no 2nd file.
+	if conf.NeedsCandidates() {
+		if err := conf.ValidatePairing(loadCandidates()); err != nil {
+			return ECConf{}, err
+		}
+	}
+	return conf, nil
+}
+
+// resolveFanEnv runs before every exported entry point, so a refused wiring is
+// refused before the device is opened: a bad edit stops a write, not redirects it.
+func resolveFanEnv() (fanEnv, error) {
+	conf, err := loadECConf()
+	if err != nil {
+		return fanEnv{}, err
+	}
+	return fanEnv{
+		Paths: FanPaths{
+			Device: firstNonEmpty(os.Getenv(fanDeviceEnv), conf.Dev, ProdFanDevice),
+			Lock:   envOr(fanLockEnv, ProdFanLock),
+			Kmsg:   envOr(fanKmsgEnv, ProdFanKmsg),
+		},
+		EC: conf,
+	}, nil
+}
+
 // flock(2) has no timeout: LOCK_EX blocks until the holder lets go, so a stuck
 // pfand would park the agent forever. These bound the wait instead -- pfand holds
 // the lock only around one write, so ~1s of retries is generous, and failing
@@ -72,8 +186,8 @@ const (
 	fanResultPoll   = 50 * time.Millisecond
 )
 
-// (?m) matters: each read returns one record ending in a newline, and Go's
-// default $ anchors to end of text, so without it the capture can never close.
+// (?m) matters: each read ends in a newline, and Go's default $ anchors to end
+// of text, so without it the capture can never close.
 var resultRe = regexp.MustCompile(`(?m)pfanctl: RESULT\s+(.+)$`)
 
 // deviceWritable mirrors pfand's dev_ok: an explicitly configured PFAN_DEV only
@@ -129,13 +243,21 @@ func withFanLock(paths FanPaths, fn func() error) error {
 	return fn()
 }
 
-func acpiFanPath(method string) string {
-	return `\_SB.PCI0.LPCB.EC0.TFN1.` + method
+// acpiFanPath builds a fan method address from the configured device. The method
+// name is this package's, never the config's, so a FAN_DEVICE cannot pick a call.
+func acpiFanPath(conf ECConf, method string) string {
+	return conf.FANDevice + "." + method
 }
 
-// acpiECPath is the EC root, not the fan device. pfand documents the difference
-// explicitly: EC88 under TFN1 returns AE_NOT_FOUND on every call.
-func acpiECPath() string { return `\_SB.PCI0.LPCB.EC0.EC88` }
+// acpiECPath is the EC root, not the fan device: pfand documents EC88 under TFN1
+// returning AE_NOT_FOUND on every call.
+func acpiECPath(conf ECConf) string { return conf.ECRoot + "." + chassisECMethod }
+
+// ecReadExpression is the EC88 call for one register. The trailing zeros are the
+// write-argument slots: pfand reads and sets with one shape.
+func ecReadExpression(conf ECConf, reg uint64) string {
+	return fmt.Sprintf("%s %d %d %d 0 0", acpiECPath(conf), ec88LeadingArg, conf.Cmd, reg)
+}
 
 func writeExpression(paths FanPaths, expr string) error {
 	if err := deviceWritable(paths.Device, os.Getenv(fanDeviceEnv)); err != nil {
@@ -148,8 +270,7 @@ func writeExpression(paths FanPaths, expr string) error {
 }
 
 // kmsg is opened O_NONBLOCK and read with raw unix.Read: os.File would hand the
-// fd to the runtime poller, turning a would-be EAGAIN into an untimed wait and
-// handing back the deadline problem this code exists to avoid.
+// fd to the runtime poller, turning a would-be EAGAIN into an untimed wait.
 func openKmsg(path string) (int, error) {
 	fd, err := unix.Open(path, unix.O_RDONLY|unix.O_NONBLOCK|unix.O_CLOEXEC, 0)
 	if err != nil {
@@ -227,23 +348,35 @@ func AcpiEval(expr string, timeout time.Duration) (string, error) {
 
 // SetFanLevel programs the duty percentage. It writes and returns: _FSL returns
 // nothing, so waiting for a RESULT line would turn every fan write into a
-// timeout -- which is why pfand's setL never reads back.
-func SetFanLevel(level int) error { return setFanLevelAt(ProdFanPaths(), level) }
+// timeout, which is why pfand's setL never reads back.
+func SetFanLevel(level int) error {
+	env, err := resolveFanEnv()
+	if err != nil {
+		return err
+	}
+	return setFanLevelAt(env.Paths, env.EC, level)
+}
 
-func setFanLevelAt(paths FanPaths, level int) error {
+func setFanLevelAt(paths FanPaths, conf ECConf, level int) error {
 	if err := ValidateLevel(level); err != nil {
 		return fmt.Errorf("%s: %w", err, ErrFanLevelNotAllowed)
 	}
-	expr := fmt.Sprintf("%s 1 %d", acpiFanPath("_FSL"), level)
+	expr := fmt.Sprintf("%s 1 %d", acpiFanPath(conf, "_FSL"), level)
 	return withFanLock(paths, func() error { return writeExpression(paths, expr) })
 }
 
 // GetFanLevel reads the programmed level; the reply is [ignored, level, rpm],
 // with rpm pinned at 0xFFFFFFFF because no tach is exposed.
-func GetFanLevel() (int, error) { return getFanLevelAt(ProdFanPaths()) }
+func GetFanLevel() (int, error) {
+	env, err := resolveFanEnv()
+	if err != nil {
+		return 0, err
+	}
+	return getFanLevelAt(env.Paths, env.EC)
+}
 
-func getFanLevelAt(paths FanPaths) (int, error) {
-	out, err := acpiEvalAt(paths, acpiFanPath("_FST")+" 0", 3*time.Second)
+func getFanLevelAt(paths FanPaths, conf ECConf) (int, error) {
+	out, err := acpiEvalAt(paths, acpiFanPath(conf, "_FST")+" 0", 3*time.Second)
 	if err != nil {
 		return 0, err
 	}
@@ -262,24 +395,95 @@ func getFanLevelAt(paths FanPaths) (int, error) {
 	return level, nil
 }
 
-// ReadEC76 returns the live duty byte out of EC 0x76.
-func ReadEC76() (int, error) { return readEC76At(ProdFanPaths()) }
+// ecReader reads one byte of an embedded controller. No write method on purpose:
+// this fork's only reviewed way to move a fan is the firmware's _FSL on an
+// observed controller, and ec_sys can write too. Leaving writes out is what stops
+// a portable backend meaning a second, unreviewed way to instruct hardware.
+type ecReader interface {
+	ReadRegister(reg uint64) (byte, error)
+}
 
-func readEC76At(paths FanPaths) (int, error) {
-	out, err := acpiEvalAt(paths, acpiECPath()+" 4 181 118 0 0", 3*time.Second)
+// newECReader picks the named backend. No probing fallback: a backend chosen by
+// what happens to be mounted is a choice no one reviewed, made when a register
+// read decides a reported value.
+func newECReader(paths FanPaths, conf ECConf) (ecReader, error) {
+	switch conf.Backend {
+	case ECBackendACPI:
+		return acpiECReader{paths: paths, conf: conf}, nil
+	case ECBackendECSys:
+		return ecSysReader{node: conf.IO}, nil
+	default:
+		return nil, fmt.Errorf("%w: %q", ErrECBackendUnknown, string(conf.Backend))
+	}
+}
+
+// acpiECReader evaluates the EC88 method. It owns decoding that reply, whose
+// layout is a property of the method rather than of the register asked for.
+type acpiECReader struct {
+	paths FanPaths
+	conf  ECConf
+}
+
+func (r acpiECReader) ReadRegister(reg uint64) (byte, error) {
+	out, err := acpiEvalAt(r.paths, ecReadExpression(r.conf, reg), 3*time.Second)
 	if err != nil {
 		return 0, err
 	}
 	v, err := strconv.ParseUint(strings.TrimSpace(out), 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("parse EC 0x76 reply %q: %w", out, err)
+		return 0, fmt.Errorf("parse EC 0x%X reply %q: %w", reg, out, err)
 	}
 	// pfanel.py's shift, which is what fills the ec76 column this project reads.
 	// Its only guard is v >= 0xFFFFFFFF; the high half is added here because this
 	// machine answers 0xFFFF.... right now, and reporting that as a duty is the
 	// silent wrong value to avoid. The extra guard can only lose data.
 	if v >= 0xFFFFFFFF || (v>>16)&0xFFFF == 0xFFFF {
-		return 0, fmt.Errorf("EC 0x76 read is unavailable (reply %s)", out)
+		return 0, fmt.Errorf("EC 0x%X read is unavailable (reply %s)", reg, out)
 	}
-	return int((v >> 8) & 0xFF), nil
+	return byte((v >> 8) & 0xFF), nil
+}
+
+// ecSysReader reads the kernel's ec_sys handle: open, seek, read. It uses os
+// rather than x/sys/unix so R-62's pinned syscall list need not grow.
+//
+// The kernel documents the node as indexable without saying whether the index is
+// the file position or the buffer; this implements the position reading.
+// Unverified here -- ec_sys is not loaded on this host -- hence opt-in only.
+type ecSysReader struct{ node string }
+
+func (r ecSysReader) ReadRegister(reg uint64) (byte, error) {
+	f, err := os.Open(r.node)
+	if err != nil {
+		return 0, fmt.Errorf("open %s: %w", r.node, err)
+	}
+	defer f.Close()
+	if _, err := f.Seek(int64(reg), io.SeekStart); err != nil {
+		return 0, fmt.Errorf("seek %s to register %d: %w", r.node, reg, err)
+	}
+	var b [1]byte
+	if _, err := io.ReadFull(f, b[:]); err != nil {
+		return 0, fmt.Errorf("read %s at register %d: %w", r.node, reg, err)
+	}
+	return b[0], nil
+}
+
+// ReadEC76 returns the live duty byte out of EC 0x76.
+func ReadEC76() (int, error) {
+	env, err := resolveFanEnv()
+	if err != nil {
+		return 0, err
+	}
+	return readEC76At(env.Paths, env.EC)
+}
+
+func readEC76At(paths FanPaths, conf ECConf) (int, error) {
+	reader, err := newECReader(paths, conf)
+	if err != nil {
+		return 0, err
+	}
+	v, err := reader.ReadRegister(ecFanDutyReg)
+	if err != nil {
+		return 0, err
+	}
+	return int(v), nil
 }

@@ -16,9 +16,11 @@ const (
 )
 
 const (
-	fanDeviceEnv = "PFAN_DEV"
-	fanLockEnv   = "PFAN_LOCK"
-	fanKmsgEnv   = "PFAN_KMSG"
+	fanDeviceEnv     = "PFAN_DEV"
+	fanLockEnv       = "PFAN_LOCK"
+	fanKmsgEnv       = "PFAN_KMSG"
+	platformConfEnv  = "PFAN_PLATFORM_CONF"
+	fanCandidatesEnv = "PFAN_CANDIDATES"
 )
 
 type FanPaths struct {

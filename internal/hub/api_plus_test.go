@@ -386,10 +386,15 @@ func TestCurveWriteReportsPendingWhilePfandHoldsTheFan(t *testing.T) {
 		"ruling 2: a pending change with no way to finish makes the operator press save repeatedly")
 }
 
-// TestCurveWriteReportsAppliedWhenNoDaemonIsRunning is the other half: the same
-// write with nothing to reload is genuinely in force, so the panel must be able
-// to say so. Folding applied away unconditionally would be its own lie.
-func TestCurveWriteReportsAppliedWhenNoDaemonIsRunning(t *testing.T) {
+// TestCurveWriteReportsPendingWithNoDaemonRunning is the other half, and it used
+// to expect applied. It was reasoned that a write with nothing to reload is
+// "genuinely in force" -- but nothing to reload is why it is not. With the daemon
+// down there is no process that reads this file at all, so the fan is running
+// whatever the firmware last commanded, and the curve just written is not the law
+// it is running. Stopping the daemon to edit the curve is the recommended
+// workflow, which makes this the arm an operator is most likely to believe, and
+// telling them it is live is the worst way to be wrong about cooling.
+func TestCurveWriteReportsPendingWithNoDaemonRunning(t *testing.T) {
 	h := newFanHarness(t)
 	h.rig.pfandUp = false
 
@@ -397,9 +402,12 @@ func TestCurveWriteReportsAppliedWhenNoDaemonIsRunning(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 
 	body := decodeBody(t, rec)
-	assert.Equal(t, true, body["applied"])
-	assert.Equal(t, false, body["needs_pfand_restart"])
-	assert.Equal(t, "applied", body["status"])
+	assert.Equal(t, false, body["applied"],
+		"no process has read this file, so nothing about the fan's behaviour changed")
+	assert.Equal(t, true, body["needs_pfand_restart"])
+	assert.Equal(t, "pending_restart", body["status"])
+	assert.Equal(t, "restart_pfand", body["next_action"],
+		"starting the daemon is what makes the curve reach the fan, so that is the outlet")
 }
 
 // TestPendingResponseNeverClaimsTheCurveIsSaved is ruling 3, asserted over the

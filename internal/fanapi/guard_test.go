@@ -78,6 +78,10 @@ type fixture struct {
 
 	writeCalls []int
 	events     []Event
+	// waits records what the guard asked to be woken up in, in order. The retry
+	// after a decline is a policy, and a policy that cannot be observed cannot be
+	// tested for the only thing that matters about it: how long it waits.
+	waits []time.Duration
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -123,6 +127,10 @@ func newFixture(t *testing.T) *fixture {
 			return nil
 		},
 		Audit: func(e Event) { f.events = append(f.events, e) },
+		AfterFunc: func(d time.Duration, fn func()) *time.Timer {
+			f.waits = append(f.waits, d)
+			return time.AfterFunc(time.Hour, fn)
+		},
 	})
 	return f
 }
@@ -745,7 +753,12 @@ func TestRegressYieldsWhenPfandHasTakenOver(t *testing.T) {
 	assert.Empty(t, f.writeCalls)
 }
 
-func TestRegressIsHeldBackWhileTheEmergencyEdgeIsReached(t *testing.T) {
+// At the emergency edge this used to decline, on the stated grounds that the
+// daemon was driving full speed. Nothing was: the daemon check returns first, so
+// declining left the fan on a duty an operator had set, at the one temperature
+// the curve says must not be reached that way. It now commands the duty the
+// curve itself names there, and still holds the handover until the edge clears.
+func TestAtTheEmergencyEdgeTheFanIsPutOnTheCurveOwnDuty(t *testing.T) {
 	f := newFixture(t)
 	_, err := f.g.SetManualLevel(70, confirmed)
 	require.NoError(t, err)
@@ -754,14 +767,17 @@ func TestRegressIsHeldBackWhileTheEmergencyEdgeIsReached(t *testing.T) {
 	f.temp = 80
 	did, err := f.g.Regress()
 	require.NoError(t, err)
-	assert.False(t, did, "the daemon drives full speed here; returning to auto would override that")
-	assert.Empty(t, f.writeCalls)
+	assert.False(t, did, "control is not handed back while the package is at the edge")
+	assert.Equal(t, []int{mustCurve(t).E}, f.writeCalls,
+		"no daemon is running, so the curve's own emergency duty is the only thing "+
+			"standing between the package and a fan nobody is driving")
 
 	f.temp = 46
+	f.advance(f.waits[len(f.waits)-1])
 	did, err = f.g.Regress()
 	require.NoError(t, err)
-	assert.True(t, did, "the regress stays pending until it is safe to run")
-	assert.Equal(t, []int{0}, f.writeCalls)
+	assert.True(t, did, "the handover waits for the edge to clear")
+	assert.Equal(t, []int{mustCurve(t).E, 0}, f.writeCalls)
 }
 
 func TestRegressIsHeldBackWhileTheTemperatureIsUnreadable(t *testing.T) {
@@ -806,15 +822,17 @@ func TestAHeldBackRegressDoesNotBurnAHalfOpenProbe(t *testing.T) {
 	}
 	f.setErr = nil
 	f.advance(10*time.Minute + 2*time.Minute)
-	f.temp = 80
+	f.tempErr = errors.New("zone gone")
 	did, err := f.g.Regress()
 	require.NoError(t, err)
 	assert.False(t, did, "the regress is held back, not written")
 
 	// A regress that declined to write has not exercised the device, so it cannot
 	// be allowed to spend the probe that is there to find out whether the device
-	// recovered.
-	f.temp = 46
+	// recovered. The unreadable sensor is the gate that still works that way; the
+	// emergency edge now writes, because it has to.
+	f.tempErr = nil
+	f.advance(f.waits[len(f.waits)-1])
 	did, err = f.g.Regress()
 	require.NoError(t, err, "the probe is still owed to the write that never happened")
 	assert.True(t, did)
@@ -839,6 +857,7 @@ func TestAFailedRegressStaysPending(t *testing.T) {
 	assert.False(t, did)
 	f.setErr = nil
 	f.writeCalls = nil
+	f.advance(f.waits[len(f.waits)-1])
 	did, err = f.g.Regress()
 	require.NoError(t, err)
 	assert.True(t, did, "a regress that could not be delivered must not be reported as delivered")

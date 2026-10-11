@@ -96,6 +96,15 @@ func TestTheRegressRetryWaitsAndThenWaitsLonger(t *testing.T) {
 	assert.True(t, plateau,
 		"the wait has to stop growing; a retry that doubles forever is a duty held "+
 			"for good wearing the name of a retry")
+
+	// The ceiling itself. The loop already refuses to keep doubling once the wait
+	// is long, so growth stops either way and a plateau on its own cannot tell a
+	// capped backoff from an uncapped one -- only the value can. Five minutes is
+	// the point past which the wait has stopped being a retry, and it is written
+	// out here rather than read back from the constant so that the number in the
+	// policy is the number under test.
+	assert.LessOrEqual(t, seen[len(seen)-1], 5*time.Minute,
+		"the wait stops at a ceiling instead of doubling until it stops happening")
 }
 
 // At or past the emergency edge the curve's own answer is its emergency duty.

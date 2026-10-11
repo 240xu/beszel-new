@@ -92,7 +92,7 @@ export interface SystemInfo {
 	rdn?: string
 	/** pending package updates [total, security] (security omitted if unknown) */
 	pu?: [number, number?]
-	/** Beszelplus snapshot. The cached copy every stats record is filled from. */
+	/** beszel-new snapshot. The cached copy every stats record is filled from. */
 	pl?: PlusStats
 }
 
@@ -177,7 +177,7 @@ export interface SystemStats {
 	wf?: Record<string, number>
 	/** network interfaces [upload bytes, download bytes, total upload bytes, total download bytes] */
 	ni?: Record<string, [number, number, number, number]>
-	/** Beszelplus snapshot, copied from info.pl, so both carry the same reading.
+	/** beszel-new snapshot, copied from info.pl, so both carry the same reading.
 	 *  Prefer this one; the cache is there for the agent's own bookkeeping. */
 	plus?: PlusStats
 }
@@ -753,7 +753,7 @@ export interface NetworkMonitorStatsRecord {
 }
 
 // ---------------------------------------------------------------------------
-// Beszelplus: mirrors agent/plus. A Go field without `omitempty` is required
+// beszel-new: mirrors agent/plus. A Go field without `omitempty` is required
 // here; one with it is optional. Collapsing the two is how a missing reading
 // becomes a zero, so the required set is exactly the no-omitempty fields.
 // ---------------------------------------------------------------------------

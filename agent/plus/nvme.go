@@ -6,7 +6,7 @@ package plus
 // The agent/plus boundary forbids importing internal/entities/*, so the
 // adaptation happens at the injection point instead: agent/system.go reads
 // *smart.SmartData and fills this in (see nvmePlusInput in agent/system.go). Only
-// the fields Beszelplus projects are carried, and Attrs is upstream's attribute
+// the fields beszel-new projects are carried, and Attrs is upstream's attribute
 // list verbatim rather than a re-typed copy -- a second typed struct would be a
 // second place for a field to be renamed or transposed without a test noticing.
 type NvmeInput struct {
@@ -39,7 +39,7 @@ var nvmeAttrs = []string{
 	"CriticalCompTime",
 }
 
-// collectNvme projects upstream's parsed NVMe health log into the Beszelplus
+// collectNvme projects upstream's parsed NVMe health log into the beszel-new
 // shape. It does not read the filesystem and does not fork smartctl.
 //
 // Rationale: upstream already runs smartctl (agent/smart.go) and already parses

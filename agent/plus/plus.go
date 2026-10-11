@@ -71,7 +71,7 @@ type NetIfaceStats struct {
 	MTU       int    `json:"mtu,omitempty"`
 }
 
-// NvmeStats is the NVMe health log as Beszelplus reports it.
+// NvmeStats is the NVMe health log as beszel-new reports it.
 //
 // Every value is copied from upstream's already-parsed SMART data; this package
 // never forks smartctl itself. Read the Contract paragraphs of collectNvme in

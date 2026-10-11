@@ -14,7 +14,7 @@ import (
 // drive, read out of `sudo smartctl -a -j /dev/nvme0` during the task. The log
 // carries 18 fields, of which upstream maps the 17 scalars into named attributes
 // — the 18th is a slice SmartAttribute cannot hold — and these are the ten
-// Beszelplus projects.
+// beszel-new projects.
 //
 // The values are deliberately not the ones the plan's fixture used. A field
 // mapping can only be caught if the source values are distinguishable, and the

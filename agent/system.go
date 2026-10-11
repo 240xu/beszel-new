@@ -293,13 +293,13 @@ func (a *Agent) getSystemStats(cacheTimeMs uint16) system.Stats {
 	a.systemInfo.BandwidthBytes = systemStats.Bandwidth[0] + systemStats.Bandwidth[1]
 	a.systemInfo.Threads = a.systemDetails.Threads
 
-	// Beszelplus metrics
+	// beszel-new metrics
 	a.updatePlusStats(cacheTimeMs, &systemStats)
 
 	return systemStats
 }
 
-// updatePlusStats refreshes the Beszelplus snapshot on the default interval and
+// updatePlusStats refreshes the beszel-new snapshot on the default interval and
 // copies the cached snapshot into every stats record.
 //
 // Collection walks every thermal zone, cpufreq policy and netdev counter -- a few

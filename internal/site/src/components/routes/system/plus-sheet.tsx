@@ -126,7 +126,7 @@ const PlusSheet = memo(function PlusSheet({ chartData, grid }: { chartData: Char
 
 	return (
 		<Sheet open={open} onOpenChange={setOpen}>
-			<DialogTitle className="sr-only">{t`Beszelplus`}</DialogTitle>
+			<DialogTitle className="sr-only">{t`beszel-new`}</DialogTitle>
 			<SheetTrigger asChild>
 				<Button title={t`View more`} variant="outline" size="icon" className="shrink-0">
 					<MoreHorizontalIcon />
@@ -240,7 +240,7 @@ export function PlusChart({ chartData, grid }: { chartData: ChartData; grid: boo
 		<ChartCard
 			grid={grid}
 			className="min-h-auto"
-			title={t`Beszelplus`}
+			title={t`beszel-new`}
 			description={t`Thermal zones, per core frequency, NVMe health, WiFi and fan`}
 			cornerEl={<PlusSheet chartData={chartData} grid={grid} />}
 		>

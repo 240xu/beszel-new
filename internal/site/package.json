@@ -5,6 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite --host",
+		"test": "bun test --preload ./tests/bun-preload.ts",
 		"build": "lingui extract --overwrite && lingui compile && tsc -b && vite build",
 		"preview": "vite preview",
 		"sync": "lingui extract --overwrite && lingui compile",

@@ -54,6 +54,20 @@ lint:
 test:
 	go test -tags='testing no_ui' ./...
 
+	@$(MAKE) --no-print-directory test-site
+
+# The site suite needs bun and a populated node_modules, neither of which the Go
+# toolchain guarantees, so a machine without them still gets a green gate and a
+# stated reason rather than a red build that looks like a regression.
+test-site:
+	@if ! command -v bun >/dev/null 2>&1; then \
+		echo "SKIP internal/site tests: bun not found (https://bun.sh/docs/installation)"; \
+	elif [ ! -d internal/site/node_modules ]; then \
+		echo "SKIP internal/site tests: run 'bun install --cwd internal/site' first"; \
+	else \
+		internal/site/scripts/test-gate.sh; \
+	fi
+
 tidy:
 	go mod tidy
 

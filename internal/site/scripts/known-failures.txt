@@ -1,0 +1,3 @@
+# <path relative to internal/site>::<bun test name> — hold green here, delete when it passes.
+src/lib/plus-fan-tab.guard.test.ts::a countdown exists only where a deadline produced one
+src/lib/plus-fan-tab.guard.test.ts::no wording that claims a write is running exists outside the two outcome tables

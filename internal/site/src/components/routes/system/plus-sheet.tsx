@@ -10,15 +10,16 @@ import {
 	cpufreqRows,
 	dptfRows,
 	FAN_POWER_IS_NOMINAL,
-	FAN_STEP_RPM_IS_ESTIMATE,
 	fanRows,
 	fanStepRows,
+	formatSpan,
 	netRows,
 	nvmeRows,
 	plusAvailable,
 	previewRows,
 	wifiRows,
 	type MetricRow,
+	type RowNote,
 	type StaticLabelKey,
 } from "@/lib/plus-metrics"
 import type { ChartData } from "@/types"
@@ -52,7 +53,6 @@ const LABELS: Record<StaticLabelKey, string> = {
 	"wifi.freq_mhz": t`Frequency`,
 	"wifi.tx_mbit": t`Transmit Rate`,
 	"wifi.retry_delta": t`Retry since previous sample`,
-	"fan.rpm_est": t`Speed`,
 	"fan.set_level_pct": t`Programmed Level`,
 	"fan.ec76_pct": t`Applied Duty`,
 	"fan.temp_c": t`Temperature`,
@@ -60,6 +60,22 @@ const LABELS: Record<StaticLabelKey, string> = {
 }
 
 const labelFor = (row: MetricRow): string => LABELS[row.key as StaticLabelKey] ?? row.label
+
+/** The words a qualifier is said in. `plus-metrics.ts` names which qualifier a row
+ *  carries and cannot speak here — it is pure and runs where `@lingui/core/macro`
+ *  does not resolve — so the two halves meet in this switch. A qualifier it does
+ *  not name has no branch, and `default` returns an empty string rather than
+ *  rendering `[object Object]` on a screen. */
+function noteText(note: RowNote): string {
+	switch (note.kind) {
+		case "stale":
+			return t`stale`
+		case "span":
+			return t`over ${formatSpan(note.seconds)}`
+		case "duty_span":
+			return t`duty ${note.from} to ${note.to}`
+	}
+}
 
 function MetricGrid({ rows }: { rows: MetricRow[] }) {
 	return (
@@ -69,8 +85,8 @@ function MetricGrid({ rows }: { rows: MetricRow[] }) {
 					<span className="text-muted-foreground">{labelFor(row)}: </span>
 					<span className="font-mono">{row.value}</span>
 					{row.notes?.map((note) => (
-						<span key={note} className="ms-1 text-xs text-muted-foreground">
-							({note})
+						<span key={note.kind} className="ms-1 text-xs text-muted-foreground">
+							({noteText(note)})
 						</span>
 					))}
 				</div>
@@ -85,7 +101,6 @@ function FanStepTable({ rows }: { rows: ReturnType<typeof fanStepRows> }) {
 			<TableHeader>
 				<TableRow>
 					<TableHead>{t`Duty`}</TableHead>
-					<TableHead>{FAN_STEP_RPM_IS_ESTIMATE ? t`Speed (estimated)` : t`Speed`}</TableHead>
 					<TableHead>{FAN_POWER_IS_NOMINAL ? t`Power (firmware nominal)` : t`Power`}</TableHead>
 				</TableRow>
 			</TableHeader>
@@ -93,7 +108,6 @@ function FanStepTable({ rows }: { rows: ReturnType<typeof fanStepRows> }) {
 				{rows.map((row) => (
 					<TableRow key={row.key}>
 						<TableCell className="font-mono">{row.duty}</TableCell>
-						<TableCell className="font-mono">{row.rpm}</TableCell>
 						<TableCell className="font-mono">{row.power}</TableCell>
 					</TableRow>
 				))}
@@ -202,7 +216,7 @@ const PlusSheet = memo(function PlusSheet({ chartData, grid }: { chartData: Char
 							grid={grid}
 							className="min-h-auto"
 							title={t`Fan`}
-							description={t`Speed is derived from the duty byte; this platform reports no tachometer.`}
+							description={t`Duty programmed, duty applied and package temperature. The fan speed this platform reports is derived from the duty byte, so it is not shown here.`}
 						>
 							<MetricGrid rows={fan} />
 						</ChartCard>

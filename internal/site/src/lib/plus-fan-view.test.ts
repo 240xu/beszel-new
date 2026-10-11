@@ -193,24 +193,22 @@ describe("what a write reported", () => {
 		expect(fanWriteOutcome(APPLIED).needsRestart).toBe(!fanWriteOutcome(PENDING).needsRestart)
 	})
 
-	test("the wording is pinned once here, and the wording rule holds under any re-spelling", () => {
-		expect(fanWriteOutcome(APPLIED).text).toBe("In force — the fan is running this now.")
-		expect(fanWriteOutcome(PENDING).text).toBe("Written to disk; the curve daemon has not picked it up.")
-		// A write nothing is running must not borrow any wording that says it is
-		// running. This is the assertion that survives a translator rewriting the
-		// other half of the table.
-		expect(fanWriteOutcome(PENDING).text).not.toMatch(/in force|saved|applied|running|生效|已保存/i)
-		expect(fanWriteOutcome(APPLIED).text).not.toBe(fanWriteOutcome(PENDING).text)
+	test("a write nothing is running is distinguishable from one that is in force", () => {
+		// The wording itself moved to plus-fan-tab.tsx, where it is translated; what
+		// stays here is the fact the panel branches on, and the two arms disagree.
+		expect(fanWriteOutcome(PENDING).kind).toBe("pending_restart")
+		expect(fanWriteOutcome(APPLIED).kind).toBe("applied")
+		expect(fanWriteOutcome(PENDING).inForce).toBe(false)
 	})
 
-	test("no two outcomes share a sentence", () => {
-		const texts = [
-			fanWriteOutcome(APPLIED).text,
-			fanWriteOutcome(PENDING).text,
-			fanWriteOutcome({ mode: "auto", pfand_active: true }).text,
-			fanWriteOutcome({ mode: "manual", pfand_active: false }).text,
+	test("no two outcomes are told apart by the same kind", () => {
+		const kinds = [
+			fanWriteOutcome(APPLIED).kind,
+			fanWriteOutcome(PENDING).kind,
+			fanWriteOutcome({ mode: "auto", pfand_active: true }).kind,
+			fanWriteOutcome({ mode: "manual", pfand_active: false }).kind,
 		]
-		expect(new Set(texts).size).toBe(texts.length)
+		expect(new Set(kinds).size).toBe(kinds.length)
 	})
 })
 
@@ -245,10 +243,10 @@ describe("a daemon change is answered like any other write", () => {
 		}
 	})
 
-	test("a stopped daemon is not described as the curve running", () => {
+	test("a stopped daemon is not reported as the curve running", () => {
 		const stopped = fanWriteOutcome({ mode: "manual", pfand_active: false })
-		expect(stopped.text).toMatch(/not running/i)
-		expect(stopped.text).not.toMatch(/is running|driving the fan from the curve on disk/i)
+		expect(stopped.kind).toBe("daemon_stopped")
+		expect(stopped.inForce).toBe(false)
 	})
 })
 
@@ -285,7 +283,6 @@ describe("a refused write says whether the last banner still holds", () => {
 		for (const { write, code } of REFUSALS) {
 			const failure = refusalOf(fanWriteRefused(write, readFanRefusal(500, JSON.stringify({ data: { code } }))))
 			expect(failure.refusal?.key).toBe(code)
-			expect(failure.refusal?.text.length).toBeGreaterThan(0)
 		}
 	})
 })
@@ -295,14 +292,16 @@ describe("refusals are read by code, never by status", () => {
 		const hot = fanRefusal(readFanRefusal(503, JSON.stringify(HOT)))
 		const sensor = fanRefusal(readFanRefusal(503, JSON.stringify(SENSOR)))
 		expect(hot.key).not.toBe(sensor.key)
-		expect(hot.text).not.toBe(sensor.text)
 	})
 
 	test("one code under two statuses is one answer, so the status cannot be doing the work", () => {
 		const a = fanRefusal(readFanRefusal(400, JSON.stringify(HOT)))
 		const b = fanRefusal(readFanRefusal(503, JSON.stringify(HOT)))
 		expect(a.key).toBe(b.key)
-		expect(a.text).toBe(b.text)
+		// The one field besides the key that could vary with the status it arrived
+		// on, and the only thing a log reader still has to go on.
+		expect(a.status).not.toBe(b.status)
+		expect(a.detail ?? "").toBe(b.detail ?? "")
 	})
 
 	test("one status under two codes is two answers, so the code is doing the work", () => {
@@ -324,12 +323,10 @@ describe("refusals are read by code, never by status", () => {
 		expect(early.detail).toBeUndefined()
 	})
 
-	test("every classified refusal the server can raise reaches a text of its own", () => {
-		const texts = FAN_REJECT_CODES.map(
-			(code) => fanRefusal(readFanRefusal(500, JSON.stringify({ data: { code } }))).text
-		)
-		expect(texts.some((text) => text.length === 0)).toBe(false)
-		expect(new Set(texts).size).toBe(FAN_REJECT_CODES.length)
+	test("every classified refusal the server can raise reaches a key of its own", () => {
+		const keys = FAN_REJECT_CODES.map((code) => fanRefusal(readFanRefusal(500, JSON.stringify({ data: { code } }))).key)
+		expect(keys.some((key) => key.length === 0)).toBe(false)
+		expect(new Set(keys).size).toBe(FAN_REJECT_CODES.length)
 	})
 
 	test("the three ways a write fails after reaching the device are told apart", () => {
@@ -337,25 +334,12 @@ describe("refusals are read by code, never by status", () => {
 		expect(new Set([code("rollback_failed"), code("write_unconfirmed"), code("write_failed")]).size).toBe(3)
 	})
 
-	test("the hot and the sensor answer are pinned once each, with the reverse assertion", () => {
-		// One reader-visible string pinned in one place; the invariant that
-		// matters is the second line, which no re-spelling can satisfy.
-		expect(fanRefusal(readFanRefusal(503, JSON.stringify(HOT))).text).toBe(
-			"The package is at or above the emergency edge in the curve, so no duty was written. Let it cool, or raise emerg in the curve, before writing again."
-		)
-		expect(fanRefusal(readFanRefusal(503, JSON.stringify(SENSOR))).text).toBe(
-			"The package temperature could not be read, so no duty was written and the reading cannot be trusted. Check the sensor and the zone it names rather than cooling the machine."
-		)
-		expect(fanRefusal(readFanRefusal(503, JSON.stringify(SENSOR))).text).not.toMatch(/too hot|at or above/i)
-	})
-
-	test("both temperature refusals now say what to do, and neither says the other's remedy", () => {
-		const hot = fanRefusal(readFanRefusal(503, JSON.stringify(HOT))).text
-		const sensor = fanRefusal(readFanRefusal(503, JSON.stringify(SENSOR))).text
-		expect(hot).toMatch(/let it cool/i)
-		expect(sensor).toMatch(/check the sensor/i)
-		expect(sensor).not.toMatch(/let it cool/i)
-		expect(hot).not.toMatch(/check the sensor/i)
+	test("the hot and the sensor answer reach keys that are not each other's", () => {
+		// The sentences moved to plus-fan-tab.tsx, where they are translated; the
+		// guarantee that survives a re-spelling or a translation is that the two
+		// codes this module already distinguishes stay distinguished.
+		expect(fanRefusal(readFanRefusal(503, JSON.stringify(HOT))).key).toBe("package_too_hot")
+		expect(fanRefusal(readFanRefusal(503, JSON.stringify(SENSOR))).key).toBe("temperature_unknown")
 	})
 })
 
@@ -365,13 +349,9 @@ describe("a refusal with nothing to branch on", () => {
 		fanRefusal(readFanRefusal(status, JSON.stringify({ status, message: "something went wrong" })))
 
 	test("it lands on no known code's key, on any status it might arrive on", () => {
-		const texts = FAN_REJECT_CODES.map(
-			(code) => fanRefusal(readFanRefusal(503, JSON.stringify({ data: { code } }))).text
-		)
+		const known = new Set<string>(FAN_REJECT_CODES)
 		for (const status of STATUSES) {
-			const view = bare(status)
-			expect(FAN_REJECT_CODES.includes(view.key as never)).toBe(false)
-			expect(texts).not.toContain(view.text)
+			expect(known.has(bare(status).key)).toBe(false)
 		}
 	})
 
@@ -382,19 +362,15 @@ describe("a refusal with nothing to branch on", () => {
 	test("it is told apart from a reason this build simply does not know", () => {
 		const unseen = fanRefusal(readFanRefusal(500, JSON.stringify({ data: { code: "thermal_profile_t4" } })))
 		expect(bare(500).key).not.toBe(unseen.key)
-		expect(bare(500).text).not.toBe(unseen.text)
 		expect(unseen.detail).toBe("thermal_profile_t4")
 	})
 
-	test("it claims nothing at all about the fan", () => {
-		// The sentence has to survive both a refusal the route raised before it
-		// read the request and a refusal raised after it acted, because the wire
-		// cannot tell those apart and neither can this panel.
-		for (const status of STATUSES) {
-			expect(bare(status).text).not.toMatch(
-				/reached the fan|before it reached|nothing was written|no duty was written|left alone|in force|written to disk/i
-			)
-		}
+	test("it is one key on every status, so no status can be read as a different fault", () => {
+		// The sentence for this key says nothing about the fan, because the wire
+		// cannot tell a refusal raised before it read the request from one raised
+		// after it acted. That claim is pinned against the wording where the
+		// wording now lives, in plus-fan-tab.guard.test.ts.
+		expect(new Set(STATUSES.map((status) => bare(status).key))).toEqual(new Set(["unclassified"]))
 	})
 })
 

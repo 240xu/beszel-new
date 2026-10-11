@@ -4,12 +4,9 @@ import type { FanStats, PlusStats, SystemStatsRecord, WiFiStats } from "@/types"
  *  `reported()` so no call site can quietly substitute a zero. */
 export const UNKNOWN = "—"
 
-export const FAN_ESTIMATE_NOTE = "estimated"
-export const FAN_STALE_NOTE = "stale"
-/** The firmware derives power and noise from the duty byte by fixed constants, so
- *  neither is an independent measurement. */
+/** The firmware derives power from the duty byte by a fixed constant, so it is
+ *  not an independent measurement. */
 export const FAN_POWER_IS_NOMINAL = true
-export const FAN_STEP_RPM_IS_ESTIMATE = true
 
 /** Ages are compared against the reader's own clock, because the collector never
  *  checks one. Calibrated against pfanel, which samples the fan roughly every 12
@@ -47,7 +44,6 @@ export const STATIC_LABEL_KEYS = [
 	"wifi.freq_mhz",
 	"wifi.tx_mbit",
 	"wifi.retry_delta",
-	"fan.rpm_est",
 	"fan.set_level_pct",
 	"fan.ec76_pct",
 	"fan.temp_c",
@@ -93,17 +89,30 @@ export function fmtBytes(value: number | undefined | null): string {
 	return exponent === 0 ? `${bytes} B` : `${(bytes / 1024 ** exponent).toFixed(1)} ${BYTE_UNITS[exponent]}`
 }
 
+/** A qualifier carried beside a value, as data rather than as a finished string.
+ *  `plus-metrics.ts` is pure and is imported by `bun test`, where `@lingui/core/macro`
+ *  cannot resolve, so the words belong to the sheet that draws them; naming the
+ *  qualifier here keeps the decision of *whether* to qualify in a testable place
+ *  while leaving *what it says* to the catalog. */
+export type RowNote =
+	| { kind: "stale" }
+	| { kind: "span"; seconds: number }
+	| { kind: "duty_span"; from: string; to: string }
+
 export interface MetricRow {
 	key: string
 	label: string
 	value: string
-	notes?: string[]
+	notes?: RowNote[]
 }
 
+/** Keyed by position because the firmware table repeats duties, so the duty
+ *  column cannot identify a step. Speed and noise are both withheld: noise is the
+ *  duty scaled by a fixed constant, and `rpm_est` is the interpolated quantity
+ *  this platform cannot measure. Both stay on the wire. */
 export interface FanStepRow {
 	key: string
 	duty: string
-	rpm: string
 	power: string
 }
 
@@ -254,8 +263,11 @@ export function formatSpan(seconds: number): string {
 /** The qualifier a windowed difference carries, in the form the sheet draws it
  *  in parentheses. One place builds it so the copy cannot drift between the row
  *  that produces it and the test that reads it. */
-export function fmtSpan(seconds: number): string {
-	return `over ${formatSpan(seconds)}`
+export function wifiRetrySpanNote(records: SystemStatsRecord[]): RowNote | undefined {
+	const window = retryWindowSeconds(records)
+	// The span qualifies a difference that exists. Without a difference there is
+	// nothing for it to qualify, so the row reads unknown and carries no note.
+	return window === undefined ? undefined : { kind: "span", seconds: window }
 }
 
 export function wifiSignal(wifi?: WiFiStats): number | undefined {
@@ -268,11 +280,9 @@ export function wifiSignal(wifi?: WiFiStats): number | undefined {
 export function wifiRows(records: SystemStatsRecord[]): MetricRow[] {
 	const wifi = latestPlus(records)?.wifi
 	if (!wifi) return []
-	const window = retryWindowSeconds(records)
 	const delta = wifiRetryDelta(records)
-	// The span qualifies a difference that exists. Without a difference there is
-	// nothing for it to qualify, so the row reads unknown and carries no note.
-	const notes = delta === undefined || window === undefined ? undefined : [fmtSpan(window)]
+	const span = wifiRetrySpanNote(records)
+	const notes = delta === undefined || span === undefined ? undefined : [span]
 	return [
 		{ key: "wifi.iface", label: "Interface", value: fmtText(wifi.iface) },
 		{ key: "wifi.signal_dbm", label: "Signal", value: withUnit(fmtCount(wifiSignal(wifi)), "dBm") },
@@ -291,25 +301,16 @@ export function fanIsStale(fan: FanStats, nowSeconds: number): boolean {
 export function fanRows(records: SystemStatsRecord[], nowSeconds: number): MetricRow[] {
 	const fan = latestPlus(records)?.fan
 	if (!fan) return []
-	const stale = fanIsStale(fan, nowSeconds)
-	const speed = reported(fan.rpm_est)
-	// A qualifier describes a reading. With no reading there is nothing to
-	// describe, so both notes hang off the same gate rather than only the first.
-	const marks = (estimate: boolean) => {
-		if (speed === null) return undefined
-		const collected: string[] = []
-		if (estimate) collected.push(FAN_ESTIMATE_NOTE)
-		if (stale) collected.push(FAN_STALE_NOTE)
-		return collected.length > 0 ? collected : undefined
-	}
+	// A stale reading qualifies every value it covers, so the note rides the first
+	// row that actually reports one. With no reading there is nothing to describe.
+	const notes =
+		fan.set_level_pct === undefined || !fanIsStale(fan, nowSeconds) ? undefined : [{ kind: "stale" } as const]
+	// The speed this platform can publish is interpolated from the duty byte by
+	// estRPM() on the agent: there is no tachometer behind it, and a reader has no
+	// way to tell that from a measured speed. It is withheld from the presentation
+	// layer rather than rounded or caveated — `rpm_est` stays on the wire.
 	return [
-		{
-			key: "fan.rpm_est",
-			label: "Speed",
-			value: withUnit(fmtCount(speed), "rpm"),
-			notes: marks(fan.rpm_est_is_estimate),
-		},
-		{ key: "fan.set_level_pct", label: "Programmed Level", value: fmtPct(fan.set_level_pct) },
+		{ key: "fan.set_level_pct", label: "Programmed Level", value: fmtPct(fan.set_level_pct), notes },
 		{ key: "fan.ec76_pct", label: "Applied Duty", value: fmtPct(fan.ec76_pct) },
 		{ key: "fan.temp_c", label: "Temperature", value: fmtCelsius(fan.temp_c) },
 		{ key: "fan.gov", label: "Mode", value: fmtText(fan.gov) },
@@ -317,15 +318,13 @@ export function fanRows(records: SystemStatsRecord[], nowSeconds: number): Metri
 }
 
 /** Keyed by position because the firmware table repeats duties, so the duty
- *  column cannot identify a step. Noise is not carried: it is the duty scaled by
- *  a fixed constant and adds nothing the duty does not already say. */
+ *  column cannot identify a step. */
 export function fanStepRows(records: SystemStatsRecord[]): FanStepRow[] {
 	const steps = latestPlus(records)?.fan_steps
 	if (!steps) return []
 	return steps.map((step, index) => ({
 		key: String(index),
 		duty: fmtPct(step.percent),
-		rpm: fmtCount(step.rpm_est),
 		power: withUnit(fmtCount(step.power_mw), "mW"),
 	}))
 }
@@ -341,7 +340,7 @@ function fanStepSummary(records: SystemStatsRecord[]): MetricRow[] {
 			key: "fan_steps.count",
 			label: "Firmware Steps",
 			value: fmtCount(steps.length),
-			notes: [`duty ${fmtPct(steps[0]?.percent)} to ${fmtPct(steps[steps.length - 1]?.percent)}`],
+			notes: [{ kind: "duty_span", from: fmtPct(steps[0]?.percent), to: fmtPct(steps[steps.length - 1]?.percent) }],
 		},
 	]
 }

@@ -52,15 +52,27 @@ test("the sheet does not read a plus collection", async () => {
 test("the sheet draws the qualifiers the rows carry", async () => {
 	const text = await read(SHEET)
 	expect(occurrences(text, /row\.notes/)).not.toEqual([])
-	expect(occurrences(text, /\(\{note\}\)/)).not.toEqual([])
+	expect(occurrences(text, /noteText\(note\)/)).not.toEqual([])
 })
 
-/** The two table headers whose text changes with the flags. Dropping either one
- *  removes a caveat about the firmware rather than a piece of decoration. */
-test("the firmware fan table keeps both caveats in its headers", async () => {
+/** The one table header whose text changes with a flag. Dropping it removes a
+ *  caveat about the firmware rather than a piece of decoration. The speed header
+ *  that used to sit beside it is gone because the column is: see the guard test
+ *  below, which pins the absence rather than trusting the reader of this file. */
+test("the firmware fan table keeps the nominal-power caveat in its header", async () => {
 	const text = await read(SHEET)
-	expect(occurrences(text, /FAN_STEP_RPM_IS_ESTIMATE \? t`Speed \(estimated\)`/)).not.toEqual([])
 	expect(occurrences(text, /FAN_POWER_IS_NOMINAL \? t`Power \(firmware nominal\)`/)).not.toEqual([])
+})
+
+/** The reverse direction of the same decision. A column re-added for a platform
+ *  that does report a tachometer would be a new claim, and every test that asserts
+ *  a row is absent passes just as happily when the row is back, so the rendering
+ *  itself is pinned: no cell can read the withheld field. */
+test("neither the fan card nor the fan table renders a speed", async () => {
+	const text = await read(SHEET)
+	expect(occurrences(text, /row\.rpm|\.rpm_est\b/)).toEqual([])
+	expect(occurrences(text, /<TableHead>[^<]*\bSpeed\b/)).toEqual([])
+	expect(occurrences(text, /FAN_STEP_RPM_IS_ESTIMATE/)).toEqual([])
 })
 
 /** A label is looked up by key so it can be translated. A component that went
@@ -88,8 +100,27 @@ test("the translation map covers exactly the declared static keys", async () => 
 	expect([...declared].sort()).toEqual([...STATIC_LABEL_KEYS].sort())
 })
 
-/** `created` is the only record clock available to the retry row. The qualifier
- *  is built by the module so the copy lives with the value it describes. */
-test("the sheet renders the retry span the module formats", async () => {
-	expect(occurrences(await read(METRICS), /fmtSpan\(window\)/)).not.toEqual([])
+/** `created` is the only record clock available to the retry row. The qualifier is
+ *  named by the module and spoken by the sheet, and this asserts both halves: a
+ *  sheet that drew its own span would restate a value the module already decided,
+ *  and a module that spelled the words out would put English in a locale. */
+test("the retry span is named by the module and worded by the sheet", async () => {
+	const metrics = await read(METRICS)
+	expect(occurrences(metrics, /wifiRetrySpanNote\(/)).not.toEqual([])
+	expect(occurrences(metrics, /over \$\{/)).toEqual([])
+	const sheet = await read(SHEET)
+	expect(occurrences(sheet, /t`over \$\{formatSpan\(note\.seconds\)\}`/)).not.toEqual([])
+})
+
+/** Every qualifier the module can name has a way to be said. A new one without a
+ *  branch here would render nothing rather than an error, which is exactly the
+ *  silent failure a reader cannot report. */
+test("every qualifier the module names is worded by the sheet", async () => {
+	const metrics = await read(METRICS)
+	const sheet = await read(SHEET)
+	const kinds = [...metrics.matchAll(/kind: "([a-z_]+)"/g)].map((m) => m[1])
+	expect(new Set(kinds).size).toBeGreaterThan(0)
+	for (const kind of kinds) {
+		expect(occurrences(sheet, new RegExp(`case "${kind}":`))).not.toEqual([])
+	}
 })

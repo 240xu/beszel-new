@@ -3,18 +3,14 @@ import {
 	cumulativeDelta,
 	cpufreqRows,
 	dptfRows,
-	FAN_ESTIMATE_NOTE,
 	FAN_POWER_IS_NOMINAL,
 	FAN_STALE_AFTER_S,
-	FAN_STALE_NOTE,
-	FAN_STEP_RPM_IS_ESTIMATE,
 	fanRows,
 	fanStepRows,
 	fmtBytes,
 	fmtCount,
 	fmtCelsius,
 	fmtPct,
-	fmtSpan,
 	fmtText,
 	formatSpan,
 	latestPlus,
@@ -34,8 +30,10 @@ const at = (plus?: PlusStats, created = 1): SystemStatsRecord[] => [
 ]
 
 const value = (rows: { key: string; value: string }[], key: string) => rows.find((row) => row.key === key)?.value
-const notes = (rows: { key: string; notes?: string[] }[], key: string) =>
-	rows.find((row) => row.key === key)?.notes ?? []
+const notes = (rows: { key: string; notes?: { kind: string }[] }[], key: string) =>
+	(rows.find((row) => row.key === key)?.notes ?? []).map((note) => note.kind)
+const noteOf = (rows: { key: string; notes?: unknown[] }[], key: string) =>
+	rows.find((row) => row.key === key)?.notes?.[0]
 const coreKeys = (rows: { key: string }[]) => rows.filter((row) => /^\d+$/.test(row.key)).map((row) => row.key)
 
 const FAN: FanStats = {
@@ -96,24 +94,13 @@ test("the unreadable placeholder is the em dash, not a zero and not a blank", ()
 	expect(UNKNOWN.trim()).not.toBe("")
 })
 
-test("an estimate is marked estimated and never as a measurement", () => {
-	expect(FAN_ESTIMATE_NOTE).toBe("estimated")
-	expect(FAN_ESTIMATE_NOTE).not.toMatch(/measured|actual|exact|real|observed/i)
-})
-
-test("a stale reading is marked stale and never as fresh or live", () => {
-	expect(FAN_STALE_NOTE).toBe("stale")
-	expect(FAN_STALE_NOTE).not.toMatch(/fresh|live|current/i)
-})
-
 test("the staleness window is 300 seconds", () => {
 	expect(FAN_STALE_AFTER_S).toBe(300)
 	expect(FAN_STALE_AFTER_S).toBeGreaterThan(0)
 })
 
-test("the firmware nominal flags are on, so the sheet says so", () => {
+test("the firmware nominal flag is on, so the sheet says so", () => {
 	expect(FAN_POWER_IS_NOMINAL).toBe(true)
-	expect(FAN_STEP_RPM_IS_ESTIMATE).toBe(true)
 })
 
 // --- absence is never a number, whatever the placeholder is spelled ----------
@@ -281,42 +268,53 @@ test("a virtual interface has no meaningful link rate so none is shown", () => {
 	expect(netRows(at({ netall: {} }))).toEqual([])
 })
 
-test("rpm is labelled an estimate because the platform has no tachometer", () => {
+test("no fan speed is offered for display, because this platform cannot measure one", () => {
+	// `rpm_est` is interpolated from the duty byte by estRPM() on the agent; the
+	// host reports no tachometer. A reader cannot tell that from a measured speed,
+	// so the presentation layer does not show it at all. The wire field is
+	// untouched -- the value below is still on the record being rendered.
 	const rows = fanRows(at(FULL), FAN.sample_ts_s)
-	expect(value(rows, "fan.rpm_est")).toBe("1180 rpm")
-	expect(notes(rows, "fan.rpm_est")).toContain("estimated")
+	expect(rows.map((row) => row.key)).not.toContain("fan.rpm_est")
+	expect(rows.map((row) => row.value)).not.toContain("1180 rpm")
+	expect(rows.some((row) => /rpm/i.test(row.label))).toBe(false)
+	expect(Object.keys(rows[0] ?? {})).not.toContain("rpm")
 })
 
-test("the estimate label follows the flag the agent sends", () => {
-	const rows = fanRows(at({ fan: { rpm_est: 1180, rpm_est_is_estimate: false, sample_ts_s: 1759500000 } }), 1759500000)
-	expect(notes(rows, "fan.rpm_est")).not.toContain("estimated")
+test("an estimate is never presented as a measurement, and never labelled either", () => {
+	// Not "estimated" beside a number, which still puts a speed on screen: no row
+	// at all. This holds whether or not the agent flagged the value.
+	for (const flag of [true, false]) {
+		const rows = fanRows(at({ fan: { rpm_est: 1180, rpm_est_is_estimate: flag, sample_ts_s: 1 } }), 1)
+		expect(rows.some((row) => row.key.includes("rpm"))).toBe(false)
+		expect(rows.every((row) => !(row.notes ?? []).includes({ kind: "estimated" } as never))).toBe(true)
+	}
 })
 
 test("a fan reading older than the staleness window is marked stale", () => {
 	const rows = fanRows(at(FULL), FAN.sample_ts_s + FAN_STALE_AFTER_S + 1)
-	expect(notes(rows, "fan.rpm_est")).toContain("stale")
+	expect(notes(rows, "fan.set_level_pct")).toContain("stale")
 })
 
 test("a fan reading inside the staleness window is not marked stale", () => {
 	const rows = fanRows(at(FULL), FAN.sample_ts_s + FAN_STALE_AFTER_S)
-	expect(notes(rows, "fan.rpm_est")).not.toContain("stale")
+	expect(notes(rows, "fan.set_level_pct")).not.toContain("stale")
 })
 
 test("a fan snapshot from the future is not stale", () => {
 	const rows = fanRows(at(FULL), FAN.sample_ts_s - 10_000)
-	expect(notes(rows, "fan.rpm_est")).not.toContain("stale")
+	expect(notes(rows, "fan.set_level_pct")).not.toContain("stale")
 })
 
 test("a qualifier is never attached to a reading that was not reported", () => {
 	// The stale mark used to hang off the collector's clock alone, so an absent
-	// speed rendered as "— (stale)": stale about a number nobody published.
+	// value rendered as "— (stale)": stale about a number nobody published.
 	const old = FAN.sample_ts_s + FAN_STALE_AFTER_S + 1
 	const absent = fanRows(at({ fan: { rpm_est_is_estimate: true, sample_ts_s: FAN.sample_ts_s } }), old)
-	expect(value(absent, "fan.rpm_est")).toBe(UNKNOWN)
-	expect(notes(absent, "fan.rpm_est")).toEqual([])
-	// Same instant, same flags, but a reported speed keeps both marks.
+	expect(value(absent, "fan.set_level_pct")).toBe(UNKNOWN)
+	expect(notes(absent, "fan.set_level_pct")).toEqual([])
+	// Same instant, but a reported level keeps the mark.
 	const present = fanRows(at(FULL), old)
-	expect(notes(present, "fan.rpm_est")).toEqual(["estimated", "stale"])
+	expect(notes(present, "fan.set_level_pct")).toEqual(["stale"])
 })
 
 test("an unreadable fan level is unknown while a programmed level of 0 is a reading", () => {
@@ -346,10 +344,20 @@ test("fan steps are keyed by position because the firmware table repeats duties"
 	expect(fanStepRows(at({ fan_steps: [] }))).toEqual([])
 })
 
-test("the firmware noise column is not presented as a measurement", () => {
+test("neither firmware-derived column is presented as a measurement", () => {
+	// noise is the duty scaled by a constant and rpm_est is interpolated from the
+	// duty byte; both would restate the duty the row beside them already carries.
 	const rows = fanStepRows(at(FULL))
 	expect(Object.keys(rows[0]).some((key) => /noise/i.test(key))).toBe(false)
-	expect(rows[0].rpm).toBe("2450")
+	expect(Object.keys(rows[0])).not.toContain("rpm")
+	expect(rows[0].power).toBe("4100 mW")
+})
+
+test("the firmware fan table keeps no speed column at all", () => {
+	// Same rule as the fan card, and the reverse direction: a column added back
+	// for a platform that does have a tachometer would need its own evidence.
+	const columns = Object.keys(fanStepRows(at(FULL))[0] ?? {})
+	expect(columns.sort()).toEqual(["duty", "key", "power"])
 })
 
 // --- the retry row names the interval it covers ------------------------------
@@ -357,13 +365,13 @@ test("the firmware noise column is not presented as a measurement", () => {
 test("a retry difference says how long it spans", () => {
 	const rows = wifiRows([...at({ wifi: { retry: 10 } }, 0), ...at({ wifi: { retry: 64 } }, 3600_000)])
 	expect(value(rows, "wifi.retry_delta")).toBe("54")
-	expect(notes(rows, "wifi.retry_delta")).toEqual(["over 1h"])
+	expect(noteOf(rows, "wifi.retry_delta")).toEqual({ kind: "span", seconds: 3600 })
 })
 
 test("the same difference over a short window is labelled with the short window", () => {
 	const rows = wifiRows([...at({ wifi: { retry: 10 } }, 0), ...at({ wifi: { retry: 64 } }, 12_000)])
 	expect(value(rows, "wifi.retry_delta")).toBe("54")
-	expect(notes(rows, "wifi.retry_delta")).toEqual(["over 12s"])
+	expect(noteOf(rows, "wifi.retry_delta")).toEqual({ kind: "span", seconds: 12 })
 })
 
 test("a span is not claimed when no difference exists to qualify", () => {
@@ -401,10 +409,14 @@ test("spans read in the largest unit that keeps them whole", () => {
 	expect(formatSpan(86_400)).toBe("24h")
 })
 
-test("the span formatter is the one that produces the note", () => {
-	// Guards the copy/paste that would otherwise leave two formatters drifting.
-	expect(`over ${formatSpan(3600)}`).toBe(fmtSpan(3600))
-	expect(`over ${formatSpan(12)}`).toBe(fmtSpan(12))
+test("the note carries the seconds, so one formatter serves every span", () => {
+	// The "over ..." wording moved to plus-sheet.tsx, which is where it can be
+	// translated; what the module still owns is the number behind it. If a second
+	// formatter reappeared here, the sheet would have two sources for one span.
+	expect(formatSpan(3600)).toBe("1h")
+	expect(
+		noteOf(wifiRows([...at({ wifi: { retry: 10 } }, 0), ...at({ wifi: { retry: 64 } }, 3600_000)]), "wifi.retry_delta")
+	).toEqual({ kind: "span", seconds: 3600 })
 })
 
 // --- the collapsed card never renders empty ----------------------------------
@@ -412,7 +424,6 @@ test("the span formatter is the one that produces the note", () => {
 test("the preview carries the fan and the zones when the snapshot has both", () => {
 	const rows = previewRows(at(FULL), FAN.sample_ts_s)
 	expect(rows.map((row) => row.key)).toEqual([
-		"fan.rpm_est",
 		"fan.set_level_pct",
 		"fan.ec76_pct",
 		"fan.temp_c",

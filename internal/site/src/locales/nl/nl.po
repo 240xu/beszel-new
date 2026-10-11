@@ -127,6 +127,14 @@ msgstr "30 dagen"
 msgid "5 min"
 msgstr "5 minuten"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "A hand-set duty is on record with no deadline on file. It stays in force: this agent writes no duty to hand it back, so use Return to the curve."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "A hand-set duty is on record. It stays in force: this agent writes no duty to hand it back, so use Return to the curve."
+msgstr ""
+
 #. Table column
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
@@ -220,6 +228,10 @@ msgstr "Waarschuwingen"
 msgid "All Containers"
 msgstr "Alle containers"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "All Interfaces"
+msgstr ""
+
 #: src/components/alerts/alerts-sheet.tsx
 #: src/components/command-palette.tsx
 #: src/components/routes/home.tsx
@@ -228,6 +240,14 @@ msgstr "Alle containers"
 #: src/components/systems-table/systems-table.tsx
 msgid "All Systems"
 msgstr "Alle systemen"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Also written unchanged:"
+msgstr ""
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Applied Duty"
+msgstr ""
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Are you sure you want to delete {name}?"
@@ -251,6 +271,10 @@ msgstr "Beschikbaar"
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Available"
 msgstr "Beschikbaar"
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Available Spare"
+msgstr ""
 
 #: src/components/routes/system/chart-card.tsx
 msgid "Average"
@@ -307,6 +331,10 @@ msgstr "Gemiddelde, minimale en maximale reactietijd"
 msgid "Avg 1h"
 msgstr "Gem. 1 u"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Awaiting restart"
+msgstr ""
+
 #: src/components/command-palette.tsx
 #: src/components/navbar.tsx
 msgid "Backups"
@@ -355,6 +383,11 @@ msgstr "Beszel ondersteunt OpenID Connect en vele OAuth2 authenticatieaanbieders
 msgid "Beszel uses <0>Shoutrrr</0> to integrate with popular notification services."
 msgstr "Beszel gebruikt <0>Shoutrr</0> om te integreren met populaire meldingsdiensten."
 
+#: src/components/routes/system/plus-sheet.tsx
+#: src/components/routes/system/plus-sheet.tsx
+msgid "beszel-new"
+msgstr ""
+
 #: src/components/add-system.tsx
 msgid "Binary"
 msgstr "Binair"
@@ -401,6 +434,7 @@ msgstr "Kan stoppen"
 #: src/components/network-monitors-table/network-monitors-table.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/settings/quiet-hours.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Cancel"
 msgstr "Annuleren"
@@ -447,6 +481,10 @@ msgstr "Verander statistiek eenheden."
 #: src/components/routes/settings/general.tsx
 msgid "Change general application options."
 msgstr "Wijzig algemene applicatie opties."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Change the curve daemon's state"
+msgstr ""
 
 #: src/components/routes/system/charts/sensor-charts.tsx
 msgid "Charge"
@@ -549,10 +587,18 @@ msgstr "Configureer hoe je waarschuwingsmeldingen ontvangt."
 msgid "Configure response monitoring from this agent."
 msgstr "Configureer de bewaking van de reactietijd vanaf deze agent."
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Confirm"
+msgstr ""
+
 #: src/components/login/auth-form.tsx
 #: src/components/login/auth-form.tsx
 msgid "Confirm password"
 msgstr "Bevestig wachtwoord"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Confirm to write this to the fan control path. There is no undo from this panel."
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Conflicts"
@@ -579,6 +625,10 @@ msgstr ""
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Continue"
 msgstr "Volgende"
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Controller Busy (min)"
+msgstr ""
 
 #: src/lib/utils.ts
 msgid "Copied to clipboard"
@@ -658,6 +708,10 @@ msgstr ""
 msgid "CPU Cores"
 msgstr "CPU-kernen"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "CPU Frequency"
+msgstr ""
+
 #: src/lib/alerts.ts
 msgid "CPU I/O Wait"
 msgstr "CPU-I/O-wachttijd (IOWait)"
@@ -702,6 +756,14 @@ msgstr "Aangemaakt"
 msgid "Critical (%)"
 msgstr "Kritiek (%)"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Critical Comp Time (min)"
+msgstr ""
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Cumulative counters, including veth pairs and docker bridges"
+msgstr ""
+
 #: src/components/routes/system/disk-io-sheet.tsx
 msgid "Cumulative data read since boot"
 msgstr "Cumulatief gelezen gegevens sinds het opstarten"
@@ -728,6 +790,7 @@ msgstr "Cumulatief geschreven"
 
 #. Current package version
 #: src/components/routes/system/package-updates-table.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Current"
 msgstr "Huidig"
 
@@ -738,6 +801,14 @@ msgstr "Huidig"
 msgid "Current state"
 msgstr "Huidige status"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Curve running"
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Curve stopped"
+msgstr ""
+
 #. Power Cycles
 #: src/components/routes/system/smart-table.tsx
 msgid "Cycles"
@@ -747,6 +818,14 @@ msgstr "Cycli"
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Daily"
 msgstr "Dagelijks"
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Data Read (cumulative)"
+msgstr ""
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Data Written (cumulative)"
+msgstr ""
 
 #: src/components/routes/system/info-bar.tsx
 msgctxt "Default system layout option"
@@ -780,6 +859,10 @@ msgstr "Details"
 #: src/components/routes/system/smart-table.tsx
 msgid "Device"
 msgstr "Apparaat"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Discard changes"
+msgstr ""
 
 #. Context: Battery state
 #: src/lib/i18n.ts
@@ -855,6 +938,24 @@ msgstr "Downloaden"
 msgid "Duration"
 msgstr "Duur"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Duty"
+msgstr ""
+
+#. placeholder {0}: note.from
+#. placeholder {1}: note.to
+#: src/components/routes/system/plus-sheet.tsx
+msgid "duty {0} to {1}"
+msgstr ""
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Duty programmed, duty applied and package temperature. The fan speed this platform reports is derived from the duty byte, so it is not shown here."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Duty written to the firmware. Nothing writes it back afterwards: the firmware reads zero as zero percent, so returning the fan to its curve is yours to do."
+msgstr ""
+
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/systems-table/systems-table-columns.tsx
@@ -917,6 +1018,10 @@ msgstr "Voer uw eenmalig wachtwoord in."
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Ephemeral"
 msgstr "Tijdelijk"
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "EPP"
+msgstr ""
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
@@ -1034,6 +1139,22 @@ msgstr "Kan monitors niet bijwerken."
 msgid "Failed: {0}"
 msgstr "Mislukt: {0}"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Fan"
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Fan control is latched open after repeated failures; nothing was written."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Fan control is only implemented on Linux."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Fan Level"
+msgstr ""
+
 #: src/components/routes/system/charts/sensor-charts.tsx
 msgid "Fans"
 msgstr "Ventilatoren"
@@ -1059,6 +1180,10 @@ msgstr "Vingerafdruk"
 msgid "Firmware"
 msgstr ""
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Firmware Fan Table"
+msgstr ""
+
 #: src/components/alerts/alerts-sheet.tsx
 msgid "For <0>{min}</0> {min, plural, one {minute} other {minutes}}"
 msgstr "Voor <0>{min}</0> {min, plural, one {minuut} other {minuten}}"
@@ -1078,6 +1203,10 @@ msgstr "Vrij"
 msgctxt "Button to copy install command"
 msgid "FreeBSD command"
 msgstr "FreeBSD commando"
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Frequency"
+msgstr ""
 
 #. Context: Battery state
 #: src/components/routes/system/info-bar.tsx
@@ -1099,6 +1228,10 @@ msgstr "Algemeen"
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Global"
 msgstr "Globaal"
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Governor"
+msgstr ""
 
 #: src/components/routes/system.tsx
 msgid "GPU"
@@ -1160,6 +1293,10 @@ msgstr "HTTP-methode"
 msgid "HTTP method: POST, GET, or HEAD (default: POST)"
 msgstr "HTTP-methode: POST, GET of HEAD (standaard: POST)"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "HWP Dynamic Boost"
+msgstr ""
+
 #: src/components/routes/system/disk-io-sheet.tsx
 msgctxt "Disk I/O average operation time (iostat await)"
 msgid "I/O Await"
@@ -1195,9 +1332,25 @@ msgctxt "Docker image"
 msgid "Image update available"
 msgstr "Image-update beschikbaar"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "In force"
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "In force — the fan is running this now."
+msgstr ""
+
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Inactive"
 msgstr "Inactief"
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Intel DPTF sensors. A zone the collector could not read is left out rather than shown as zero."
+msgstr ""
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Interface"
+msgstr ""
 
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
@@ -1327,6 +1480,10 @@ msgstr ""
 msgid "Max 1h"
 msgstr "Max. 1 u"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Media Errors"
+msgstr ""
+
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/routes/system/info-bar.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
@@ -1363,7 +1520,12 @@ msgstr "Min. 1 u"
 msgid "Minor"
 msgstr ""
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Mode"
+msgstr ""
+
 #. Device model
+#: src/components/routes/system/plus-sheet.tsx
 #: src/components/routes/system/smart-table.tsx
 msgid "Model"
 msgstr ""
@@ -1444,6 +1606,10 @@ msgstr "Nee"
 msgid "No detail data for this pool."
 msgstr "Geen gedetailleerde gegevens beschikbaar voor deze pool."
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "No hand-set duty is on record. One set before an agent restarted would still be driving the fan, and this panel cannot see it."
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "No logs found."
 msgstr "Geen logboeken gevonden."
@@ -1478,6 +1644,10 @@ msgstr "Geen systemen gevonden."
 msgid "No targets found."
 msgstr "Geen doelen gevonden."
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "No Turbo"
+msgstr ""
+
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "None"
 msgstr "Geen"
@@ -1491,6 +1661,10 @@ msgstr "Meldingen"
 #: src/lib/alerts.ts
 msgid "Notifications may include recent container log excerpts."
 msgstr "Meldingen kunnen recente fragmenten uit containerlogboeken bevatten."
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "NVMe Health"
+msgstr ""
 
 #: src/components/login/auth-form.tsx
 msgid "OAuth 2 / OIDC support"
@@ -1546,9 +1720,23 @@ msgstr "Of ga verder met"
 msgid "Other"
 msgstr "Overig"
 
+#. placeholder {0}: formatSpan(note.seconds)
+#: src/components/routes/system/plus-sheet.tsx
+msgid "over {0}"
+msgstr ""
+
 #: src/components/alerts/alerts-sheet.tsx
 msgid "Overwrite existing alerts"
 msgstr "Overschrijf bestaande waarschuwingen"
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "P-State"
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgctxt "CPU package"
+msgid "Package"
+msgstr ""
 
 #. Software package
 #: src/components/routes/system/package-updates-table.tsx
@@ -1626,6 +1814,10 @@ msgstr "Gepauzeerd ({pausedSystemsLength})"
 msgid "Payload format"
 msgstr "Payload-indeling"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Per core, named by cpu number, plus the active tuning policy"
+msgstr ""
+
 #: src/components/routes/system/cpu-sheet.tsx
 #: src/components/routes/system/cpu-sheet.tsx
 msgid "Per-core average utilization"
@@ -1639,6 +1831,10 @@ msgstr "Percentage van de tijd dat de schijf bezig is met I/O"
 msgid "Percentage of time spent in each state"
 msgstr "Percentage tijd besteed in elke status"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Percentage Used"
+msgstr ""
+
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Permanent"
 msgstr "Blijvend"
@@ -1646,6 +1842,10 @@ msgstr "Blijvend"
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Persistence"
 msgstr "Persistentie"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "pfand steps the duty by package temperature. Every field is written, including the ones this form does not offer."
+msgstr ""
 
 #: src/components/routes/system/raw-capacity-label.tsx
 msgid "Physical device space. True usable capacity is unknown. Pool disk usage alerts are disabled."
@@ -1702,10 +1902,26 @@ msgctxt "Container ports"
 msgid "Ports"
 msgstr "Poorten"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Power"
+msgstr ""
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Power (firmware nominal)"
+msgstr ""
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Power Cycles"
+msgstr ""
+
 #. Power On Time
 #: src/components/routes/system/smart-table.tsx
 msgid "Power On"
 msgstr "Inschakelen"
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Power On Hours"
+msgstr ""
 
 #: src/components/routes/system/charts/gpu-charts.tsx
 #: src/components/routes/system/charts/memory-charts.tsx
@@ -1719,6 +1935,10 @@ msgstr "Voorkeurstaal"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Process started"
 msgstr "Proces gestart"
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Programmed Level"
+msgstr ""
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
@@ -1744,6 +1964,10 @@ msgstr "Wachtrijdiepte"
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Quiet Hours"
 msgstr "Stille uren"
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Radio link. Retry is a difference between two samples, not a counter reading."
+msgstr ""
 
 #: src/components/routes/system/raw-capacity-label.tsx
 #: src/components/routes/system/storage-pools-table.tsx
@@ -1825,6 +2049,10 @@ msgstr "Reactie"
 msgid "Response time monitoring from agents."
 msgstr "Bewaking van de reactietijd door agents."
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Restart the curve daemon"
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Restarts"
 msgstr "Herstarten"
@@ -1833,6 +2061,14 @@ msgstr "Herstarten"
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Resume"
 msgstr "Hervatten"
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Retry since previous sample"
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Return to the curve"
+msgstr ""
 
 #. Package version
 #: src/components/routes/system/package-updates-table.tsx
@@ -2023,9 +2259,17 @@ msgstr "Tijdstempels tonen"
 msgid "Sign in"
 msgstr "Aanmelden"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Signal"
+msgstr ""
+
 #: src/components/routes/system/charts/wifi-chart.tsx
 msgid "Signal strength of connected Wi-Fi interfaces"
 msgstr "Signaalsterkte van verbonden wifi-interfaces"
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "SMART log. A field the drive omits reads as unknown, not as zero."
+msgstr ""
 
 #: src/components/command-palette.tsx
 msgid "SMTP settings"
@@ -2035,6 +2279,10 @@ msgstr "SMTP-instellingen"
 #: src/components/systems-table/systems-table.tsx
 msgid "Sort By"
 msgstr "Sorteren op"
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "stale"
+msgstr ""
 
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -2121,6 +2369,10 @@ msgctxt "Tabs system layout option"
 msgid "Tabs"
 msgstr "Tabbladen"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Take manual control"
+msgstr ""
+
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
@@ -2143,9 +2395,15 @@ msgid "Temp"
 msgstr "Temperatuur"
 
 #: src/components/routes/system/charts/sensor-charts.tsx
+#: src/components/routes/system/plus-sheet.tsx
+#: src/components/routes/system/plus-sheet.tsx
 #: src/lib/alerts.ts
 msgid "Temperature"
 msgstr "Temperatuur"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Temperature Curve"
+msgstr ""
 
 #: src/components/routes/settings/general.tsx
 msgid "Temperature unit"
@@ -2167,13 +2425,93 @@ msgstr "Test-heartbeat"
 msgid "Test notification sent"
 msgstr "Testmelding verzonden"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "That duty is not one this firmware accepts."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The change was not confirmed, so the fan was left alone."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The curve daemon is in control. Switch to manual before setting a duty by hand."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The curve daemon is not running, so it is not driving the fan."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The curve daemon is running and is driving the fan from the curve on disk."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The curve daemon owns the fan; stop it before setting a duty by hand."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The curve failed validation and was rejected before anything was written."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "the edited curve"
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The fan control device refused the write."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The fan is not holding the duty that was requested; the old one was put back."
+msgstr ""
+
 #: src/components/routes/settings/heartbeat.tsx
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
 msgstr "De algehele status is <0>ok</0> wanneer alle systemen in de lucht zijn, <1>waarschuwing</1> wanneer meldingen zijn geactiveerd, en <2>fout</2> wanneer een systeem plat ligt."
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The package is at or above the emergency edge in the curve, so no duty was written. Let it cool, or raise emerg in the curve, before writing again."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The package temperature could not be read, so no duty was written and the reading cannot be trusted. Check the sensor and the zone it names rather than cooling the machine."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The previous duty could not be restored: the fan is holding one you did not ask for."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The request never reached the server."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The server refused this for a reason this build does not know."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The server refused this without naming a reason, so nothing can be concluded about the fan."
+msgstr ""
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "The steps the firmware itself publishes. Power is the duty scaled by a fixed constant."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The write did not complete."
+msgstr ""
+
 #: src/components/login/forgot-pass-form.tsx
 msgid "Then log into the backend and reset your user account password in the users table."
 msgstr "Log vervolgens in op de backend en reset het wachtwoord van je gebruikersaccount in het gebruikersoverzicht."
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Thermal Zones"
+msgstr ""
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Thermal zones, per core frequency, NVMe health, WiFi and fan"
+msgstr ""
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "This action cannot be undone. This will permanently delete all current records for {name} from the database."
@@ -2243,6 +2581,10 @@ msgstr "Totale tijd besteed aan lezen/schrijven (kan 100% overschrijden)"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Total: {0}"
 msgstr "Totaal: {0}"
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Transmit Rate"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Triggered by"
@@ -2353,6 +2695,10 @@ msgstr "Onbekend"
 msgid "Unlimited"
 msgstr "Onbeperkt"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Unsafe Shutdowns"
+msgstr ""
+
 #. Context: System is up
 #: src/components/routes/system/info-bar.tsx
 #: src/components/systems-table/systems-table-columns.tsx
@@ -2451,6 +2797,7 @@ msgstr "Details bekijken"
 #: src/components/routes/system/cpu-sheet.tsx
 #: src/components/routes/system/disk-io-sheet.tsx
 #: src/components/routes/system/network-sheet.tsx
+#: src/components/routes/system/plus-sheet.tsx
 msgid "View more"
 msgstr "Meer weergeven"
 
@@ -2499,6 +2846,10 @@ msgstr "Bij gebruik van POST bevat elke heartbeat een JSON-payload met een samen
 msgid "Wi-Fi signal"
 msgstr "Wifi-signaal"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "WiFi"
+msgstr ""
+
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgctxt "Button to copy install command"
@@ -2519,6 +2870,22 @@ msgstr "Schrijven"
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "Write errors"
 msgstr "Schrijffouten"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Write this curve"
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Write this curve to the disk"
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Write this duty to the firmware"
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Written to disk; the curve daemon has not picked it up."
+msgstr ""
 
 #: src/components/routes/settings/layout.tsx
 msgid "YAML Config"

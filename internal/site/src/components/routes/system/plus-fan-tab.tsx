@@ -290,7 +290,9 @@ export function PlusFanTab({ grid, dataEmpty }: { grid: boolean; dataEmpty: bool
 						<div className="text-sm">
 							<span className="text-muted-foreground">{t`Current`}: </span>
 							<span className="font-mono">{fanLevelLabel(state)}</span>
-							<span className="text-muted-foreground ms-3">{t`Package`}: </span>
+							{/* "Package" also names a software package in the updates table, where it
+							 *  reads 套件. Context keeps the CPU package out of that. */}
+							<span className="text-muted-foreground ms-3">{t({ message: "Package", context: "CPU package" })}: </span>
 							<span className="font-mono">{fmtCelsius(state.pkg_temp_c)}</span>
 						</div>
 

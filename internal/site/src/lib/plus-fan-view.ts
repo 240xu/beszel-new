@@ -62,16 +62,6 @@ export async function issueFanWrite(write: FanWrite): Promise<FanWriteResult> {
 
 export type FanOutcomeKind = "applied" | "pending_restart" | "daemon_running" | "daemon_stopped"
 
-/** Wording that has to mean one thing. The pending arm borrows none of the applied
- *  arm's: calling a curve with no daemon in front of it in force is the opposite
- *  of the truth about the fan. The daemon arms report what the server says runs. */
-const OUTCOME_TEXT: Record<FanOutcomeKind, string> = {
-	applied: "In force — the fan is running this now.",
-	pending_restart: "Written to disk; the curve daemon has not picked it up.",
-	daemon_running: "The curve daemon is running and is driving the fan from the curve on disk.",
-	daemon_stopped: "The curve daemon is not running, so it is not driving the fan.",
-}
-
 const DAEMON_ARMS = {
 	running: { kind: "daemon_running", inForce: true },
 	stopped: { kind: "daemon_stopped", inForce: false },
@@ -79,8 +69,6 @@ const DAEMON_ARMS = {
 
 export interface FanWriteOutcome {
 	kind: FanOutcomeKind
-	/** The English source text. `plus-fan-tab.tsx` translates all four keys. */
-	text: string
 	inForce: boolean
 	needsRestart: boolean
 	nextAction: "restart_pfand" | null
@@ -95,7 +83,6 @@ export function fanWriteOutcome(result: FanWriteResult): FanWriteOutcome {
 		const arm = DAEMON_ARMS[result.pfand_active ? "running" : "stopped"]
 		return {
 			kind: arm.kind,
-			text: OUTCOME_TEXT[arm.kind],
 			inForce: arm.inForce,
 			needsRestart: false,
 			nextAction: null,
@@ -105,7 +92,6 @@ export function fanWriteOutcome(result: FanWriteResult): FanWriteOutcome {
 	if (result.status === FAN_SAVE_STATUS.pendingRestart) {
 		return {
 			kind: "pending_restart",
-			text: OUTCOME_TEXT.pending_restart,
 			inForce: false,
 			needsRestart: true,
 			nextAction: "restart_pfand",
@@ -114,7 +100,6 @@ export function fanWriteOutcome(result: FanWriteResult): FanWriteOutcome {
 	}
 	return {
 		kind: "applied",
-		text: OUTCOME_TEXT.applied,
 		inForce: true,
 		needsRestart: false,
 		nextAction: null,
@@ -124,31 +109,8 @@ export function fanWriteOutcome(result: FanWriteResult): FanWriteOutcome {
 
 export type FanRefusalKey = FanRejectCode | "unclassified" | "unrecognised"
 
-/** The English source text, and the only place the meaning is written down. */
-const REFUSAL_TEXT: Record<FanRefusalKey, string> = {
-	rollback_failed: "The previous duty could not be restored: the fan is holding one you did not ask for.",
-	write_unconfirmed: "The fan is not holding the duty that was requested; the old one was put back.",
-	write_failed: "The fan control device refused the write.",
-	confirm_required: "The change was not confirmed, so the fan was left alone.",
-	level_not_allowed: "That duty is not one this firmware accepts.",
-	curve_rejected: "The curve failed validation and was rejected before anything was written.",
-	pfand_active: "The curve daemon owns the fan; stop it before setting a duty by hand.",
-	package_too_hot:
-		"The package is at or above the emergency edge in the curve, so no duty was written. Let it cool, or raise emerg in the curve, before writing again.",
-	temperature_unknown:
-		"The package temperature could not be read, so no duty was written and the reading cannot be trusted. Check the sensor and the zone it names rather than cooling the machine.",
-	breaker_open: "Fan control is latched open after repeated failures; nothing was written.",
-	unsupported: "Fan control is only implemented on Linux.",
-	internal: "The write did not complete.",
-	// Neither fallback may assert anything about the fan: a server that names no
-	// reason may have refused before it read the request or failed after it acted.
-	unclassified: "The server refused this without naming a reason, so nothing can be concluded about the fan.",
-	unrecognised: "The server refused this for a reason this build does not know.",
-}
-
 export interface FanRefusalView {
 	key: FanRefusalKey
-	text: string
 	status: number
 	detail?: string
 }
@@ -163,7 +125,6 @@ export function fanRefusal(error: FanRefusalError): FanRefusalView {
 	const key: FanRefusalKey = error.code ?? (error.rawCode === undefined ? "unclassified" : "unrecognised")
 	return {
 		key,
-		text: REFUSAL_TEXT[key],
 		status: error.status,
 		detail: error.rawCode === error.code ? undefined : error.rawCode,
 	}

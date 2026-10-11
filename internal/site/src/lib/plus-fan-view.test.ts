@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { FanCurve, FanState } from "@/types"
-import { FAN_REJECT_CODES, readFanRefusal } from "@/lib/plus-refusals"
+import { FAN_REJECT_CODES, type FanRejectCode, readFanRefusal } from "@/lib/plus-refusals"
 import {
 	confirmed,
 	curveWrite,
@@ -9,11 +9,27 @@ import {
 	fanRefusal,
 	fanRegressView,
 	fanWriteOutcome,
+	fanWriteRefused,
+	fanWriteSettled,
 	issueFanWrite,
 	levelWrite,
 	modeWrite,
 	type CurveSaveResult,
+	type FanWrite,
+	type FanWriteSettled,
 } from "@/lib/plus-fan-view"
+
+/** Narrowing that does not depend on a test having passed: `expect(x.ok)` is a
+ *  runtime claim, and the types here are the guarantee that survives a re-spelling. */
+function outcomeOf(settled: FanWriteSettled) {
+	if (!settled.ok) throw new Error("expected a write that was answered")
+	return settled.outcome
+}
+
+function refusalOf(settled: FanWriteSettled) {
+	if (settled.ok) throw new Error("expected a write that was refused")
+	return settled
+}
 
 /** The two wire bodies that carry the most dangerous disagreement. They share a
  *  status on purpose: a status-only client reports a broken sensor as a hot
@@ -186,6 +202,92 @@ describe("what a write reported", () => {
 		expect(fanWriteOutcome(PENDING).text).not.toMatch(/in force|saved|applied|running|生效|已保存/i)
 		expect(fanWriteOutcome(APPLIED).text).not.toBe(fanWriteOutcome(PENDING).text)
 	})
+
+	test("no two outcomes share a sentence", () => {
+		const texts = [
+			fanWriteOutcome(APPLIED).text,
+			fanWriteOutcome(PENDING).text,
+			fanWriteOutcome({ mode: "auto", pfand_active: true }).text,
+			fanWriteOutcome({ mode: "manual", pfand_active: false }).text,
+		]
+		expect(new Set(texts).size).toBe(texts.length)
+	})
+})
+
+describe("a daemon change is answered like any other write", () => {
+	test("a started daemon produces an outcome, so no banner can be left behind", async () => {
+		const { calls } = stubFetch([ok({ mode: "auto", pfand_active: true })])
+		const outcome = outcomeOf(fanWriteSettled(await issueFanWrite({ kind: "mode", mode: "auto" })))
+		expect(calls[0].url).toBe("/api/plus/fan/mode")
+		expect(outcome.kind).toBe("daemon_running")
+		expect(outcome.inForce).toBe(true)
+		expect(outcome.needsRestart).toBe(false)
+		expect(outcome.nextAction).toBeNull()
+	})
+
+	test("what is reported is what the server says runs, not what was asked for", async () => {
+		// systemctl can exit 0 and leave the daemon down. The request said auto; the
+		// answer did not, and the answer is the one the panel may restate.
+		stubFetch([ok({ mode: "auto", pfand_active: false })])
+		const outcome = outcomeOf(fanWriteSettled(await issueFanWrite({ kind: "mode", mode: "auto" })))
+		expect(outcome.kind).toBe("daemon_stopped")
+		expect(outcome.inForce).toBe(false)
+	})
+
+	test("a daemon change reports no duty, because it programs none", () => {
+		expect(fanWriteOutcome({ mode: "auto", pfand_active: true }).level).toBeNull()
+		expect(fanWriteOutcome({ mode: "auto", pfand_active: true }).level).not.toBe(0)
+	})
+
+	test("a daemon that has answered is never reported as still needing one", () => {
+		for (const pfand_active of [true, false]) {
+			expect(fanWriteOutcome({ mode: "auto", pfand_active }).needsRestart).toBe(false)
+		}
+	})
+
+	test("a stopped daemon is not described as the curve running", () => {
+		const stopped = fanWriteOutcome({ mode: "manual", pfand_active: false })
+		expect(stopped.text).toMatch(/not running/i)
+		expect(stopped.text).not.toMatch(/is running|driving the fan from the curve on disk/i)
+	})
+})
+
+describe("a refused write says whether the last banner still holds", () => {
+	const REFUSALS: { write: FanWrite; code: FanRejectCode }[] = [
+		{ write: { kind: "mode", mode: "auto" }, code: "internal" },
+		{ write: { kind: "level", level: 70 }, code: "package_too_hot" },
+		{ write: { kind: "curve", curve: CURVE }, code: "curve_rejected" },
+	]
+
+	test("a failed restart drops the banner that asked for the restart", () => {
+		const failure = refusalOf(
+			fanWriteRefused(REFUSALS[0].write, readFanRefusal(500, JSON.stringify({ data: { code: "internal" } })))
+		)
+		expect(failure.dropBanner).toBe(true)
+		expect(failure.offline).toBe(false)
+		expect(failure.refusal?.key).toBe("internal")
+	})
+
+	test("a refused duty keeps the banner of the write before it, which is still in force", () => {
+		const failure = refusalOf(fanWriteRefused(REFUSALS[1].write, readFanRefusal(503, JSON.stringify(HOT))))
+		expect(failure.dropBanner).toBe(false)
+		expect(failure.refusal?.key).toBe("package_too_hot")
+	})
+
+	test("a request that never left has nothing to say about the last one either", () => {
+		const failure = refusalOf(fanWriteRefused(REFUSALS[0].write, new TypeError("fetch failed")))
+		expect(failure.offline).toBe(true)
+		expect(failure.refusal).toBeNull()
+		expect(failure.dropBanner).toBe(true)
+	})
+
+	test("every refusal names the key the panel would render", () => {
+		for (const { write, code } of REFUSALS) {
+			const failure = refusalOf(fanWriteRefused(write, readFanRefusal(500, JSON.stringify({ data: { code } }))))
+			expect(failure.refusal?.key).toBe(code)
+			expect(failure.refusal?.text.length).toBeGreaterThan(0)
+		}
+	})
 })
 
 describe("refusals are read by code, never by status", () => {
@@ -239,12 +341,60 @@ describe("refusals are read by code, never by status", () => {
 		// One reader-visible string pinned in one place; the invariant that
 		// matters is the second line, which no re-spelling can satisfy.
 		expect(fanRefusal(readFanRefusal(503, JSON.stringify(HOT))).text).toBe(
-			"The package is at or above the emergency edge in the curve, so no duty was written."
+			"The package is at or above the emergency edge in the curve, so no duty was written. Let it cool, or raise emerg in the curve, before writing again."
 		)
 		expect(fanRefusal(readFanRefusal(503, JSON.stringify(SENSOR))).text).toBe(
-			"The package temperature could not be read, so no duty was written and the reading cannot be trusted."
+			"The package temperature could not be read, so no duty was written and the reading cannot be trusted. Check the sensor and the zone it names rather than cooling the machine."
 		)
 		expect(fanRefusal(readFanRefusal(503, JSON.stringify(SENSOR))).text).not.toMatch(/too hot|at or above/i)
+	})
+
+	test("both temperature refusals now say what to do, and neither says the other's remedy", () => {
+		const hot = fanRefusal(readFanRefusal(503, JSON.stringify(HOT))).text
+		const sensor = fanRefusal(readFanRefusal(503, JSON.stringify(SENSOR))).text
+		expect(hot).toMatch(/let it cool/i)
+		expect(sensor).toMatch(/check the sensor/i)
+		expect(sensor).not.toMatch(/let it cool/i)
+		expect(hot).not.toMatch(/check the sensor/i)
+	})
+})
+
+describe("a refusal with nothing to branch on", () => {
+	const STATUSES = [400, 401, 403, 404, 409, 422, 500, 502, 503]
+	const bare = (status: number) =>
+		fanRefusal(readFanRefusal(status, JSON.stringify({ status, message: "something went wrong" })))
+
+	test("it lands on no known code's key, on any status it might arrive on", () => {
+		const texts = FAN_REJECT_CODES.map(
+			(code) => fanRefusal(readFanRefusal(503, JSON.stringify({ data: { code } }))).text
+		)
+		for (const status of STATUSES) {
+			const view = bare(status)
+			expect(FAN_REJECT_CODES.includes(view.key as never)).toBe(false)
+			expect(texts).not.toContain(view.text)
+		}
+	})
+
+	test("every status without a code reaches the same key, so the status cannot be doing the work", () => {
+		expect(new Set(STATUSES.map((status) => bare(status).key)).size).toBe(1)
+	})
+
+	test("it is told apart from a reason this build simply does not know", () => {
+		const unseen = fanRefusal(readFanRefusal(500, JSON.stringify({ data: { code: "thermal_profile_t4" } })))
+		expect(bare(500).key).not.toBe(unseen.key)
+		expect(bare(500).text).not.toBe(unseen.text)
+		expect(unseen.detail).toBe("thermal_profile_t4")
+	})
+
+	test("it claims nothing at all about the fan", () => {
+		// The sentence has to survive both a refusal the route raised before it
+		// read the request and a refusal raised after it acted, because the wire
+		// cannot tell those apart and neither can this panel.
+		for (const status of STATUSES) {
+			expect(bare(status).text).not.toMatch(
+				/reached the fan|before it reached|nothing was written|no duty was written|left alone|in force|written to disk/i
+			)
+		}
 	})
 })
 

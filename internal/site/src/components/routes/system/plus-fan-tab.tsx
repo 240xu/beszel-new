@@ -5,39 +5,42 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { fmtCelsius } from "@/lib/plus-metrics"
 import { getFanState } from "@/lib/plus-api"
-import { FanApiError } from "@/lib/plus-refusals"
 import {
 	FAN_DUTIES,
 	fanLevelLabel,
-	fanRefusal,
 	fanRegressView,
-	fanWriteOutcome,
+	fanWriteRefused,
+	fanWriteSettled,
 	issueFanWrite,
-	type CurveSaveResult,
 	type FanOutcomeKind,
 	type FanRefusalKey,
 	type FanWrite,
 	type FanWriteOutcome,
+	type FanWriteSettled,
 } from "@/lib/plus-fan-view"
 import type { FanCurve, FanMode, FanState } from "@/types"
 import { ChartCard } from "./chart-card"
 
 /** Translations of the outcome wording `plus-fan-view.ts` owns. Typed against the
- *  outcome keys, so a third kind cannot appear there without this failing to
- *  compile, and no arm can reach the badge of another. */
+ *  outcome keys, so a kind cannot appear there without this failing to compile,
+ *  and no arm can reach the badge of another. */
 const OUTCOME_TEXT: Record<FanOutcomeKind, string> = {
 	applied: t`In force — the fan is running this now.`,
 	pending_restart: t`Written to disk; the curve daemon has not picked it up.`,
+	daemon_running: t`The curve daemon is running and is driving the fan from the curve on disk.`,
+	daemon_stopped: t`The curve daemon is not running, so it is not driving the fan.`,
 }
 
 const OUTCOME_BADGE: Record<FanOutcomeKind, string> = {
 	applied: t`In force`,
 	pending_restart: t`Awaiting restart`,
+	daemon_running: t`Curve running`,
+	daemon_stopped: t`Curve stopped`,
 }
 
-/** Translations of the refusal wording, typed against `FanRefusalKey` for the
- *  same reason: a refusal this build has a key for cannot fall through to a
- *  neighbour's sentence. */
+/** Translations of the refusal wording, typed against `FanRefusalKey` for the same
+ *  reason: a refusal this build has a key for cannot fall through to a neighbour's
+ *  sentence. */
 const REFUSAL_TEXT: Record<FanRefusalKey, string> = {
 	rollback_failed: t`The previous duty could not be restored: the fan is holding one you did not ask for.`,
 	write_unconfirmed: t`The fan is not holding the duty that was requested; the old one was put back.`,
@@ -46,12 +49,12 @@ const REFUSAL_TEXT: Record<FanRefusalKey, string> = {
 	level_not_allowed: t`That duty is not one this firmware accepts.`,
 	curve_rejected: t`The curve failed validation and was rejected before anything was written.`,
 	pfand_active: t`The curve daemon owns the fan; stop it before setting a duty by hand.`,
-	package_too_hot: t`The package is at or above the emergency edge in the curve, so no duty was written.`,
-	temperature_unknown: t`The package temperature could not be read, so no duty was written and the reading cannot be trusted.`,
+	package_too_hot: t`The package is at or above the emergency edge in the curve, so no duty was written. Let it cool, or raise emerg in the curve, before writing again.`,
+	temperature_unknown: t`The package temperature could not be read, so no duty was written and the reading cannot be trusted. Check the sensor and the zone it names rather than cooling the machine.`,
 	breaker_open: t`Fan control is latched open after repeated failures; nothing was written.`,
 	unsupported: t`Fan control is only implemented on Linux.`,
 	internal: t`The write did not complete.`,
-	unclassified: t`The request was refused before it reached the fan.`,
+	unclassified: t`The server refused this without naming a reason, so nothing can be concluded about the fan.`,
 	unrecognised: t`The server refused this for a reason this build does not know.`,
 }
 
@@ -117,14 +120,33 @@ function useFanState(intervalMs = 10_000): FanState | null {
 	return state
 }
 
-function useFanWrite(onWritten: (result: CurveSaveResult | undefined) => void, onFailed: (err: unknown) => void) {
+/** The banner and the refusal line are written from one settled value, so the two
+ *  can never describe the same write at once. */
+function applySettled(
+	settled: FanWriteSettled,
+	setOutcome: (outcome: FanWriteOutcome | null) => void,
+	setRefusal: (refusal: { key: FanRefusalKey; detail?: string } | null) => void,
+	setOffline: (offline: boolean) => void
+) {
+	if (settled.ok) {
+		setOutcome(settled.outcome)
+		setRefusal(null)
+		setOffline(false)
+		return
+	}
+	if (settled.dropBanner) setOutcome(null)
+	setOffline(settled.offline)
+	setRefusal(settled.refusal && { key: settled.refusal.key, detail: settled.refusal.detail })
+}
+
+function useFanWrite(onSettled: (settled: FanWriteSettled) => void) {
 	const [busy, setBusy] = useState(false)
 	const run = async (write: FanWrite) => {
 		setBusy(true)
 		try {
-			onWritten(await issueFanWrite(write))
+			onSettled(fanWriteSettled(await issueFanWrite(write)))
 		} catch (err) {
-			onFailed(err)
+			onSettled(fanWriteRefused(write, err))
 		} finally {
 			setBusy(false)
 		}
@@ -194,7 +216,7 @@ function RegressLine({ state }: { state: FanState }) {
 	}
 	return (
 		<p className="mt-2 text-xs text-muted-foreground">
-			{t`A hand-set duty is on record, but no deadline came with it, so this panel cannot say when it ends.`}
+			{t`A hand-set duty is on record with no deadline. Writing that duty again now starts a fresh countdown to the curve.`}
 		</p>
 	)
 }
@@ -236,26 +258,10 @@ export function PlusFanTab({ grid, dataEmpty }: { grid: boolean; dataEmpty: bool
 	const [offline, setOffline] = useState(false)
 
 	const state = useFanState()
-	const written = useFanWrite(
-		(result) => {
-			if (result) setOutcome(fanWriteOutcome(result))
-			setArmed(null)
-			setRefusal(null)
-			setOffline(false)
-		},
-		(err) => {
-			// The armed panel stays open on a refusal so the operator reads what
-			// happened before choosing to retry it or cancel it.
-			if (err instanceof FanApiError) {
-				const view = fanRefusal(err)
-				setRefusal({ key: view.key, detail: view.detail })
-				setOffline(false)
-			} else {
-				setRefusal(null)
-				setOffline(true)
-			}
-		}
-	)
+	const written = useFanWrite((settled) => {
+		applySettled(settled, setOutcome, setRefusal, setOffline)
+		if (settled.ok) setArmed(null)
+	})
 
 	const manual = state ? !state.pfand_active : false
 
@@ -343,22 +349,11 @@ export function PlusFanCurveTab({ grid, dataEmpty }: { grid: boolean; dataEmpty:
 	const [refusal, setRefusal] = useState<{ key: FanRefusalKey; detail?: string } | null>(null)
 
 	const state = useFanState()
-	const written = useFanWrite(
-		(result) => {
-			if (result) {
-				setOutcome(fanWriteOutcome(result))
-				setDraft(null)
-			}
-			setArmed(null)
-			setRefusal(null)
-		},
-		(err) => {
-			if (err instanceof FanApiError) {
-				const view = fanRefusal(err)
-				setRefusal({ key: view.key, detail: view.detail })
-			}
-		}
-	)
+	const written = useFanWrite((settled) => {
+		applySettled(settled, setOutcome, setRefusal, () => {})
+		if (settled.ok) setArmed(null)
+		if (settled.ok) setDraft(null)
+	})
 
 	const curve = draft ?? state?.curve ?? null
 

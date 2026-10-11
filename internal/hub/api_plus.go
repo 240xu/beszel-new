@@ -249,7 +249,14 @@ func (fc *fanRoutes) mode(e *core.RequestEvent) error {
 	}
 	if err := fc.pfand(action); err != nil {
 		slog.Error("fan mode change failed", "mode", req.Mode, "err", err)
-		return e.InternalServerError("could not change the curve daemon's state", nil)
+		// Coded, because this is the one refusal on this surface that happens after
+		// the daemon has been asked to act. A code-less refusal can only say "the
+		// server named no reason", and an operator told that about a failed restart
+		// is sent looking for a request that was never read rather than for a
+		// systemd job that failed. `internal` is the same catch-all the guard falls
+		// back to for a write it could not classify, and it is truthful here.
+		return coded(e, http.StatusInternalServerError,
+			"could not change the curve daemon's state", "internal")
 	}
 	return e.JSON(http.StatusOK, map[string]any{
 		"mode":         req.Mode,
@@ -284,20 +291,29 @@ func (fc *fanRoutes) auditList(e *core.RequestEvent) error {
 func (fc *fanRoutes) fail(e *core.RequestEvent, what string, err error) error {
 	fault := fanapi.Classify(err)
 	slog.Warn("fan write refused", "op", what, "code", fault.Code, "actor", actor(e), "err", err)
-	// Data is assigned rather than passed as errData: PocketBase rewrites a map
-	// errData into validation codes, which would replace every refusal with
-	// "validation_invalid_value" and leave the panel with nothing to branch on.
-	apiErr := e.Error(fault.Status, fault.Message, nil)
-	apiErr.Data = map[string]any{"code": fault.Code}
-	return apiErr
+	return coded(e, fault.Status, fault.Message, fault.Code)
 }
 
 // confirmRequired refuses a write that arrived unconfirmed. The code is taken
 // from the guard's own classification so one place names it, and Data is
 // assigned for the reason fail gives.
 func confirmRequired(e *core.RequestEvent) error {
-	apiErr := e.Error(http.StatusBadRequest, "confirm is required", nil)
-	apiErr.Data = map[string]any{"code": fanapi.Classify(fanapi.ErrNotConfirmed).Code}
+	return coded(e, http.StatusBadRequest, "confirm is required",
+		fanapi.Classify(fanapi.ErrNotConfirmed).Code)
+}
+
+// coded is the one way this file puts a refusal code on the wire. Data is
+// assigned after the error is built rather than passed as errData: PocketBase
+// rewrites a map errData into validation codes, which would replace the refusal
+// with "validation_invalid_value" and leave the panel with nothing to branch on.
+//
+// Only codes fanapi already publishes may be used here. A refusal the guard never
+// classified has no member of that closed set to borrow, and a borrowed one that
+// misdescribes the failure is worse than none: a panel told "the curve failed
+// validation" about an unreadable body goes looking for a bad curve.
+func coded(e *core.RequestEvent, status int, message, code string) error {
+	apiErr := e.Error(status, message, nil)
+	apiErr.Data = map[string]any{"code": code}
 	return apiErr
 }
 
@@ -307,6 +323,14 @@ func confirmRequired(e *core.RequestEvent) error {
 // instruction, and a name the panel misspells would otherwise be dropped in
 // silence while the operator believes it was applied. The parser in agent/plus
 // takes the same position about the curve file, for the same reason.
+//
+// These two refusals carry no code, and that is the deliberate remainder: the
+// closed set fanapi publishes has no member meaning "this body could not be read"
+// for a duty or a mode, and every member that could be borrowed would misdescribe
+// it. A code-less refusal is answered by a panel that says only what it knows —
+// that the server named no reason — which is true, where "the request was refused
+// before it reached the fan" was true by accident and not by construction. Every
+// such path is listed in TestFanRefusalsEitherCarryACodeOrAreOnThisList.
 func decodeBody(e *core.RequestEvent, dst any) error {
 	body, err := readFanBody(e)
 	if err != nil {
@@ -394,16 +418,20 @@ func (r *curveRequest) values() [22]*int {
 
 func decodeCurveRequest(e *core.RequestEvent) (*curveRequest, error) {
 	var req curveRequest
+	// A body this route cannot read is a curve it rejected before anything was
+	// written, which is what curve_rejected already means, so it is named rather
+	// than left for the panel to guess from the status.
 	body, err := readFanBody(e)
 	if err != nil {
-		return nil, e.BadRequestError("invalid body", nil)
+		return nil, coded(e, http.StatusBadRequest, "invalid body", "curve_rejected")
 	}
 	if err := strictJSON(body, &req); err != nil {
-		return nil, e.BadRequestError("invalid body", nil)
+		return nil, coded(e, http.StatusBadRequest, "invalid body", "curve_rejected")
 	}
 	for i, v := range req.values() {
 		if v == nil {
-			return nil, e.BadRequestError(fmt.Sprintf("curve is missing %s", curveFieldNames[i]), nil)
+			return nil, coded(e, http.StatusBadRequest,
+				fmt.Sprintf("curve is missing %s", curveFieldNames[i]), "curve_rejected")
 		}
 	}
 	return &req, nil

@@ -60,13 +60,42 @@ test("a pending write leaves the operator an outlet, and the outlet takes the co
 	expect(occurrences(source, /onRestart=\{\(\) => setArmed\(modeIntent\("auto"\)\)\}/)).not.toEqual([])
 })
 
+test("a daemon change that succeeded and one that failed both reach a sentence", async () => {
+	// The banner is written from one settled value, so an outlet that was taken and
+	// worked leaves "Awaiting restart" nowhere on the screen.
+	const source = await read(TAB)
+	for (const table of ["OUTCOME_TEXT", "OUTCOME_BADGE"]) {
+		expect(tableEntry(source, table, "daemon_running")).not.toBe("")
+		expect(tableEntry(source, table, "daemon_stopped")).not.toBe("")
+	}
+	expect(tableEntry(source, "OUTCOME_TEXT", "daemon_running")).not.toBe(
+		tableEntry(source, "OUTCOME_TEXT", "daemon_stopped")
+	)
+	expect(tableEntry(source, "OUTCOME_TEXT", "daemon_stopped")).not.toMatch(CLAIMS_IN_FORCE)
+	expect(tableBody(await read(TAB), "OUTCOME_BADGE")).toContain("pending_restart")
+})
+
+test("the banner is never written behind a test on a result that may be missing", async () => {
+	// A gate like `if (result)` is how a completed restart leaves the previous
+	// banner claiming a restart is still owed: nothing arrives to replace it.
+	const source = await read(TAB)
+	expect(occurrences(source, /if \(result\)|result\s*&&|result\?\./)).toEqual([])
+	expect(occurrences(source, /fanWriteSettled\(/)).not.toEqual([])
+	expect(occurrences(source, /setOutcome\(settled\.outcome\)/)).not.toEqual([])
+	expect(occurrences(source, /fanWriteRefused\(/)).not.toEqual([])
+})
+
 test("a hot package and an unreadable sensor do not share a sentence", async () => {
 	const source = await read(TAB)
 	const hot = tableEntry(source, "REFUSAL_TEXT", "package_too_hot")
 	const sensor = tableEntry(source, "REFUSAL_TEXT", "temperature_unknown")
 	expect(hot).not.toBe(sensor)
-	expect(sensor).not.toMatch(/too hot|at or above|emergency edge/i)
+	expect(sensor).not.toMatch(/too hot|at or above|emergency edge|let it cool/i)
+	expect(hot).not.toMatch(/check the sensor/i)
 	expect(hot).not.toBe("")
+	// Both now name a remedy, and the remedies are not each other's.
+	expect(hot).toMatch(/cool|emerg/i)
+	expect(sensor).toMatch(/sensor/i)
 })
 
 test("every refusal the server can raise has a sentence of its own", async () => {
@@ -79,9 +108,17 @@ test("every refusal the server can raise has a sentence of its own", async () =>
 	expect(keys.has("unrecognised")).toBe(true)
 })
 
+test("the sentence shown when no reason is named asserts nothing about the fan", async () => {
+	const source = await read(TAB)
+	const bare = tableEntry(source, "REFUSAL_TEXT", "unclassified")
+	expect(bare).not.toBe("")
+	expect(bare).not.toMatch(/reached the fan|nothing was written|left alone|in force/i)
+	expect(bare).not.toBe(tableEntry(source, "REFUSAL_TEXT", "unrecognised"))
+})
+
 test("a refusal is classified once, by code, and never by the status it arrived on", async () => {
 	const source = await read(TAB)
-	expect(occurrences(source, /fanRefusal\(err\)/)).not.toEqual([])
+	expect(occurrences(source, /fanWriteRefused\(|fanRefusal\(/)).not.toEqual([])
 	expect(occurrences(source, /err\.status|view\.status|\.status\s*[<>=]/)).toEqual([])
 })
 
@@ -92,7 +129,12 @@ test("a countdown exists only where a deadline produced one", async () => {
 	expect(occurrences(source, /fanRegressView\(/)).not.toEqual([])
 	expect(occurrences(source, /regress\.kind === "counting_down"/)).not.toEqual([])
 	expect(occurrences(source, /regress\.kind === "none"\)\s*return null/)).not.toEqual([])
-	expect(occurrences(source, /cannot say when it ends/)).not.toEqual([])
+	// A regress with no deadline is not a thing this panel cannot act on: writing
+	// the duty again starts a fresh countdown, which guard.go schedules on every
+	// accepted level write.
+	expect(occurrences(source, /no deadline/)).not.toEqual([])
+	expect(occurrences(source, /cannot say when it ends/)).toEqual([])
+	expect(occurrences(source, /starts a fresh countdown/)).not.toEqual([])
 })
 
 test("no fan write is dispatched from this panel by hand", async () => {
@@ -117,7 +159,7 @@ test("the duty shown as current is the one the server published", async () => {
 
 test("the panel reads the outcome, not the raw write result", async () => {
 	const source = await read(TAB)
-	expect(occurrences(source, /fanWriteOutcome\(/)).not.toEqual([])
+	expect(occurrences(source, /fanWriteSettled\(|fanWriteOutcome\(/)).not.toEqual([])
 	expect(occurrences(source, /\.applied\b/)).toEqual([])
 	expect(occurrences(source, /needs_pfand_restart/)).toEqual([])
 })

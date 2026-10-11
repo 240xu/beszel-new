@@ -248,11 +248,11 @@ func TestValidateRejectsInvertedHysteresis(t *testing.T) {
 	assert.Error(t, c.Validate())
 }
 
-// TestValidateRejectsZeroLowestBand separates the two zeroes on this host. The
-// duty whitelist admits 0 as the firmware handover, but in a curve 0 is the
-// firmware's stop value, which is why the host pins L0_MIN.
+// TestValidateRejectsZeroLowestBand covers both places a zero could reach the fan.
+// The duty whitelist refuses it outright, and in a curve 0 is the firmware's stop
+// value, which is why the host pins L0_MIN.
 func TestValidateRejectsZeroLowestBand(t *testing.T) {
-	require.NoError(t, ValidateLevel(0), "0 stays a valid duty: it is the auto handover")
+	require.Error(t, ValidateLevel(0), "0 is a duty of zero percent, not a curve handover")
 	c, err := ParseCurve(golden(t, "pfand.conf"))
 	require.NoError(t, err)
 	c.L0 = 0

@@ -155,7 +155,7 @@ function useFanWrite(onSettled: (settled: FanWriteSettled) => void) {
 }
 
 function ArmedTarget({ write }: { write: FanWrite }) {
-	if (write.kind === "level") return <>{write.level === 0 ? "0 (auto)" : `${write.level}%`}</>
+	if (write.kind === "level") return <>{`${write.level}%`}</>
 	if (write.kind === "mode") return <>{write.mode}</>
 	return <>{t`the edited curve`}</>
 }
@@ -209,14 +209,14 @@ function RegressLine({ state }: { state: FanState }) {
 	if (regress.kind === "counting_down") {
 		return (
 			<p className="mt-2 text-xs text-muted-foreground">
-				{t`A hand-set duty is on record and reverts to the curve in ${regress.countdown ?? ""}.`}
+				{t`A hand-set duty is on record. It stays in force: this agent writes no duty to hand it back, so use Return to the curve.`}
 			</p>
 		)
 	}
 	if (regress.kind === "no_deadline") {
 		return (
 			<p className="mt-2 text-xs text-muted-foreground">
-				{t`A hand-set duty is on record with no deadline. Writing that duty again now starts a fresh countdown to the curve.`}
+				{t`A hand-set duty is on record with no deadline on file. It stays in force: this agent writes no duty to hand it back, so use Return to the curve.`}
 			</p>
 		)
 	}
@@ -227,7 +227,7 @@ function RegressLine({ state }: { state: FanState }) {
 	// the two cannot be told apart rather than guessing which one is true.
 	return (
 		<p className="mt-2 text-xs text-muted-foreground">
-			{t`No hand-set duty is on record. One set before an agent restarted would still be driving the fan, and this panel cannot see it; setting a duty again starts a fresh countdown to the curve.`}
+			{t`No hand-set duty is on record. One set before an agent restarted would still be driving the fan, and this panel cannot see it.`}
 		</p>
 	)
 }
@@ -282,7 +282,7 @@ export function PlusFanTab({ grid, dataEmpty }: { grid: boolean; dataEmpty: bool
 			empty={dataEmpty || !state}
 			grid={grid}
 			title={t`Fan Level`}
-			description={t`Duty written to the firmware. Zero hands control back to the curve.`}
+			description={t`Duty written to the firmware. Nothing writes it back afterwards: the firmware reads zero as zero percent, so returning the fan to its curve is yours to do.`}
 		>
 			{state && (
 				<>
@@ -314,7 +314,7 @@ export function PlusFanTab({ grid, dataEmpty }: { grid: boolean; dataEmpty: bool
 							<SelectContent>
 								{FAN_DUTIES.map((duty) => (
 									<SelectItem key={duty} value={String(duty)}>
-										{duty === 0 ? "0 (auto)" : `${duty}%`}
+										{`${duty}%`}
 									</SelectItem>
 								))}
 							</SelectContent>

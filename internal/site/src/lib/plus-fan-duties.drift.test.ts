@@ -38,7 +38,10 @@ describe("the duty whitelist still mirrors the Go one", () => {
 	test("the mirror is a mirror and not a second whitelist", () => {
 		const unique = new Set(FAN_DUTIES)
 		expect(unique.size).toBe(FAN_DUTIES.length)
-		expect(FAN_DUTIES).toContain(0)
-		expect(goDuties()).toContain(0)
+		// Zero is in neither list: the firmware writes any argument straight into
+		// the EC fan-duty register, so offering it here would put an option in
+		// front of an operator that the server answers by refusing.
+		expect(FAN_DUTIES).not.toContain(0)
+		expect(goDuties()).not.toContain(0)
 	})
 })

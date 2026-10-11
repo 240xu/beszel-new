@@ -727,17 +727,25 @@ func TestRegressDoesNotFireBeforeItsDeadline(t *testing.T) {
 	assert.Empty(t, f.writeCalls, "an early regress is a write nobody asked for")
 }
 
-func TestRegressReturnsToAutoAtItsDeadline(t *testing.T) {
+// At its deadline the guard has no value that hands this fan back. The firmware's
+// _FSL writes whatever number it is given straight into the EC fan-duty register
+// and has no case for zero, so a zero duty is a request for zero percent -- and
+// whether the fan keeps turning on that byte is an EC curve setting this guard
+// cannot read. So the control device is not touched at all.
+func TestTheRegressAtItsDeadlineDoesNotWriteTheZeroDuty(t *testing.T) {
 	f := newFixture(t)
 	_, err := f.g.SetManualLevel(70, confirmed)
 	require.NoError(t, err)
 	f.writeCalls = nil
 	f.advance(10 * time.Minute)
+
 	did, err := f.g.Regress()
 	require.NoError(t, err)
-	require.True(t, did)
-	assert.Equal(t, []int{0}, f.writeCalls, "0 is the handover back to the firmware curve, never 'off'")
-	assert.Equal(t, 0, f.level)
+	assert.False(t, did, "no duty is written in place of a handover")
+	assert.Empty(t, f.writeCalls, "the control device is not touched at all")
+	assert.Equal(t, 70, f.level, "the duty the operator set is still the one in force")
+	assert.Equal(t, OutcomeRefused, f.lastEvent().Outcome)
+	assert.Equal(t, DeclineNoHandover, f.lastEvent().Code)
 }
 
 func TestRegressYieldsWhenPfandHasTakenOver(t *testing.T) {
@@ -776,8 +784,9 @@ func TestAtTheEmergencyEdgeTheFanIsPutOnTheCurveOwnDuty(t *testing.T) {
 	f.advance(f.waits[len(f.waits)-1])
 	did, err = f.g.Regress()
 	require.NoError(t, err)
-	assert.True(t, did, "the handover waits for the edge to clear")
-	assert.Equal(t, []int{mustCurve(t).E, 0}, f.writeCalls)
+	assert.False(t, did, "clearing the edge does not create a handover to take")
+	assert.Equal(t, []int{mustCurve(t).E}, f.writeCalls,
+		"nothing is written once the edge clears: the duty stays held for an operator")
 }
 
 func TestRegressIsHeldBackWhileTheTemperatureIsUnreadable(t *testing.T) {
@@ -807,7 +816,9 @@ func TestANewManualWriteExtendsTheRegressDeadline(t *testing.T) {
 	f.advance(10 * time.Minute)
 	did, err = f.g.Regress()
 	require.NoError(t, err)
-	assert.True(t, did)
+	assert.False(t, did, "the deadline now belongs to the second write, and no duty follows it")
+	assert.False(t, f.g.PendingRegressAt().IsZero(),
+		"so the duty is still held, and still recorded as due back on the curve")
 }
 
 func TestAHeldBackRegressDoesNotBurnAHalfOpenProbe(t *testing.T) {
@@ -832,10 +843,14 @@ func TestAHeldBackRegressDoesNotBurnAHalfOpenProbe(t *testing.T) {
 	// recovered. The unreadable sensor is the gate that still works that way; the
 	// emergency edge now writes, because it has to.
 	f.tempErr = nil
+	f.temp = 85
 	f.advance(f.waits[len(f.waits)-1])
 	did, err = f.g.Regress()
 	require.NoError(t, err, "the probe is still owed to the write that never happened")
-	assert.True(t, did)
+	assert.False(t, did, "control is still not handed back, but the duty was written")
+	c := mustCurve(t)
+	assert.Equal(t, c.E, f.writeCalls[len(f.writeCalls)-1],
+		"the only writer left inside a regress reached the device")
 }
 
 func TestRegressWithNothingPendingIsANoOp(t *testing.T) {
@@ -846,11 +861,15 @@ func TestRegressWithNothingPendingIsANoOp(t *testing.T) {
 	assert.Empty(t, f.writeCalls)
 }
 
-func TestAFailedRegressStaysPending(t *testing.T) {
+// The handover write is gone, so the duty that must never be misreported is the
+// emergency hold: it is the only writer a regress has left, and it is the one an
+// operator reads as "the fan is being looked after".
+func TestAFailedEmergencyHoldStaysPending(t *testing.T) {
 	f := newFixture(t)
 	_, err := f.g.SetManualLevel(70, confirmed)
 	require.NoError(t, err)
 	f.advance(10 * time.Minute)
+	f.temp = 85
 	f.setErr = errors.New("device busy")
 	did, err := f.g.Regress()
 	require.Error(t, err)
@@ -860,7 +879,9 @@ func TestAFailedRegressStaysPending(t *testing.T) {
 	f.advance(f.waits[len(f.waits)-1])
 	did, err = f.g.Regress()
 	require.NoError(t, err)
-	assert.True(t, did, "a regress that could not be delivered must not be reported as delivered")
+	assert.False(t, did)
+	assert.Equal(t, mustCurve(t).E, f.writeCalls[len(f.writeCalls)-1],
+		"a hold that could not be delivered must be retried, not reported as delivered")
 }
 
 // ---- audit ----
@@ -924,23 +945,32 @@ func TestARegressThatDidNotWriteIsNotAuditedAsApplied(t *testing.T) {
 	}
 }
 
-func TestASucceededRegressIsAuditedAsApplied(t *testing.T) {
+// The emergency hold writes a duty, but it is not a handover, so the attempt ends
+// as a refusal with a named reason. An operator reading the log has to be able to
+// tell "held at the emergency duty" from "nothing was watched", and an applied
+// event would claim the fan went back to its curve.
+func TestTheEmergencyEdgeIsAuditedAsRefusedNotApplied(t *testing.T) {
 	f := newFixture(t)
 	_, err := f.g.SetManualLevel(70, confirmed)
 	require.NoError(t, err)
 	f.advance(10 * time.Minute)
+	f.temp = 85
 
 	did, err := f.g.Regress()
 	require.NoError(t, err)
-	require.True(t, did)
-	assert.Equal(t, OutcomeApplied, f.lastEvent().Outcome)
+	require.False(t, did, "the hold is a duty, not a handover")
+	require.NotEmpty(t, f.writeCalls, "the emergency duty did reach the device")
+	last := f.lastEvent()
+	assert.Equal(t, OutcomeRefused, last.Outcome)
+	assert.Equal(t, DeclineAtEmergency, last.Code)
 }
 
-func TestAFailedRegressIsAuditedAsFailed(t *testing.T) {
+func TestAFailedEmergencyHoldIsAuditedAsFailed(t *testing.T) {
 	f := newFixture(t)
 	_, err := f.g.SetManualLevel(70, confirmed)
 	require.NoError(t, err)
 	f.advance(10 * time.Minute)
+	f.temp = 85
 	f.setErr = errors.New("device busy")
 
 	did, err := f.g.Regress()

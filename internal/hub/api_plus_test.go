@@ -909,13 +909,14 @@ func TestStateReportsARegressDeadlineOnlyWhenThereIsOne(t *testing.T) {
 	assert.True(t, parsed.After(time.Now()), "the deadline is in the future, not year one")
 }
 
-// TestAZeroDutyIsNeverLabelledOff: level 0 hands the fan back to the firmware
-// curve. It does not stop the fan.
-func TestAZeroDutyIsNeverLabelledOff(t *testing.T) {
+// A device can still report a zero duty -- the curve daemon writes one during
+// its own handshake -- and the label has to describe it as the duty it is.
+// Calling it a handover would promise a write this stack never makes.
+func TestAZeroDutyReadBackIsLabelledAsADuty(t *testing.T) {
 	h := newFanHarness(t)
 	h.rig.level = 0
 	rec := h.do(t, "admin", http.MethodGet, "/api/plus/fan/state", nil)
-	assert.Equal(t, "auto", decodeBody(t, rec)["level_label"])
+	assert.Equal(t, "0%", decodeBody(t, rec)["level_label"])
 }
 
 // ---- compile-time guards on the harness itself ----

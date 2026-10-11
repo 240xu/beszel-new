@@ -9,9 +9,11 @@ export type { CurveSaveResult }
  *  but it does answer: a write that returns nothing can never be stated. */
 export type FanWriteResult = CurveSaveResult | FanModeResult
 
-/** Mirrors `validLevels` in agent/plus/levels.go; zero is the curve handover.
+/** Mirrors `validLevels` in agent/plus/levels.go. Zero is not in either: the
+ *  firmware writes whatever duty it is given straight into the EC fan-duty
+ *  register, so zero is a request for zero percent and not a mode.
  *  `plus-fan-duties.drift.test.ts` reads that Go file and fails on any drift. */
-export const FAN_DUTIES = [0, 25, 30, 40, 50, 60, 70, 80, 85, 90, 95, 100] as const
+export const FAN_DUTIES = [25, 30, 40, 50, 60, 70, 80, 85, 90, 95, 100] as const
 
 /** The server publishes the label for a duty it read, so the panel never rebuilds
  *  one: a re-tuned firmware table must not be contradicted from the number. */

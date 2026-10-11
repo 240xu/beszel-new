@@ -21,7 +21,6 @@ func TestADeclinedRegressIsLookedAtAgain(t *testing.T) {
 	}{
 		{"the sensor cannot be read", func(f *fixture) { f.tempErr = errors.New("no such device") }},
 		{"the package is at the emergency edge", func(f *fixture) { f.temp = 85 }},
-		{"the device refuses the write", func(f *fixture) { f.setErr = errors.New("device busy") }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newFixture(t)
@@ -32,11 +31,7 @@ func TestADeclinedRegressIsLookedAtAgain(t *testing.T) {
 			f.advance(10 * time.Minute)
 			tc.setup(f)
 			did, err := f.g.Regress()
-			if tc.name == "the device refuses the write" {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
+			require.NoError(t, err)
 			assert.False(t, did, "nothing was handed back")
 			assert.Greater(t, len(f.waits), initial,
 				"a regress that stopped short has to be looked at again; nothing else re-arms it")
@@ -129,9 +124,11 @@ func TestAtTheEmergencyEdgeTheFanIsNotLeftOnTheDutyAnOperatorSet(t *testing.T) {
 		"the handover still has to happen once the edge clears")
 }
 
-// A regress that completed must not leave a retry behind, or the fan would be
-// handed over again and again after the manual duty is long gone.
-func TestACompletedRegressSchedulesNothingFurther(t *testing.T) {
+// The duty stays held, the refusal is on record, and the attempt is still looked
+// at again. The last part is what a held duty depends on: the emergency interlock
+// runs inside every regress attempt, so a schedule that stopped would leave a
+// manual duty cooling the machine on its own.
+func TestAHeldDutyIsRefusedAuditedAndWatched(t *testing.T) {
 	f := newFixture(t)
 	_, err := f.g.SetManualLevel(70, confirmed)
 	require.NoError(t, err)
@@ -139,10 +136,44 @@ func TestACompletedRegressSchedulesNothingFurther(t *testing.T) {
 
 	before := len(f.waits)
 	did, err := f.g.Regress()
+	require.NoError(t, err, "declining to invent a handover is not a failure")
+	assert.False(t, did)
+	assert.Greater(t, len(f.waits), before,
+		"a held duty is still watched, so the emergency interlock keeps running")
+
+	assert.False(t, f.g.PendingRegressAt().IsZero(),
+		"the duty is still held, so it is still due back on the curve")
+
+	require.NotEmpty(t, f.events)
+	last := f.events[len(f.events)-1]
+	assert.Equal(t, OpRegress, last.Op)
+	assert.Equal(t, OutcomeRefused, last.Outcome)
+	assert.Equal(t, DeclineNoHandover, last.Code)
+	assert.NotEmpty(t, last.Message,
+		"an operator told only that it was refused cannot tell what to do instead")
+}
+
+// The guard writes duties and this firmware turns every argument into an EC
+// fan-duty byte, so a zero write is a request for zero percent rather than a
+// handover. A timer that issued one unattended is the whole failure: the guard
+// cannot read the EC curve setting that decides whether the fan keeps turning on
+// that byte, so there is no safe value to write here.
+func TestTheRegressNeverAsksForTheZeroDuty(t *testing.T) {
+	f := newFixture(t)
+	_, err := f.g.SetManualLevel(70, confirmed)
 	require.NoError(t, err)
-	assert.True(t, did)
-	assert.Equal(t, before, len(f.waits), "there is nothing left to retry")
-	assert.True(t, f.g.PendingRegressAt().IsZero())
+	f.advance(10 * time.Minute)
+
+	// Repeated, because the retry is what would eventually have issued the write.
+	for i := 0; i < 4; i++ {
+		_, err := f.g.Regress()
+		require.NoError(t, err)
+		f.advance(5 * time.Minute)
+	}
+	for _, lv := range f.writeCalls {
+		assert.NotEqual(t, 0, lv,
+			"the guard must never write the zero duty on this firmware")
+	}
 }
 
 // The daemon taking the fan back is a handover that has happened, not a gate

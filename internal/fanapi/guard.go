@@ -427,25 +427,24 @@ func (g *Guard) regressLocked(now time.Time) (bool, string, error) {
 	if temp >= c.Emerg {
 		return false, DeclineAtEmergency, g.holdEmergencyLocked(now, c.E)
 	}
+	// There is no duty that hands this fan back to its curve. _FSL forwards its
+	// argument to an EC fan-duty write and has no case for zero, so a zero duty is a
+	// request for zero percent -- which stops the fan outright whenever the EC is
+	// following the set value, and does nothing at all when it is not. Which of the
+	// two this host is in is an EC curve setting the guard cannot read, so writing it
+	// would be guessing with the fan as the stake.
+	//
+	// The duty therefore stays held for an operator to restore. That costs
+	// convenience, not safety: the emergency interlock above runs on every attempt
+	// and is what a held duty needs, so the retry below is kept rather than dropped.
+	//
 	// Admission last: a regress that declined to write never touched the device,
 	// and letting it spend the probe would leave the breaker waiting for a write
 	// that did not happen.
 	if err := g.admit(now); err != nil {
 		return false, "", err
 	}
-	if err := g.d.SetLevel(0); err != nil {
-		g.fail(now)
-		return false, "", fmt.Errorf("return the fan to its curve: %w", err)
-	}
-	got, err := g.d.GetLevel()
-	if err != nil || got != 0 {
-		g.fail(now)
-		return false, "", fmt.Errorf("%w: asked for the curve, device reports %d (%v)",
-			ErrWriteUnconfirmed, got, err)
-	}
-	g.record()
-	g.clearRegressLocked()
-	return true, "", nil
+	return false, DeclineNoHandover, nil
 }
 
 func (g *Guard) scheduleRegressLocked(now time.Time, delay time.Duration) {
@@ -526,6 +525,7 @@ const (
 	DeclineDaemon      = "regress_daemon_owns_fan"
 	DeclineUnreadable  = "regress_temperature_unreadable"
 	DeclineAtEmergency = "regress_at_emergency_edge"
+	DeclineNoHandover  = "regress_no_handover_value"
 )
 
 var declineMessages = map[string]string{
@@ -533,6 +533,8 @@ var declineMessages = map[string]string{
 	DeclineDaemon:      "the daemon owns the fan",
 	DeclineUnreadable:  "the package temperature could not be established",
 	DeclineAtEmergency: "the package is at or above the emergency edge",
+	DeclineNoHandover: "no duty returns this fan to its curve: the firmware writes " +
+		"zero to the EC as zero percent, so the duty is held until an operator moves it",
 }
 
 // auditDeclined records an attempt that stopped short of the device without

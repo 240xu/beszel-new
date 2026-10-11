@@ -442,9 +442,8 @@ describe("the regress deadline", () => {
 
 describe("the duty whitelist", () => {
 	test("every duty the firmware accepts is offered", () => {
-		expect(FAN_DUTIES).toContain(0)
 		expect(FAN_DUTIES).toContain(100)
-		expect(FAN_DUTIES.length).toBe(12)
+		expect(FAN_DUTIES.length).toBe(11)
 	})
 
 	test("a duty the firmware refuses is not offered", () => {

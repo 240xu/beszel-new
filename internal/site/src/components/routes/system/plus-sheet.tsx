@@ -216,7 +216,7 @@ const PlusSheet = memo(function PlusSheet({ chartData, grid }: { chartData: Char
 							grid={grid}
 							className="min-h-auto"
 							title={t`Fan`}
-							description={t`Duty programmed, duty applied and package temperature. The fan speed this platform reports is derived from the duty byte, so it is not shown here.`}
+							description={t`Duty programmed, duty applied and package temperature.`}
 						>
 							<MetricGrid rows={fan} />
 						</ChartCard>

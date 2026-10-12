@@ -944,8 +944,8 @@ msgid "duty {0} to {1}"
 msgstr "duty {0} to {1}"
 
 #: src/components/routes/system/plus-sheet.tsx
-msgid "Duty programmed, duty applied and package temperature. The fan speed this platform reports is derived from the duty byte, so it is not shown here."
-msgstr "Duty programmed, duty applied and package temperature. The fan speed this platform reports is derived from the duty byte, so it is not shown here."
+msgid "Duty programmed, duty applied and package temperature."
+msgstr "Duty programmed, duty applied and package temperature."
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Duty written to the firmware. Nothing writes it back afterwards: the firmware reads zero as zero percent, so returning the fan to its curve is yours to do."

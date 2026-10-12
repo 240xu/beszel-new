@@ -949,7 +949,7 @@ msgid "duty {0} to {1}"
 msgstr ""
 
 #: src/components/routes/system/plus-sheet.tsx
-msgid "Duty programmed, duty applied and package temperature. The fan speed this platform reports is derived from the duty byte, so it is not shown here."
+msgid "Duty programmed, duty applied and package temperature."
 msgstr ""
 
 #: src/components/routes/system/plus-fan-tab.tsx

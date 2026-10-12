@@ -128,9 +128,14 @@ describe("the duty label is the server's, not one rebuilt here", () => {
 		expect(fanLevelLabel(state({ level: 30, level_label: "quiet" }))).toBe("quiet")
 	})
 
-	test("zero reads as the handover, because that is what the firmware calls it", () => {
-		expect(fanLevelLabel(state({ level: 0, level_label: "auto" }))).toBe("auto")
-		expect(fanLevelLabel(state({ level: 0, level_label: "auto" }))).not.toMatch(/[\d]/)
+	test("zero reads as zero percent, because that is what the firmware calls it", () => {
+		// `_FSL 0` is the firmware's zero-percent performance state. It is not a
+		// handover and nothing on this stack performs one, so a label calling it
+		// `auto` would claim an event the reader cannot observe. This suite used to
+		// assert the opposite, from a fixture the server has not produced since
+		// LevelLabel stopped answering `auto` for a zero.
+		expect(fanLevelLabel(state({ level: 0, level_label: "0%" }))).toBe("0%")
+		expect(fanLevelLabel(state({ level: 0, level_label: "0%" }))).not.toMatch(/auto/i)
 	})
 
 	test("a duty nobody could read has no label rather than a fabricated one", () => {

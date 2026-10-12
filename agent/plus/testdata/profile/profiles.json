@@ -1,0 +1,27 @@
+{
+  "profiles": [
+    {
+      "match": {
+        "sys_vendor": "Panasonic Corporation",
+        "product_name": "CFQV8-1",
+        "product_version": "001"
+      },
+      "fan": {
+        "static_duties": [25, 30, 40, 50, 60, 70, 80, 85, 90, 95, 100],
+        "min_duty": 25,
+        "max_duty": 100
+      },
+      "thermal": { "max_temp_c": 100, "max_temp_label": "Package id 0" }
+    },
+    {
+      "match": { "product_name": "CFQV8-1" },
+      "fan": { "static_duties": [25, 30, 40, 50, 60, 70, 80], "min_duty": 25, "max_duty": 100 },
+      "thermal": { "max_temp_c": 100, "max_temp_label": "Package id 0" }
+    },
+    {
+      "match": { "sys_vendor": "Not This Vendor" },
+      "fan": { "static_duties": [30, 60, 90], "min_duty": 30, "max_duty": 90 },
+      "thermal": { "max_temp_c": 95, "max_temp_label": "Package id 0" }
+    }
+  ]
+}

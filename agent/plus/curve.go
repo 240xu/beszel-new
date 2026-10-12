@@ -25,9 +25,15 @@ const (
 // curveMaxTempC caps every temperature the curve names. Too high and the emergency
 // edge sits above every reachable temperature, leaving the emergency duty and the
 // guard's interlock on it both unreachable; too low only refuses the write, which
-// is safe. The value is the platform's thermal ceiling: past the CPU's rated
-// junction temperature the core shuts itself down and the curve stops deciding.
-const curveMaxTempC = 100
+// is safe. The value is the platform's thermal ceiling, and it is this machine's
+// own rather than a number this fork was built around: it is read from the hwmon
+// sensor the matched profile names, because sensor order is not a ranking and a
+// ceiling taken from whichever sensor was enumerated first is a disk's alarm
+// threshold presented as a CPU's. Unresolved is a refusal, never a default -- a
+// curve bounded by a guess is bounded by nothing.
+func curveMaxTempC() (int, error) {
+	return prodSource().ThermalCeiling()
+}
 
 // ErrCurveInvalid marks a curve refused on its values. A guard that cannot tell
 // that from a failed write charges its breaker for its own carefulness.
@@ -196,10 +202,14 @@ func (c *Curve) Validate() error {
 		return fmt.Errorf("EMERG_REL=%d must be below EMERG=%d", c.EmergRel, c.Emerg)
 	}
 	// Above this the emergency branch, and the guard's interlock, are unreachable.
-	if c.Emerg > curveMaxTempC {
+	ceiling, err := curveMaxTempC()
+	if err != nil {
+		return fmt.Errorf("this curve cannot be bounded: %w", err)
+	}
+	if c.Emerg > ceiling {
 		return fmt.Errorf("EMERG=%d is above %dC, past which this platform throttles "+
 			"or shuts down on its own and the curve no longer decides anything",
-			c.Emerg, curveMaxTempC)
+			c.Emerg, ceiling)
 	}
 	// 0 is the duty whitelist's handover, but in a curve it is the stop value.
 	if c.L0 < curveMinDuty {

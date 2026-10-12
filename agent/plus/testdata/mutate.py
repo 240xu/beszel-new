@@ -89,18 +89,23 @@ class Mutation:
         expect: str,
         files: dict[str, list[Edit]],
         creates: dict[str, str] | None = None,
+        stale: str = "",
     ) -> None:
         self.ident = ident
         self.claim = claim
         self.expect = expect
         self.files = files
         self.creates = creates or {}
+        # A reason, not a delete. The entry keeps its identifier so the next
+        # reader can see the baseline shrank rather than moved.
+        self.stale = stale
 
 
 CURVE = "agent/plus/curve.go"
 PLAT = "agent/plus/platformconf.go"
 LEVELS = "agent/plus/levels.go"
 FANCTL = "agent/plus/fanctl_linux.go"
+PROFILE = "agent/plus/profile.go"
 
 # The multi-line blocks below are the ones whose exact text matters most, so
 # each is quoted as it stands in the tree. run --preflight to prove it.
@@ -128,7 +133,138 @@ STRIP_COMMENT_BLOCK = """		line := raw
 RENDER_LOOP = "	for _, f := range curveFields(c) {"
 ACPI_CHECK = '	for _, acpi := range []struct{ name, val string }{{"EC_ROOT", p.ECRoot}, {"FAN_DEVICE", p.FANDevice}} {'
 
-MUTATIONS: list[Mutation] = [
+
+# --- K group: the machine profile, the duty intersection, and the ceiling ---
+#
+# The ceiling probes matter more than their count suggests: hwmon enumeration is
+# lexical, and on the calibrated machine the first sensor carrying a temperature
+# bound is a disk controller's alarm rather than the package's limit. Every other
+# ordering a reader could pick from that tree is wrong, so a test that does not
+# kill a first-sensor resolver cannot claim to have selected by label.
+
+LABEL_FILTER = "\t\t\tif err != nil || strings.TrimSpace(raw) != want {"
+FLOOR_DIV = "\tcelsius := int(milli / 1000)"
+CEILING_CROSSCHECK = (
+    "\tif stated := profile.Thermal.MaxTempC; stated > 0 && stated != celsius {"
+)
+AMBIGUITY_GUARD = "\tif first := found[0].milli; found[len(found)-1].milli != first {"
+PUBLISHED_JOIN = "\t\tif published[d] {"
+NO_TABLE_GUARD = "\tif len(steps) == 0 {"
+EMPTY_LABEL_GUARD = '\tif want == "" {'
+KNOWN_KEY_GUARD = "\t\tif !knownDMIKey(key) {"
+UNPUBLISHED_GUARD = "\t\tif !published {"
+AGREEMENT_CHECK = "\t\tif have != strings.TrimSpace(want) {"
+STRICT_DECODE = "\tdec.DisallowUnknownFields()"
+DUTY_MEMBERSHIP = "\tif !set.Has(level) {"
+CEILING_CALL = (
+    "\tceiling, err := curveMaxTempC()\n"
+    "\tif err != nil {\n"
+    '\t\treturn fmt.Errorf("this curve cannot be bounded: %w", err)\n'
+    "\t}"
+)
+
+K_PROBES: list[Mutation] = [
+    Mutation(
+        "K01",
+        "the ceiling is read from the first sensor with a bound, not the named one",
+        "killed",
+        {PROFILE: [Edit(LABEL_FILTER,
+                        "\t\t\tif err != nil || strings.TrimSpace(raw) != want && false {")]},
+    ),
+    Mutation(
+        "K02",
+        "a fractional ceiling is rounded up instead of floored",
+        "killed",
+        {PROFILE: [Edit(FLOOR_DIV, "\tcelsius := int((milli + 500) / 1000)")]},
+    ),
+    Mutation(
+        "K03",
+        "the whitelist becomes the profile's duties alone, with no firmware half",
+        "killed",
+        {LEVELS: [Edit(PUBLISHED_JOIN, "\t\tif true {")]},
+    ),
+    Mutation(
+        "K04",
+        "an unreadable fan table resolves to an empty set instead of refusing",
+        "killed",
+        {LEVELS: [Edit(NO_TABLE_GUARD, "\tif false {")]},
+    ),
+    Mutation(
+        "K05",
+        "a disagreeing DMI dimension no longer stops the match",
+        "killed",
+        {PROFILE: [Edit(AGREEMENT_CHECK, "\t\tif false {")]},
+    ),
+    Mutation(
+        "K06",
+        "a match on a dimension this fork does not read is accepted",
+        "killed",
+        {PROFILE: [Edit(KNOWN_KEY_GUARD, "\t\tif false {")]},
+    ),
+    Mutation(
+        "K07",
+        "an undeclared field in the catalogue is ignored",
+        "killed",
+        {PROFILE: [Edit(STRICT_DECODE, "\t_ = dec")]},
+    ),
+    Mutation(
+        "K08",
+        "a dimension the machine does not publish is no longer a mismatch",
+        "killed",
+        {PROFILE: [Edit(UNPUBLISHED_GUARD, "\t\tif !published && false {")]},
+    ),
+    Mutation(
+        "K09",
+        "a profile naming no sensor falls through to whatever the tree publishes",
+        "killed",
+        {PROFILE: [Edit(EMPTY_LABEL_GUARD, "\tif false {")]},
+    ),
+    Mutation(
+        "K10",
+        "two sensors carrying one label no longer have to agree",
+        "killed",
+        {PROFILE: [Edit(AMBIGUITY_GUARD,
+                        "\tif first := found[0].milli; false && found[len(found)-1].milli != first {")]},
+    ),
+    Mutation(
+        "K11",
+        "the profile's stated ceiling no longer has to agree with its sensor",
+        "killed",
+        {PROFILE: [Edit(CEILING_CROSSCHECK,
+                        "\tif stated := profile.Thermal.MaxTempC; stated > 0 && false {")]},
+    ),
+    Mutation(
+        "K12",
+        "a duty outside the resolved set is admitted",
+        "killed",
+        {LEVELS: [Edit(DUTY_MEMBERSHIP, "\tif false {")]},
+    ),
+    Mutation(
+        "K13",
+        "an unresolved thermal ceiling is swallowed rather than refused",
+        "killed",
+        {CURVE: [Edit(CEILING_CALL, "\tceiling, _ := curveMaxTempC()")]},
+    ),
+    # The guard the EMPTY detector leans on: this pattern is stale by
+    # construction, so it must never apply. If it does, the guard is broken.
+    Mutation(
+        "C00",
+        "CONTROL -- a pattern that can never match, proving the stale guard fires",
+        "control",
+        {PROFILE: [Edit("\tceling := int(milli / 1000)",
+                        "\tceling := int(milli / 1001)")]},
+    ),
+    # A patch that rewrites a line with itself: the suite stays green and the
+    # only honest report is EMPTY, not "survived".
+    Mutation(
+        "E00",
+        "EMPTY -- a patch that changes nothing, proving empty is not scored",
+        "empty",
+        {PROFILE: [Edit(FLOOR_DIV, FLOOR_DIV)]},
+    ),
+]
+
+MUTATIONS: list[Mutation] = K_PROBES + [
     Mutation(
         "M01",
         "band-duty table opened up to any duty",
@@ -169,6 +305,7 @@ MUTATIONS: list[Mutation] = [
         "duty 0 labelled off instead of auto",
         "killed",
         {LEVELS: [Edit('		return "auto"', '		return "off"')]},
+        stale="levels.go stopped naming an auto label before this group existed",
     ),
     Mutation(
         "M06",
@@ -185,6 +322,7 @@ MUTATIONS: list[Mutation] = [
                 ),
             ]
         },
+        stale="curve.go imported sort before this group existed, so the anchor import pair is gone",
     ),
     Mutation(
         "M07",
@@ -201,6 +339,7 @@ MUTATIONS: list[Mutation] = [
                 ),
             ]
         },
+        stale="curve.go imported sort before this group existed, so the anchor import pair is gone",
     ),
     Mutation(
         "M08",
@@ -370,6 +509,7 @@ MUTATIONS: list[Mutation] = [
                 )
             ]
         },
+        stale="the rendered curve stopped carrying a binding this entry wrote to",
     ),
     Mutation(
         "M21",
@@ -443,6 +583,7 @@ MUTATIONS: list[Mutation] = [
                 ),
             ]
         },
+        stale="curve.go imported sort before this group existed, so the anchor import pair is gone",
     ),
     Mutation(
         "R62b",
@@ -557,9 +698,15 @@ def main() -> int:
         return 2
     log(f"worktree {wt} at {head[:12]}")
 
+    for rel in ("internal/site/dist", "internal/site/src/locales"):
+        src_path, dst_path = os.path.join(repo, rel), os.path.join(wt, rel)
+        if os.path.isdir(src_path) and not os.path.exists(dst_path):
+            shutil.copytree(src_path, dst_path)
+            log(f"copied {rel} into the worktree (it is not in git)")
+
     pristine = {
         rel: digest(os.path.join(wt, rel))
-        for rel in ("agent/plus/curve.go", PLAT, LEVELS, FANCTL)
+        for rel in ("agent/plus/curve.go", PLAT, LEVELS, FANCTL, PROFILE)
     }
     created: list[str] = []
 
@@ -604,9 +751,29 @@ def main() -> int:
                 fh.write(body)
             created.append(rel)
 
+    def changed(touched) -> bool:
+        """Whether any touched file actually differs from the pristine copy.
+
+        A patch whose replacement equals what it replaced leaves the tree
+        byte-identical, the suite green, and the log claiming a surviving
+        mutant. That is the number a reviewer reads as "this suite has a gap",
+        so it is detected here rather than reported as a result.
+        """
+        for rel in touched:
+            if rel not in pristine:
+                return True
+            if digest(os.path.join(wt, rel)) != pristine[rel]:
+                return True
+        return False
+
     def preflight() -> bool:
         ok = True
         for m in MUTATIONS:
+            if m.expect in ("control", "empty"):
+                continue
+            if m.stale:
+                log(f"PREFLIGHT SKIP {m.ident}: no longer matches the tree -- {m.stale}")
+                continue
             restore()
             try:
                 mutate(m)
@@ -643,14 +810,41 @@ def main() -> int:
         return 2
     log("baseline green; snapshotting originals")
 
-    tally = {"killed": 0, "survived": 0, "compile": 0}
+    tally = {"killed": 0, "survived": 0, "compile": 0, "empty": 0,
+             "control": 0, "stale": 0}
     mismatches: list[str] = []
     for m in MUTATIONS:
+        if m.stale:
+            tally["stale"] += 1
+            log(f"[{m.ident}] stale (not scored) {m.stale}")
+            continue
         restore()
         try:
             mutate(m)
         except PatchMiss as exc:
+            if m.expect == "control":
+                tally["control"] += 1
+                log(f"[{m.ident}] control ok -- the stale pattern did not match")
+                continue
             log(f"[{m.ident}] FATAL {exc}")
+            _teardown(wt, repo, tmp, args.keep, log, head)
+            return 3
+        if m.expect == "control":
+            log(
+                f"[{m.ident}] FATAL the control pattern MATCHED. The stale-pattern "
+                "guard this harness leans on is not firing, so every other number "
+                "in this log is unverified."
+            )
+            _teardown(wt, repo, tmp, args.keep, log, head)
+            return 3
+        if not changed(set(m.files) | set(m.creates)):
+            tally["empty"] += 1
+            log(f"[{m.ident}] empty (not scored) {m.claim}")
+            if m.expect != "empty":
+                mismatches.append(m.ident)
+            continue
+        if m.expect == "empty":
+            log(f"[{m.ident}] FATAL declared empty but the patch changed the tree")
             _teardown(wt, repo, tmp, args.keep, log, head)
             return 3
         good, bout = builds()
@@ -684,8 +878,23 @@ def main() -> int:
     log("restored: baseline green again")
     log("")
     log(
-        f"killed={tally['killed']} survived={tally['survived']} compile_not_scored={tally['compile']}"
+        f"killed={tally['killed']} survived={tally['survived']} "
+        f"compile_not_scored={tally['compile']} empty_not_scored={tally['empty']} "
+        f"control_ok={tally['control']} stale_not_scored={tally['stale']}"
     )
+    if tally["stale"]:
+        log(
+            "stale entries are ones whose patch no longer matches the tree. They "
+            "are excluded from every count below and from the killed/survived "
+            "baseline, so this run is not comparable with a run that scored them."
+        )
+    if tally["survived"]:
+        log(
+            "a survived mutant is a gap in the suite, not a score: it names "
+            "behaviour the tests do not currently pin."
+        )
+    if not tally["control"]:
+        log("NO CONTROL ran; the stale-pattern guard is unproven for this run")
     if mismatches:
         log(
             f"EXPECTATION MISMATCH on {', '.join(mismatches)} -- the declared expectation in the harness "

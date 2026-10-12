@@ -41,7 +41,7 @@ endif
 # Set executable extension based on target OS
 EXE_EXT := $(if $(filter windows,$(OS)),.exe,)
 
-.PHONY: tidy build-agent build-hub build-hub-dev build clean lint dev-server dev-agent dev-hub dev generate-locales fetch-smartctl-conditional
+.PHONY: tidy test test-site build-agent build-hub build-hub-dev build clean lint dev-server dev-agent dev-hub dev generate-locales fetch-smartctl-conditional
 .DEFAULT_GOAL := build
 
 clean:
@@ -56,17 +56,15 @@ test:
 
 	@$(MAKE) --no-print-directory test-site
 
-# The site suite needs bun and a populated node_modules, neither of which the Go
-# toolchain guarantees, so a machine without them still gets a green gate and a
-# stated reason rather than a red build that looks like a regression.
+# The gate owns every "can this run" decision rather than this file. It used to sit here
+# as a skip that exited 0, and because bun installs to ~/.bun/bin -- which
+# non-interactive shells and CI runners leave off PATH -- 204 frontend tests went unrun
+# while the build reported success. A gate's only job is to tell the truth about tests,
+# so the decision moved next to the suite where it can be tested, and its self-tests run
+# first so that its refusal path is never taken on faith.
 test-site:
-	@if ! command -v bun >/dev/null 2>&1; then \
-		echo "SKIP internal/site tests: bun not found (https://bun.sh/docs/installation)"; \
-	elif [ ! -d internal/site/node_modules ]; then \
-		echo "SKIP internal/site tests: run 'bun install --cwd internal/site' first"; \
-	else \
-		internal/site/scripts/test-gate.sh; \
-	fi
+	@internal/site/scripts/test-gate.test.sh
+	@internal/site/scripts/test-gate.sh
 
 tidy:
 	go mod tidy

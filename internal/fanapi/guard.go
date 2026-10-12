@@ -1,7 +1,6 @@
 // Package fanapi guards every write that changes how the fan runs. agent/plus
-// knows how to program a duty and validate a curve; this package decides whether
-// the write is allowed, proves it landed, puts the fan back when it did not, and
-// hands it back to the curve on a timer.
+// knows how to program a duty and validate a curve; this package decides whether the
+// write is allowed, proves it landed, and hands the fan back to the curve on a timer.
 package fanapi
 
 import (
@@ -24,12 +23,11 @@ const (
 
 const (
 	// breakerThreshold is how many writes in a row must fail before the control
-	// path is presumed broken. A refusal by a guard does not count: that is the
-	// guard working, not a device fault.
+	// path is presumed broken. A guard's refusal does not count: that is the guard
+	// working, not a device fault.
 	breakerThreshold = 3
-	// breakerCooldown is how long the path is left alone before one probe is
-	// admitted: long enough not to hammer a failing device, short enough that a
-	// transient fault clears unnoticed.
+	// breakerCooldown is how long the path is left alone before one probe is admitted:
+	// long enough not to hammer a failing device, short enough to clear a transient.
 	breakerCooldown = 2 * time.Minute
 )
 
@@ -63,9 +61,8 @@ const (
 )
 
 // Event is one audited attempt. Every path emits exactly one, refusals included:
-// a write that never happened is what an incident review needs.
-// Code and Message carry the refusal in the form a caller can act on; Reason
-// stays untranslated for a log.
+// a write that never happened is what an incident review needs. Code and Message
+// carry the refusal in actionable form; Reason stays untranslated for a log.
 type Event struct {
 	Op      Op
 	Outcome Outcome
@@ -127,8 +124,7 @@ type breaker struct {
 }
 
 // Guard is the guardrail. The mutex is the whole of the "one half-open probe at a
-// time" guarantee, which is why the breaker holds no reservation flag of its own:
-// see admit.
+// time" guarantee, which is why the breaker holds no reservation flag; see admit.
 type Guard struct {
 	d  Deps
 	mu sync.Mutex
@@ -173,13 +169,10 @@ func (g *Guard) setLevelLocked(level int, req Request, now time.Time) (Result, e
 	if err := plus.ValidateLevel(level); err != nil {
 		return Result{}, fmt.Errorf("%s: %w", err, plus.ErrFanLevelNotAllowed)
 	}
-	// The daemon rewrites the duty whenever its own result moves the fan by more
-	// than its dead zone, so a manual level programmed under it would be undone a
-	// tick or two later — before anyone could act on the panel's claim that it was
-	// set. Refusing is honest; winning a race lost on the next tick is not. Its
-	// fail-safe reads a device candidate list, so a host whose list is unreadable
-	// has a daemon that logs and writes nothing at all: "the daemon is up" is the
-	// conservative reading, and being wrong that way costs a refused write.
+	// The daemon rewrites the duty whenever its own result moves the fan by more than
+	// its dead zone, so a duty programmed under it is undone a tick later, before anyone
+	// could act on the panel's claim. Its fail-safe reads a device candidate list, so an
+	// unreadable one leaves a daemon that writes nothing: "up" is the conservative reading.
 	if g.d.PfandUp() {
 		return Result{}, fmt.Errorf("duty %d: %w", level, plus.ErrPfandActive)
 	}
@@ -207,9 +200,15 @@ func (g *Guard) setLevelLocked(level int, req Request, now time.Time) (Result, e
 	}
 	got, err := g.d.GetLevel()
 	if err != nil || got != level {
+		// A disagreeing read-back names neither of its two authors: a write that
+		// never landed, or a daemon that started inside this window and took the
+		// fan back. The entry gate ran before the window opened, so it cannot
+		// tell them apart. The undo is a write by hand, so it obeys that same
+		// gate -- and nothing broke, so the breaker is left alone.
+		if g.d.PfandUp() {
+			return Result{}, fmt.Errorf("duty %d: %w", level, plus.ErrPfandActive)
+		}
 		g.fail(now)
-		// A single-slot device has no way to say "your write lost", so the only
-		// evidence is a read-back that disagrees with the request.
 		unconfirmed := fmt.Errorf("asked for %d, device reports %d (%v): %w",
 			level, got, err, ErrWriteUnconfirmed)
 		if rerr := g.restoreLevel(prev); rerr != nil {
@@ -234,8 +233,8 @@ func (g *Guard) restoreLevel(prev int) error {
 	return nil
 }
 
-// WriteCurve replaces the curve, adding confirmation, arbitration and a restore
-// to the validator agent/plus already proved to be a superset of the host's.
+// WriteCurve replaces the curve, adding confirmation, arbitration and a restore to
+// the validator agent/plus proved to be a superset of the host's.
 func (g *Guard) WriteCurve(c *plus.Curve, req Request) (Result, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -304,9 +303,8 @@ func (g *Guard) verifyCurve(want *plus.Curve) error {
 }
 
 // temperature reads the package temperature and the emergency edge it is judged
-// against. The edge comes from the operator's own curve, so the guard cannot
-// drift from the control law it protects. An unreadable sensor is not a safe one:
-// the daemon answers a failed read with full speed, and refusing matches that.
+// against. The edge comes from the operator's own curve, so the guard cannot drift
+// from the control law it protects. An unreadable sensor is not a safe one.
 func (g *Guard) temperature() (int, *plus.Curve, error) {
 	c, err := g.d.ReadCurve()
 	if err != nil {
@@ -320,11 +318,9 @@ func (g *Guard) temperature() (int, *plus.Curve, error) {
 }
 
 // admit decides whether this attempt may reach the device. It carries no
-// reservation to release: the flag used to have to be cleared by every admitted
-// path that returned without writing, one forgot, and it outlived the call —
-// after which admit refused every caller in perpetuity and only an agent restart
-// recovered. A reservation that outlives its call is a latch nothing owns, so
-// admission sits where a write must follow: past every guard.
+// reservation: the flag that used to need clearing outlived the calls that owed
+// it, latched, and refused every caller until an agent restart. A reservation
+// outliving its call is a latch nobody owns, so admission sits past every guard.
 func (g *Guard) admit(now time.Time) error {
 	b := &g.brk
 	switch b.state {
@@ -383,9 +379,8 @@ func (g *Guard) Regress() (bool, error) {
 	return did, err
 }
 
-// holdEmergencyLocked puts the fan on the duty the curve itself commands here, and
-// proves it landed. Only runs at or past the edge, so a refusal leaves the previous
-// duty standing, reported.
+// holdEmergencyLocked puts the fan on the duty the curve itself commands here, and proves
+// it landed. Only runs at or past the edge, so a refusal leaves the previous duty standing.
 func (g *Guard) holdEmergencyLocked(now time.Time, duty int) error {
 	if err := g.admit(now); err != nil {
 		return err
@@ -396,6 +391,12 @@ func (g *Guard) holdEmergencyLocked(now time.Time, duty int) error {
 	}
 	got, err := g.d.GetLevel()
 	if err != nil || got != duty {
+		// The daemon may have claimed the fan between the check above and this
+		// read-back. That is not a fault here: past the edge the curve hands out
+		// the same duty, so the daemon arriving is the outcome, not a lost write.
+		if g.d.PfandUp() {
+			return fmt.Errorf("duty %d: %w", duty, plus.ErrPfandActive)
+		}
 		g.fail(now)
 		return fmt.Errorf("%w: asked for the emergency duty %d, device reports %d (%v)",
 			ErrWriteUnconfirmed, duty, got, err)
@@ -404,8 +405,7 @@ func (g *Guard) holdEmergencyLocked(now time.Time, duty int) error {
 	return nil
 }
 
-// regressLocked also names which gate declined, so a handover that did not
-// happen is still auditable.
+// regressLocked also names which gate declined, so a handover that did not happen is auditable.
 func (g *Guard) regressLocked(now time.Time) (bool, string, error) {
 	if g.regressAt.IsZero() || now.Before(g.regressAt) {
 		return false, DeclineNone, nil
@@ -429,18 +429,14 @@ func (g *Guard) regressLocked(now time.Time) (bool, string, error) {
 	}
 	// There is no duty that hands this fan back to its curve. _FSL forwards its
 	// argument to an EC fan-duty write and has no case for zero, so a zero duty is a
-	// request for zero percent -- which stops the fan outright whenever the EC is
-	// following the set value, and does nothing at all when it is not. Which of the
-	// two this host is in is an EC curve setting the guard cannot read, so writing it
-	// would be guessing with the fan as the stake.
-	//
-	// The duty therefore stays held for an operator to restore. That costs
-	// convenience, not safety: the emergency interlock above runs on every attempt
-	// and is what a held duty needs, so the retry below is kept rather than dropped.
+	// request for zero percent: it stops the fan whenever the EC follows the set
+	// value, and does nothing when it does not. Which of the two this host is in is
+	// an EC curve setting the guard cannot read, so the duty stays held for an
+	// operator. That costs convenience, not safety: the interlock above runs on every
+	// attempt, which is what a held duty needs, so the retry below is kept.
 	//
 	// Admission last: a regress that declined to write never touched the device,
-	// and letting it spend the probe would leave the breaker waiting for a write
-	// that did not happen.
+	// and letting it spend the probe would leave the breaker waiting for a write.
 	if err := g.admit(now); err != nil {
 		return false, "", err
 	}
@@ -518,8 +514,7 @@ func (g *Guard) audit(op Op, req Request, level, got int, err error) {
 	g.d.Audit(e)
 }
 
-// The gates a regress can decline at, named rather than phrased so an audit
-// entry never carries prose a panel would have to match.
+// The gates a regress can decline at, named so an audit entry never carries prose.
 const (
 	DeclineNone        = "regress_nothing_pending"
 	DeclineDaemon      = "regress_daemon_owns_fan"
@@ -537,8 +532,7 @@ var declineMessages = map[string]string{
 		"zero to the EC as zero percent, so the duty is held until an operator moves it",
 }
 
-// auditDeclined records an attempt that stopped short of the device without
-// failing. The caller still gets no error, but the event says no write happened.
+// auditDeclined records an attempt that stopped short of the device without failing.
 func (g *Guard) auditDeclined(op Op, actor, code string) {
 	g.d.Audit(Event{
 		Op: op, Outcome: OutcomeRefused, Actor: actor,

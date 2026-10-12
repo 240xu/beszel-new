@@ -24,13 +24,11 @@ const (
 
 // curveMaxTempC caps every temperature the curve names. Too high and the emergency
 // edge sits above every reachable temperature, leaving the emergency duty and the
-// guard's interlock on it both unreachable; too low only refuses the write, which
-// is safe. The value is the platform's thermal ceiling, and it is this machine's
-// own rather than a number this fork was built around: it is read from the hwmon
-// sensor the matched profile names, because sensor order is not a ranking and a
-// ceiling taken from whichever sensor was enumerated first is a disk's alarm
-// threshold presented as a CPU's. Unresolved is a refusal, never a default -- a
-// curve bounded by a guess is bounded by nothing.
+// guard's interlock unreachable; too low only refuses the write, which is safe. The
+// value is this machine's own thermal ceiling, read from the hwmon sensor the
+// matched profile names: sensor order is not a ranking, and the ceiling of whichever
+// sensor enumerated first is a disk's alarm threshold presented as a CPU's.
+// Unresolved is a refusal, never a default.
 func curveMaxTempC() (int, error) {
 	return prodSource().ThermalCeiling()
 }
@@ -105,9 +103,9 @@ func curveFields(c *Curve) []curveField {
 }
 
 // ParseCurve reads the daemon's curve file, deliberately stricter than the panel's
-// reader. The daemon sources this file with a shell, so a line that is not an
-// assignment is a command rather than a syntax error, and an unrecognised key
-// leaves that parameter on its compiled-in default with nothing logged.
+// reader. The daemon sources it with a shell, so a line that is not an assignment is a
+// command rather than a syntax error, and an unrecognised key leaves that parameter
+// on its compiled-in default with nothing logged.
 func ParseCurve(src string) (*Curve, error) {
 	c := &Curve{}
 	fields := curveFields(c)
@@ -248,6 +246,15 @@ func (c *Curve) Validate() error {
 		return fmt.Errorf("DEAD=%d must be at most %d, or the duty ladder can never be "+
 			"written past its own adjacent steps", c.Dead, curveMaxDead)
 	}
+	// The way back down out of the emergency duty is the test T <= EMERG-HYST, so a
+	// hysteresis reaching the edge removes it and the emergency duty becomes the only
+	// one the curve can leave. HYST is the one tuning whose overrun cools harder
+	// rather than less -- the daemon gates downshifts on it and never upshifts -- so
+	// this bounds a curve that stops tracking, not one that can run hot.
+	if c.Hyst >= c.Emerg {
+		return fmt.Errorf("HYST=%d must be below EMERG=%d, or the emergency duty becomes "+
+			"the only duty the curve can ever leave", c.Hyst, c.Emerg)
+	}
 	if c.Dwell < c.IV {
 		return fmt.Errorf("DWELL=%d must be at least IV=%d", c.Dwell, c.IV)
 	}
@@ -260,10 +267,9 @@ func (c *Curve) Validate() error {
 	return nil
 }
 
-// Render writes the curve in the layout the host's writer produces, so a rewrite is
-// indistinguishable from one the panel made. Comments are regenerated rather than
-// preserved: carrying forward whatever text preceded them would let an edit
-// smuggle in a line the daemon would source.
+// Render writes the curve in the layout the host's writer produces. Comments are
+// regenerated rather than preserved: carrying forward whatever text preceded them
+// would let an edit smuggle in a line the daemon would source.
 func (c *Curve) Render() string {
 	var b strings.Builder
 	b.WriteString("# pfand 曲线参数 —— 由面板「自定义曲线」按钮写入\n# 分级骨架：温度上限 -> 档位\n\n")
@@ -311,14 +317,11 @@ func ValidateBytes(raw []byte) error {
 	return c.Validate()
 }
 
-// WriteCurveBytesFile replaces the curve file with bytes the caller has already
-// composed, keeping the atomic replace of WriteCurveFile.
+// WriteCurveBytesFile replaces the curve file with bytes the caller has already composed,
+// keeping the atomic replace of WriteCurveFile.
 //
-// The guard needs this because it restores the bytes it read, not a re-render of
-// them: Render regenerates comments, so a restore by rendering would put back a
-// file that is not the one that ran. The bytes are parsed before they are
-// allowed near the disk, which is the rule WriteCurveFile applies to a Curve for
-// the same reason: the daemon's answer to a curve it dislikes is full speed.
+// The guard restores the bytes it read, not a re-render: Render regenerates comments,
+// so a restore by rendering would put back a file that is not the one that ran.
 func WriteCurveBytesFile(path string, raw []byte) error {
 	if err := ValidateBytes(raw); err != nil {
 		return fmt.Errorf("refusing to write an invalid curve: %w: %w", ErrCurveInvalid, err)

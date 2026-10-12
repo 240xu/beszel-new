@@ -58,6 +58,10 @@ type fixture struct {
 	// loseRaceTo models the single-slot device being claimed by another writer
 	// between our write and our read-back: the write is accepted and lost anyway.
 	loseRaceTo *int
+	// pfandOnWrite starts the daemon the moment we write. It is the window the entry
+	// gate cannot see into, because the gate is asked before the write and answered
+	// after it.
+	pfandOnWrite bool
 
 	pfand bool
 
@@ -143,6 +147,9 @@ func (f *fixture) setLevel(lv int) error {
 	f.level = lv
 	if f.loseRaceTo != nil {
 		f.level = *f.loseRaceTo
+	}
+	if f.pfandOnWrite {
+		f.pfand = true
 	}
 	return nil
 }
@@ -984,4 +991,66 @@ func mustCurve(t *testing.T) *plus.Curve {
 	c, err := plus.ParseCurve(goldenCurve)
 	require.NoError(t, err)
 	return c
+}
+
+// The daemon can start inside the window between the entry gate and the read-back.
+// The undo is itself a write by hand, so it has to face the same gate the forward
+// write faced -- otherwise a lost race becomes two writers fighting for the fan.
+func TestADaemonThatArrivesMidWriteIsNotWrittenOver(t *testing.T) {
+	f := newFixture(t)
+	f.level = 0
+	other := 40
+	f.loseRaceTo, f.pfandOnWrite = &other, true
+
+	_, err := f.g.SetManualLevel(70, confirmed)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, plus.ErrPfandActive,
+		"the daemon won, so the daemon owns the fan; calling that an unconfirmed "+
+			"write describes a fault that did not happen")
+	assert.Equal(t, []int{70}, f.writeCalls,
+		"putting the old duty back would overwrite a daemon that is now driving the fan")
+	assert.Equal(t, 40, f.level, "the duty actually in force is left alone")
+	assert.Equal(t, OutcomeRefused, f.lastEvent().Outcome)
+}
+
+// Charging that race to the breaker would latch fan control open after three
+// races, every one of which is evidence the control path still works.
+func TestARaceTheDaemonWonDoesNotChargeTheBreaker(t *testing.T) {
+	f := newFixture(t)
+	f.level = 0
+	other := 40
+	for i := 0; i < breakerThreshold+1; i++ {
+		f.loseRaceTo, f.pfandOnWrite = &other, true
+		_, err := f.g.SetManualLevel(70, confirmed)
+		require.ErrorIs(t, err, plus.ErrPfandActive)
+		// An operator stops the daemon by hand and tries again.
+		f.pfand, f.loseRaceTo, f.pfandOnWrite = false, nil, false
+	}
+	res, err := f.g.SetManualLevel(70, confirmed)
+	require.NoError(t, err,
+		"more daemon races than the breaker tolerates real failures, and the path "+
+			"still writes once the fan is actually free")
+	assert.True(t, res.Applied)
+}
+
+// The emergency hold is the guard's second write site, so it owes the same check.
+func TestTheEmergencyHoldLeavesARaceToTheDaemonAlone(t *testing.T) {
+	f := newFixture(t)
+	f.level, f.temp = 25, 85
+	f.g.regressAt = f.now
+	other := 30
+	f.loseRaceTo, f.pfandOnWrite = &other, true
+
+	_, err := f.g.Regress()
+	require.Error(t, err)
+	assert.ErrorIs(t, err, plus.ErrPfandActive,
+		"past the edge the curve hands out the same duty, so the daemon arriving "+
+			"is the outcome rather than a lost write")
+	assert.Equal(t, 30, f.level)
+
+	f.pfand, f.loseRaceTo, f.pfandOnWrite = false, nil, false
+	f.advance(regressRetryMax)
+	_, err = f.g.Regress()
+	assert.NoError(t, err, "the hold still takes the fan once it is free again")
+	assert.Equal(t, 100, f.level, "the emergency duty the curve names")
 }

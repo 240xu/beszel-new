@@ -231,3 +231,36 @@ func TestEveryCurveValidateAcceptsRoundTripsThroughTheParser(t *testing.T) {
 		})
 	}
 }
+
+// The one tuning the daemon gates downshifts on: it never gates an upshift. A
+// hysteresis that reaches the emergency edge removes the only test that lets the
+// fan leave the emergency duty, so the curve drives to E and stops there forever.
+// The bound is a relationship, so it is checked as one -- moving the edge has to
+// move the widest survivable hysteresis with it, which a constant could not.
+func TestTheHysteresisCannotSwallowTheWayOutOfEmergency(t *testing.T) {
+	for _, edge := range []int{60, 80, 95} {
+		base, err := ParseCurve(golden(t, "pfand.conf"))
+		require.NoError(t, err)
+		// Squeeze the ladder under the edge under test; the shipped spacing only
+		// fits the shipped edge.
+		edges := []*int{&base.Idle, &base.T1, &base.T2, &base.T3, &base.T4, &base.T5, &base.EmergRel}
+		for i, e := range edges {
+			*e = edge - (len(edges)-i)*3
+		}
+		base.Emerg = edge
+		require.NoErrorf(t, base.Validate(),
+			"the curve the sweep runs against has to be one this validator admits at all")
+
+		keep := make(map[int]bool, 201)
+		for v := 0; v <= 200; v++ {
+			c := *base
+			c.Hyst = v
+			keep[v] = c.Validate() == nil
+		}
+
+		assert.Equalf(t, edge-1, highest(keep, 0, 200),
+			"at edge %d, one below is the widest hysteresis that still leaves a way out", edge)
+		assert.Falsef(t, keep[edge],
+			"at edge %d a hysteresis at the edge leaves the emergency duty with no exit", edge)
+	}
+}

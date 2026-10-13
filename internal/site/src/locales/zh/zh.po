@@ -1145,7 +1145,7 @@ msgstr "风扇"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Fan control is latched open after repeated failures; nothing was written."
-msgstr "风扇控制因反复失败而被锁定为开启状态；本次没有写入任何内容。"
+msgstr "風扇控制因反覆失敗已被鎖定斷開；本次沒有寫入任何內容。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Fan control is only implemented on Linux."

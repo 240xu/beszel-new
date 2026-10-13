@@ -87,20 +87,44 @@ test("every plus string has a non-empty source entry", () => {
 	}
 })
 
-test("zh carries a translation for every plus string", () => {
-	const en = new Map(plusEntries("en").map((entry) => [entry.msgid, entry.msgstr]))
-	const zh = new Map(plusEntries("zh").map((entry) => [entry.msgid, entry.msgstr]))
-	const untranslated: string[] = []
-	for (const [msgid, source] of en) {
-		const target = zh.get(msgid)
-		if (!target) {
-			untranslated.push(`${msgid} (absent)`)
-			continue
-		}
-		if (target === source && !KEEP_IN_ENGLISH.has(source)) untranslated.push(source)
-	}
-	expect(untranslated).toEqual([])
+/** The Chinese catalogs a reader is actually served, taken from `getLocale` in
+ *  `i18n.ts` rather than from a list maintained here: every `zh-*` it does not
+ *  name explicitly becomes `zh-CN`, so a Simplified reader gets that catalog and
+ *  the `zh-TW` / `zh-Hant` / `zh-MO` readers get `zh`. A hole in either is a hole
+ *  a reader sees, so neither is exempt -- and asserting only `zh` is what let
+ *  `zh-CN` sit empty and green at the same time. */
+const CHINESE_LOCALES = ["zh", "zh-CN"] as const
+
+test("the Simplified Chinese catalog is the one a Simplified reader is served", () => {
+	// The premise the loop below rests on, pinned against the source rather than
+	// against this file: if `i18n.ts` ever stops routing `zh-*` to `zh-CN`, the
+	// assertion that `zh-CN` is filled stops describing the product and starts
+	// describing a catalog nobody loads. Read from the file, not from an import,
+	// because an import would be this test's own claim either way.
+	const i18n = read("../lib/i18n.ts")
+	expect(i18n).toContain("zhVariantMap: Record<string, string>")
+	expect(i18n).toContain('return zhVariantMap[locale] || "zh-CN"')
+	// And the catalog those readers land in is one the build actually compiles.
+	const config = read("../../lingui.config.ts")
+	expect([...config.matchAll(/^\t\t"([a-zA-Z-]+)",$/gm)].map((m) => m[1])).toContain("zh-CN")
 })
+
+for (const locale of CHINESE_LOCALES) {
+	test(`${locale} carries a translation for every plus string`, () => {
+		const en = new Map(plusEntries("en").map((entry) => [entry.msgid, entry.msgstr]))
+		const target = new Map(plusEntries(locale).map((entry) => [entry.msgid, entry.msgstr]))
+		const untranslated: string[] = []
+		for (const [msgid, source] of en) {
+			const value = target.get(msgid)
+			if (!value) {
+				untranslated.push(`${msgid} (absent)`)
+				continue
+			}
+			if (value === source && !KEEP_IN_ENGLISH.has(source)) untranslated.push(source)
+		}
+		expect(untranslated).toEqual([])
+	})
+}
 
 /** Terms a Chinese reader needs in the original, because a translation would name
  *  something they cannot look up: the product name, the kernel's own names for the
@@ -119,18 +143,152 @@ test("every configured locale has a catalog of its own", () => {
 	}
 })
 
-test("zh is translated rather than merely regenerated", () => {
-	// A re-extract writes `msgstr ""` into zh for every new string, so a catalog
-	// that exists says nothing. What distinguishes the two is the ratio: a run
-	// that filled zh in and a run that only regenerated it differ here and nowhere
-	// else that a count can see.
-	const en = plusEntries("en").length
-	const zh = plusEntries("zh").length
-	expect(en).toBeGreaterThan(0)
-	expect(zh).toBe(en)
-	const filled = plusEntries("zh").filter((entry) => entry.msgstr.length > 0).length
-	expect(filled / zh).toBeGreaterThan(0.9)
-})
+for (const locale of CHINESE_LOCALES) {
+	test(`${locale} is translated rather than merely regenerated`, () => {
+		// A re-extract writes `msgstr ""` into the catalog for every new string, so
+		// a catalog that exists says nothing. What distinguishes the two is the
+		// ratio: a run that filled the catalog in and a run that only regenerated
+		// it differ here and nowhere else that a count can see.
+		const en = plusEntries("en").length
+		const target = plusEntries(locale).length
+		expect(en).toBeGreaterThan(0)
+		expect(target).toBe(en)
+		const filled = plusEntries(locale).filter((entry) => entry.msgstr.length > 0).length
+		expect(filled / target).toBeGreaterThan(0.9)
+	})
+}
+/** The prompts an operator reads before writing to the fan, and the wording this
+ *  catalog must not be allowed to drift into.
+ *
+ *  The loop above proves a translation *exists*. That is not enough for this set:
+ *  a reader acts on these sentences, so a fluent mistranslation does more damage
+ *  than the blank it replaced -- an operator who believes the firmware will hand
+ *  the fan back, or who reads a latched-open path as a live one, changes the
+ *  machine on the strength of a sentence. So these are asserted on content.
+ *
+ *  The msgids are literals rather than imports: the lookup that follows reads the
+ *  catalog, so a blanked entry fails here, and a renamed button fails the
+ *  cross-reference below. A newly added safety prompt is covered generically by
+ *  the coverage loop; these are the ones worth naming. */
+const SAFETY_PROMPTS = [
+	// The destructive write, and the half of it that is the whole warning.
+	"Confirm to write this to the fan control path. There is no undo from this panel.",
+	// The _FSL 0 sentence: the firmware reads zero as zero percent, which is why
+	// nothing writes it back and why handing the fan over is the operator's job.
+	"Duty written to the firmware. Nothing writes it back afterwards: the firmware reads zero as zero percent, so returning the fan to its curve is yours to do.",
+	// "It stays in force" is a claim about firmware retention, not about a policy
+	// having taken effect.
+	"A hand-set duty is on record with no deadline on file. It stays in force: this agent writes no duty to hand it back, so use Return to the curve.",
+	"A hand-set duty is on record. It stays in force: this agent writes no duty to hand it back, so use Return to the curve.",
+	"No hand-set duty is on record. One set before an agent restarted would still be driving the fan, and this panel cannot see it.",
+	"In force",
+	"In force — the fan is running this now.",
+	// fanapi.ErrBreakerOpen: the path is latched OPEN and refuses every caller
+	// until an agent restart. Reading it as "control is on" sends an operator to
+	// retry a write that cannot succeed.
+	"Fan control is latched open after repeated failures; nothing was written.",
+	// The pair that must not converge; cooling a host with a dead sensor is the
+	// mistake they exist to prevent.
+	"The package is at or above the emergency edge in the curve, so no duty was written. Let it cool, or raise emerg in the curve, before writing again.",
+	"The package temperature could not be read, so no duty was written and the reading cannot be trusted. Check the sensor and the zone it names rather than cooling the machine.",
+	"The server refused this without naming a reason, so nothing can be concluded about the fan.",
+	// The button the "stays in force" prompts send the operator to by name.
+	"Return to the curve",
+] as const
+
+/** One locale's rendering of a msgid, straight from the catalog. `undefined` when
+ *  the entry is absent, which is what the presence assertions below check for --
+ *  an absent key and a blank value are different failures and are reported as
+ *  different things. */
+function translated(locale: string, msgid: string): string | undefined {
+	return entries(locale).find((entry) => entry.msgid === msgid)?.msgstr
+}
+
+for (const locale of CHINESE_LOCALES) {
+	test(`${locale} carries every operator safety prompt, and carries it non-empty`, () => {
+		const absent: string[] = []
+		for (const msgid of SAFETY_PROMPTS) {
+			const value = translated(locale, msgid)
+			// Spelled out rather than folded into one aggregate, so a blanked prompt is
+			// reported as the sentence that lost it and not as a count.
+			expect(`${msgid}: ${value ?? "absent"}`).not.toBe(`${msgid}: `)
+			if (value === undefined || value.length === 0) absent.push(msgid)
+		}
+		expect(absent).toEqual([])
+	})
+
+	test(`${locale} never tells an operator the firmware will hand the fan back for them`, () => {
+		// The rule the _FSL 0 finding turns on: writing 0 is 0%, not a hand-back, so
+		// no prompt may imply that the firmware, the agent, or some automatic mode
+		// will do it. `自动` / `自動` is the word that does the damage in Chinese, and
+		// the source words are matched so the check survives an English leak.
+		// Stated for every prompt above plus the curve-mode button, because a
+		// hand-back word on any one of them is the hazard.
+		const claims: string[] = []
+		for (const msgid of [...SAFETY_PROMPTS, "Return to the curve", "Take manual control"]) {
+			const value = translated(locale, msgid)
+			if (value === undefined || value.length === 0) continue
+			if (/自动|自動|\bautomatic\b|\bauto\b/i.test(value)) claims.push(`${msgid} -> ${value}`)
+		}
+		expect(claims).toEqual([])
+	})
+
+	test(`${locale} does not render a latched-open write path as one that is on`, () => {
+		// Pins the defect this catalog actually shipped: the refusal was rendered as
+		// "latched to the ON state", which tells an operator the path is live when
+		// fanapi has latched it open and will refuse every write until restart.
+		const value = translated(locale, "Fan control is latched open after repeated failures; nothing was written.")
+		expect(`${value}`).not.toBe("undefined")
+		expect(`${value}`).not.toMatch(/开启|開啟|已打开|已打開|on state|開啟狀態/)
+		// And the reverse, or the assertion proves nothing: the sentence does have to
+		// say the write did not happen.
+		expect(`${value}`).toMatch(/没有写入|沒有寫入/)
+	})
+
+	test(`${locale} names the same button the prompts that reference it use`, () => {
+		// Two of the prompts tell the operator which button to press by name. A
+		// translator who renders the button one way and the reference another way
+		// produces a prompt pointing at a control that does not exist on screen,
+		// and nothing else in the suite would notice: both strings are present and
+		// both are non-empty.
+		const button = translated(locale, "Return to the curve")
+		expect(`${button}`).not.toBe("undefined")
+		for (const msgid of [
+			"A hand-set duty is on record with no deadline on file. It stays in force: this agent writes no duty to hand it back, so use Return to the curve.",
+			"A hand-set duty is on record. It stays in force: this agent writes no duty to hand it back, so use Return to the curve.",
+		]) {
+			const prompt = translated(locale, msgid)
+			expect(`${prompt}`).not.toBe("undefined")
+			expect(prompt as string).toContain(button as string)
+		}
+	})
+
+	test(`${locale} keeps the two temperature refusals apart on screen`, () => {
+		// The same pair the English assertions below keep apart, checked where a
+		// Chinese reader actually reads it. Cooling a host whose sensor is dead is
+		// the mistake, so the hot refusal must not name the sensor and the sensor
+		// refusal must not tell them to cool it.
+		const hot = translated(locale, SAFETY_PROMPTS[8] as string)
+		const sensor = translated(locale, SAFETY_PROMPTS[9] as string)
+		expect(hot).not.toBe(sensor)
+		// Each names the other's absent remedy, in both directions. Asserting only
+		// that the sensor refusal names the sensor left the gap a mutation slipped
+		// through: appending "please cool the machine first" to it kept every
+		// assertion above satisfied while telling an operator to do the one thing
+		// this pair exists to stop them doing.
+		expect(`${hot}`).not.toMatch(/检查传感器|檢查感測器|check the sensor/i)
+		expect(`${sensor}`).toMatch(/检查传感器|檢查感測器|check the sensor/i)
+		// Cooling advice belongs to the hot refusal and to it only. Matched as an
+		// instruction (please/first/should + cool) rather than as the bare word,
+		// because the correct sensor refusal has to be able to say "rather than
+		// cool the machine" in order to rule the advice out.
+		expect(`${hot}`).toMatch(/请先降温|請先降溫|let it cool/i)
+		expect(`${sensor}`).not.toMatch(
+			/(请先|请|應先|应先|应该|應該|需要)[^，。]*降温|cooling the machine|cool the machine/i
+		)
+	})
+}
+
 /** The guard test that follows is not about counts. `plus-fan-view.ts` used to own
  *  a second, English copy of every sentence `plus-fan-tab.tsx` renders, and the
  *  suite pinned that copy instead of the one on screen: mutating the component

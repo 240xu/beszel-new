@@ -129,11 +129,11 @@ msgstr "5 分钟"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "A hand-set duty is on record with no deadline on file. It stays in force: this agent writes no duty to hand it back, so use Return to the curve."
-msgstr ""
+msgstr "记录中有一项手动设置的占空比，但没有记录截止时间。该占空比会一直由固件保持：本代理不会写入任何占空比把它交还给曲线，请使用「返回曲线」。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "A hand-set duty is on record. It stays in force: this agent writes no duty to hand it back, so use Return to the curve."
-msgstr ""
+msgstr "记录中有一项手动设置的占空比。该占空比会一直由固件保持：本代理不会写入任何占空比把它交还给曲线，请使用「返回曲线」。"
 
 #. Table column
 #: src/components/routes/settings/quiet-hours.tsx
@@ -230,7 +230,7 @@ msgstr "所有容器"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "All Interfaces"
-msgstr ""
+msgstr "全部网络接口"
 
 #: src/components/alerts/alerts-sheet.tsx
 #: src/components/command-palette.tsx
@@ -243,11 +243,11 @@ msgstr "所有客户端"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Also written unchanged:"
-msgstr ""
+msgstr "以下字段也将原样写入："
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Applied Duty"
-msgstr ""
+msgstr "实际占空比"
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Are you sure you want to delete {name}?"
@@ -274,7 +274,7 @@ msgstr "可用"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Available Spare"
-msgstr ""
+msgstr "可用备用空间"
 
 #: src/components/routes/system/chart-card.tsx
 msgid "Average"
@@ -333,7 +333,7 @@ msgstr "1 小时平均"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Awaiting restart"
-msgstr ""
+msgstr "等待重启"
 
 #: src/components/command-palette.tsx
 #: src/components/navbar.tsx
@@ -386,7 +386,7 @@ msgstr "Beszel 使用 <0>Shoutrrr</0> 以实现与常见的通知服务集成。
 #: src/components/routes/system/plus-sheet.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "beszel-new"
-msgstr ""
+msgstr "beszel-new"
 
 #: src/components/add-system.tsx
 msgid "Binary"
@@ -484,7 +484,7 @@ msgstr "更改常规应用程序选项。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Change the curve daemon's state"
-msgstr ""
+msgstr "更改曲线守护进程的状态"
 
 #: src/components/routes/system/charts/sensor-charts.tsx
 msgid "Charge"
@@ -589,7 +589,7 @@ msgstr "从此客户端配置响应监控。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Confirm"
-msgstr ""
+msgstr "确认写入"
 
 #: src/components/login/auth-form.tsx
 #: src/components/login/auth-form.tsx
@@ -598,7 +598,7 @@ msgstr "确认密码"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Confirm to write this to the fan control path. There is no undo from this panel."
-msgstr ""
+msgstr "确认将此写入风扇控制路径。本面板无法撤销。"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Conflicts"
@@ -628,7 +628,7 @@ msgstr "继续"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Controller Busy (min)"
-msgstr ""
+msgstr "控制器忙碌时间（分钟）"
 
 #: src/lib/utils.ts
 msgid "Copied to clipboard"
@@ -710,7 +710,7 @@ msgstr "CPU 核心"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "CPU Frequency"
-msgstr ""
+msgstr "CPU 频率"
 
 #: src/lib/alerts.ts
 msgid "CPU I/O Wait"
@@ -758,11 +758,11 @@ msgstr "临界 (%)"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Critical Comp Time (min)"
-msgstr ""
+msgstr "严重压缩时间（分钟）"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Cumulative counters, including veth pairs and docker bridges"
-msgstr ""
+msgstr "累计计数器，包含 veth 对与 docker 网桥"
 
 #: src/components/routes/system/disk-io-sheet.tsx
 msgid "Cumulative data read since boot"
@@ -803,11 +803,11 @@ msgstr "当前状态"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Curve running"
-msgstr ""
+msgstr "曲线运行中"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Curve stopped"
-msgstr ""
+msgstr "曲线已停止"
 
 #. Power Cycles
 #: src/components/routes/system/smart-table.tsx
@@ -821,11 +821,11 @@ msgstr "每日"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Data Read (cumulative)"
-msgstr ""
+msgstr "累计读取量"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Data Written (cumulative)"
-msgstr ""
+msgstr "累计写入量"
 
 #: src/components/routes/system/info-bar.tsx
 msgctxt "Default system layout option"
@@ -862,7 +862,7 @@ msgstr "设备"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Discard changes"
-msgstr ""
+msgstr "放弃更改"
 
 #. Context: Battery state
 #: src/lib/i18n.ts
@@ -940,21 +940,21 @@ msgstr "持续时间"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Duty"
-msgstr ""
+msgstr "占空比"
 
 #. placeholder {0}: note.from
 #. placeholder {1}: note.to
 #: src/components/routes/system/plus-sheet.tsx
 msgid "duty {0} to {1}"
-msgstr ""
+msgstr "占空比 {0} 至 {1}"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Duty programmed, duty applied and package temperature."
-msgstr ""
+msgstr "已设定的档位、实际占空比以及封装温度。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Duty written to the firmware. Nothing writes it back afterwards: the firmware reads zero as zero percent, so returning the fan to its curve is yours to do."
-msgstr ""
+msgstr "占空比已写入固件。此后不会再有任何写入把它改回去：固件把零读作 0%，所以把风扇交还给曲线需要由你自己来操作。"
 
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -1021,7 +1021,7 @@ msgstr "暂时"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "EPP"
-msgstr ""
+msgstr "EPP"
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
@@ -1141,19 +1141,19 @@ msgstr "失败: {0}"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Fan"
-msgstr ""
+msgstr "风扇"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Fan control is latched open after repeated failures; nothing was written."
-msgstr ""
+msgstr "风扇控制因反复失败已被锁定断开；本次没有写入任何内容。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Fan control is only implemented on Linux."
-msgstr ""
+msgstr "风扇控制仅在 Linux 上实现。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Fan Level"
-msgstr ""
+msgstr "风扇档位"
 
 #: src/components/routes/system/charts/sensor-charts.tsx
 msgid "Fans"
@@ -1182,7 +1182,7 @@ msgstr "固件"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Firmware Fan Table"
-msgstr ""
+msgstr "固件风扇表"
 
 #: src/components/alerts/alerts-sheet.tsx
 msgid "For <0>{min}</0> {min, plural, one {minute} other {minutes}}"
@@ -1206,7 +1206,7 @@ msgstr "FreeBSD 命令"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Frequency"
-msgstr ""
+msgstr "频率"
 
 #. Context: Battery state
 #: src/components/routes/system/info-bar.tsx
@@ -1231,7 +1231,7 @@ msgstr "全局"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Governor"
-msgstr ""
+msgstr "调频策略"
 
 #: src/components/routes/system.tsx
 msgid "GPU"
@@ -1295,7 +1295,7 @@ msgstr "HTTP 方法：POST、GET 或 HEAD (默认：POST)"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "HWP Dynamic Boost"
-msgstr ""
+msgstr "HWP 动态加速"
 
 #: src/components/routes/system/disk-io-sheet.tsx
 msgctxt "Disk I/O average operation time (iostat await)"
@@ -1334,11 +1334,11 @@ msgstr "有可用的镜像更新"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "In force"
-msgstr ""
+msgstr "保持中"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "In force — the fan is running this now."
-msgstr ""
+msgstr "保持中——风扇当前正按此运行。"
 
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Inactive"
@@ -1346,11 +1346,11 @@ msgstr "非活跃"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Intel DPTF sensors. A zone the collector could not read is left out rather than shown as zero."
-msgstr ""
+msgstr "Intel DPTF 传感器。采集器读不到的传感区会被略去，而不是显示为零。"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Interface"
-msgstr ""
+msgstr "网络接口"
 
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
@@ -1482,7 +1482,7 @@ msgstr "1 小时最大"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Media Errors"
-msgstr ""
+msgstr "介质错误"
 
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/routes/system/info-bar.tsx
@@ -1522,7 +1522,7 @@ msgstr "次要"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Mode"
-msgstr ""
+msgstr "模式"
 
 #. Device model
 #: src/components/routes/system/plus-sheet.tsx
@@ -1608,7 +1608,7 @@ msgstr "此存储池没有可用的详细数据。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "No hand-set duty is on record. One set before an agent restarted would still be driving the fan, and this panel cannot see it."
-msgstr ""
+msgstr "记录中没有手动设置的占空比。若在代理重启之前设置过，它现在仍会驱动风扇，而本面板看不到这一点。"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "No logs found."
@@ -1646,7 +1646,7 @@ msgstr "未找到目标。"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "No Turbo"
-msgstr ""
+msgstr "禁用睿频"
 
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "None"
@@ -1664,7 +1664,7 @@ msgstr "通知可能包含近期的容器日志片段。"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "NVMe Health"
-msgstr ""
+msgstr "NVMe 健康状态"
 
 #: src/components/login/auth-form.tsx
 msgid "OAuth 2 / OIDC support"
@@ -1723,7 +1723,7 @@ msgstr "其他"
 #. placeholder {0}: formatSpan(note.seconds)
 #: src/components/routes/system/plus-sheet.tsx
 msgid "over {0}"
-msgstr ""
+msgstr "超过 {0}"
 
 #: src/components/alerts/alerts-sheet.tsx
 msgid "Overwrite existing alerts"
@@ -1731,12 +1731,12 @@ msgstr "覆盖现有警报"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "P-State"
-msgstr ""
+msgstr "P 状态"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgctxt "CPU package"
 msgid "Package"
-msgstr ""
+msgstr "封装"
 
 #. Software package
 #: src/components/routes/system/package-updates-table.tsx
@@ -1816,7 +1816,7 @@ msgstr "有效载荷 (Payload) 格式"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Per core, named by cpu number, plus the active tuning policy"
-msgstr ""
+msgstr "按 cpu 编号逐核心列出，并附当前生效的调优策略"
 
 #: src/components/routes/system/cpu-sheet.tsx
 #: src/components/routes/system/cpu-sheet.tsx
@@ -1833,7 +1833,7 @@ msgstr "在每个状态下花费的时间百分比"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Percentage Used"
-msgstr ""
+msgstr "已用百分比"
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Permanent"
@@ -1845,7 +1845,7 @@ msgstr "持久性"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "pfand steps the duty by package temperature. Every field is written, including the ones this form does not offer."
-msgstr ""
+msgstr "pfand 依据封装温度分档调节占空比。所有字段都会被写入，包括本表单未提供的那些。"
 
 #: src/components/routes/system/raw-capacity-label.tsx
 msgid "Physical device space. True usable capacity is unknown. Pool disk usage alerts are disabled."
@@ -1904,15 +1904,15 @@ msgstr "端口"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Power"
-msgstr ""
+msgstr "功率"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Power (firmware nominal)"
-msgstr ""
+msgstr "功率（固件标称值）"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Power Cycles"
-msgstr ""
+msgstr "上电次数"
 
 #. Power On Time
 #: src/components/routes/system/smart-table.tsx
@@ -1921,7 +1921,7 @@ msgstr "开机时间"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Power On Hours"
-msgstr ""
+msgstr "累计上电时长"
 
 #: src/components/routes/system/charts/gpu-charts.tsx
 #: src/components/routes/system/charts/memory-charts.tsx
@@ -1938,7 +1938,7 @@ msgstr "进程启动"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Programmed Level"
-msgstr ""
+msgstr "已设定档位"
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
@@ -1967,7 +1967,7 @@ msgstr "静默时间"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Radio link. Retry is a difference between two samples, not a counter reading."
-msgstr ""
+msgstr "无线链路。重试是两次采样之间的差值，而不是计数器读数。"
 
 #: src/components/routes/system/raw-capacity-label.tsx
 #: src/components/routes/system/storage-pools-table.tsx
@@ -2051,7 +2051,7 @@ msgstr "来自客户端的响应时间监控。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Restart the curve daemon"
-msgstr ""
+msgstr "重启曲线守护进程"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Restarts"
@@ -2064,11 +2064,11 @@ msgstr "恢复"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Retry since previous sample"
-msgstr ""
+msgstr "自上次采样以来的重试"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Return to the curve"
-msgstr ""
+msgstr "返回曲线"
 
 #. Package version
 #: src/components/routes/system/package-updates-table.tsx
@@ -2261,7 +2261,7 @@ msgstr "登录"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Signal"
-msgstr ""
+msgstr "信号"
 
 #: src/components/routes/system/charts/wifi-chart.tsx
 msgid "Signal strength of connected Wi-Fi interfaces"
@@ -2269,7 +2269,7 @@ msgstr "已连接 Wi-Fi 接口的信号强度"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "SMART log. A field the drive omits reads as unknown, not as zero."
-msgstr ""
+msgstr "SMART 日志。驱动器未提供的字段显示为未知，而不是零。"
 
 #: src/components/command-palette.tsx
 msgid "SMTP settings"
@@ -2282,7 +2282,7 @@ msgstr "排序依据"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "stale"
-msgstr ""
+msgstr "已过期"
 
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -2371,7 +2371,7 @@ msgstr "标签页"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Take manual control"
-msgstr ""
+msgstr "接管手动控制"
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
@@ -2403,7 +2403,7 @@ msgstr "温度"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Temperature Curve"
-msgstr ""
+msgstr "温度曲线"
 
 #: src/components/routes/settings/general.tsx
 msgid "Temperature unit"
@@ -2427,43 +2427,43 @@ msgstr "测试通知已发送"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "That duty is not one this firmware accepts."
-msgstr ""
+msgstr "该占空比不在此固件接受的范围内。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The change was not confirmed, so the fan was left alone."
-msgstr ""
+msgstr "更改未获确认，因此没有对风扇做任何改动。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The curve daemon is in control. Switch to manual before setting a duty by hand."
-msgstr ""
+msgstr "曲线守护进程正在控制风扇。请先切换到手动模式，再手动设置占空比。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The curve daemon is not running, so it is not driving the fan."
-msgstr ""
+msgstr "曲线守护进程没有运行，因此并未驱动风扇。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The curve daemon is running and is driving the fan from the curve on disk."
-msgstr ""
+msgstr "曲线守护进程正在运行，并按磁盘上的曲线驱动风扇。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The curve daemon owns the fan; stop it before setting a duty by hand."
-msgstr ""
+msgstr "风扇归曲线守护进程所有；请先停止它，再手动设置占空比。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The curve failed validation and was rejected before anything was written."
-msgstr ""
+msgstr "曲线未通过校验，在写入任何内容之前就已被拒绝。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "the edited curve"
-msgstr ""
+msgstr "编辑后的曲线"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The fan control device refused the write."
-msgstr ""
+msgstr "风扇控制设备拒绝了本次写入。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The fan is not holding the duty that was requested; the old one was put back."
-msgstr ""
+msgstr "风扇并未保持所请求的占空比；原来的占空比已被恢复。"
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
@@ -2471,35 +2471,35 @@ msgstr "当所有系统都正常运行时，整体状态为 <0>ok</0>；当触�
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The package is at or above the emergency edge in the curve, so no duty was written. Let it cool, or raise emerg in the curve, before writing again."
-msgstr ""
+msgstr "封装温度已达到或超过曲线中的紧急阈值，因此没有写入任何占空比。请先降温，或在曲线中调高 emerg，然后再写入。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The package temperature could not be read, so no duty was written and the reading cannot be trusted. Check the sensor and the zone it names rather than cooling the machine."
-msgstr ""
+msgstr "无法读取封装温度，因此没有写入任何占空比，且该读数不可信。请检查传感器及其所指向的区域，而不是给机器降温。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The previous duty could not be restored: the fan is holding one you did not ask for."
-msgstr ""
+msgstr "无法恢复之前的占空比：风扇当前保持着一个你并未请求的占空比。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The request never reached the server."
-msgstr ""
+msgstr "该请求根本没有到达服务器。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The server refused this for a reason this build does not know."
-msgstr ""
+msgstr "服务器以本版本不认识的理由拒绝了此次请求。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The server refused this without naming a reason, so nothing can be concluded about the fan."
-msgstr ""
+msgstr "服务器未说明理由就拒绝了此次请求，因此无法对风扇的状态得出任何结论。"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "The steps the firmware itself publishes. Power is the duty scaled by a fixed constant."
-msgstr ""
+msgstr "固件自身发布的各个档位。功率是占空比按固定常数换算而来的。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The write did not complete."
-msgstr ""
+msgstr "本次写入没有完成。"
 
 #: src/components/login/forgot-pass-form.tsx
 msgid "Then log into the backend and reset your user account password in the users table."
@@ -2507,11 +2507,11 @@ msgstr "然后登录到后台并在用户表中重置您的用户账户密码。
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Thermal Zones"
-msgstr ""
+msgstr "温度区域"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Thermal zones, per core frequency, NVMe health, WiFi and fan"
-msgstr ""
+msgstr "温度区域、逐核心频率、NVMe 健康状态、WiFi 与风扇"
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "This action cannot be undone. This will permanently delete all current records for {name} from the database."
@@ -2584,7 +2584,7 @@ msgstr "总计: {0}"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Transmit Rate"
-msgstr ""
+msgstr "发送速率"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Triggered by"
@@ -2697,7 +2697,7 @@ msgstr "无限制"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Unsafe Shutdowns"
-msgstr ""
+msgstr "非正常关机次数"
 
 #. Context: System is up
 #: src/components/routes/system/info-bar.tsx
@@ -2848,7 +2848,7 @@ msgstr "Wi-Fi 信号"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "WiFi"
-msgstr ""
+msgstr "WiFi"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
@@ -2873,19 +2873,19 @@ msgstr "写入错误"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Write this curve"
-msgstr ""
+msgstr "写入此曲线"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Write this curve to the disk"
-msgstr ""
+msgstr "将此曲线写入磁盘"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Write this duty to the firmware"
-msgstr ""
+msgstr "将此占空比写入固件"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Written to disk; the curve daemon has not picked it up."
-msgstr ""
+msgstr "已写入磁盘；曲线守护进程尚未读取它。"
 
 #: src/components/routes/settings/layout.tsx
 msgid "YAML Config"

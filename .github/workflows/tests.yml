@@ -1,0 +1,80 @@
+name: Tests
+
+# The gate exists because `make test` was good and entirely unenforced: six workflows, zero of
+# which ever ran it. Nothing here duplicates what the Makefile already knows how to do -- these
+# steps install toolchains and then hand off to it. Anything re-typed by hand (a bare `go test`,
+# a narrower `make test-go`) is exactly the drift the drift guard below exists to catch.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: make test (go + site)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Reads the `go` directive out of go.mod rather than pinning a version here, so a Go
+      # bump cannot leave this workflow silently testing an older toolchain than the module
+      # asks for.
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      # setup-bun puts bun on PATH through GITHUB_PATH. That is the whole fix for the bug that
+      # started this: bun installs into ~/.bun/bin, which is off PATH for every non-interactive
+      # shell, so 204 frontend tests once went unrun on a build that still reported success.
+      - name: Set up bun
+        uses: oven-sh/setup-bun@v2
+
+      # Assert the runners are real rather than trusting the installer. A missing toolchain has
+      # to be a red setup step; it must never become a gate that ran nothing.
+      - name: Verify toolchains
+        run: |
+          set -euo pipefail
+          command -v go >/dev/null || { echo "go is not on PATH" >&2; exit 1; }
+          go version
+          command -v bun >/dev/null || { echo "bun is not on PATH" >&2; exit 1; }
+          bun --version
+
+      - name: Install site dependencies
+        run: bun install --cwd ./internal/site
+
+      # internal/site/embed.go carries `//go:embed all:dist` while internal/site/dist is
+      # gitignored. On a fresh checkout that combination means `go test ./...` cannot compile:
+      # ten packages fail with "pattern all:dist: no matching files found". The Makefile
+      # already knows this -- its own build-hub-dev target plants exactly this stub -- so this
+      # is not a new convention, it is the one the Makefile uses. No test reads the bundle
+      # (internal/tests/api.go nils ui.DistDirFS out rather than loading it), so a stub keeps
+      # the suite honest instead of turning the test gate into a site build. Whether that embed
+      # should require a build artifact before the Go tests can compile at all is a real
+      # question, and it is not this workflow's to answer; what is this workflow's job is to
+      # fail loudly rather than quietly skip, which deleting this step does immediately.
+      - name: Seed the embedded site directory
+        run: |
+          mkdir -p ./internal/site/dist
+          touch ./internal/site/dist/index.html
+
+      # Cheap, and it fails loudly if this file and the Makefile ever stop describing the same
+      # gate. Runs first so the failure names the drift instead of surfacing as a mystery test
+      # failure later.
+      - name: Guard against workflow/Makefile drift
+        run: make ci-gate-drift
+
+      # The one command that matters. It is `test: test-go test-site`, with no valve, so it
+      # cannot exit 0 with either suite unrun.
+      - name: Run the gate
+        run: make test

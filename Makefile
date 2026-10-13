@@ -41,7 +41,7 @@ endif
 # Set executable extension based on target OS
 EXE_EXT := $(if $(filter windows,$(OS)),.exe,)
 
-.PHONY: tidy test test-go test-site build-agent build-hub build-hub-dev build clean lint dev-server dev-agent dev-hub dev generate-locales fetch-smartctl-conditional
+.PHONY: tidy test test-go test-site ci-gate-drift build-agent build-hub build-hub-dev build clean lint dev-server dev-agent dev-hub dev generate-locales fetch-smartctl-conditional
 .DEFAULT_GOAL := build
 
 clean:
@@ -68,6 +68,14 @@ test-go:
 test-site:
 	@internal/site/scripts/test-gate.test.sh
 	@internal/site/scripts/test-gate.sh
+
+# Guards the one thing a test workflow can quietly stop doing. .github/workflows/tests.yml runs
+# exactly one make target; this asserts that target is still the real conjunction of both suites
+# rather than a name that happens to exist. Re-typing `go test ./...` into a workflow is how
+# the `-tags 'testing no_ui'` and the entire frontend gate would both be lost at once, so the
+# workflow calls make instead, and this checks the call. CI runs it before `make test`.
+ci-gate-drift:
+	@.github/workflows/check-gate-drift.sh
 
 tidy:
 	go mod tidy

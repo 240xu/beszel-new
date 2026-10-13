@@ -41,7 +41,7 @@ endif
 # Set executable extension based on target OS
 EXE_EXT := $(if $(filter windows,$(OS)),.exe,)
 
-.PHONY: tidy test test-site build-agent build-hub build-hub-dev build clean lint dev-server dev-agent dev-hub dev generate-locales fetch-smartctl-conditional
+.PHONY: tidy test test-go test-site build-agent build-hub build-hub-dev build clean lint dev-server dev-agent dev-hub dev generate-locales fetch-smartctl-conditional
 .DEFAULT_GOAL := build
 
 clean:
@@ -51,17 +51,20 @@ clean:
 lint:
 	golangci-lint run
 
-test:
+# The conjunction, and nothing else: it owns no skip of its own, so `make test` can only
+# exit 0 with both suites green. The gate below is the piece that used to be a skip which
+# exited 0, and a build that reports success without running tests is the failure mode this
+# arrangement exists to make impossible.
+test: test-go test-site
+
+# Split out so a Go-only contributor does not have to stand up a 505MB bun install to check
+# a Go change. Cost of merging these two again: 5.78s plus 505MB per Go-only change, which
+# is the entire reason the escape valve that let the frontend suite go unrun had to go.
+test-go:
 	go test -tags='testing no_ui' ./...
 
-	@$(MAKE) --no-print-directory test-site
-
-# The gate owns every "can this run" decision rather than this file. It used to sit here
-# as a skip that exited 0, and because bun installs to ~/.bun/bin -- which
-# non-interactive shells and CI runners leave off PATH -- 204 frontend tests went unrun
-# while the build reported success. A gate's only job is to tell the truth about tests,
-# so the decision moved next to the suite where it can be tested, and its self-tests run
-# first so that its refusal path is never taken on faith.
+# The gate owns every "can this run" decision rather than this file, because it can be
+# tested there: its self-tests run first so that its refusal path is never taken on faith.
 test-site:
 	@internal/site/scripts/test-gate.test.sh
 	@internal/site/scripts/test-gate.sh

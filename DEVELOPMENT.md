@@ -8,7 +8,9 @@
 
 ## 1. 项目定位与硬件前提
 
-**beszel-new** 是 Beszel（`henrygd/beszel`，MIT）的 fork，基线 `baseline-v0.21.0`。目标平台**单一且固定**：**Panasonic CFQV8-1**。
+**beszel-new** 是 Beszel（`henrygd/beszel`，MIT）的 fork。基线是上游 **v0.21.0**；仓库里的 `baseline-v0.21.0` / `v0.21.0` 两个 tag 是它的**本地参考点**。目标平台**单一且固定**：**Panasonic CFQV8-1**。
+
+⚠️ 那两个 tag 与本仓库 HEAD **没有共同祖先**（本仓库历史被重写过，上游 release 提交的内容等价副本成了根提交、PGP 签名被剥除）。它们可以用于**本地树比对**，但**推不上去**，也不能当作可与上游交换历史的基线。完整证据与同步上游的代价见 [README.md](./README.md) 的「与上游同步」一节。
 
 技术层面的硬前提（这些是所有设计决策的根因，改代码前必须理解）：
 
@@ -62,6 +64,22 @@
 
 **查不到 ⇒ `ErrThermalCeilingUnknown` ⇒ 拒绝，没有默认值。** 这是有意的：宁可不许写，不要用一个猜的上限。
 （取整方向是**向下取整**：82.85 → 82，不是四舍五入的 83 —— 四舍五入会放行机器已经越过的 83。）
+
+### 1.4 与上游同步：为什么没有 rebase 这条路
+
+§1 已经说明：两个 baseline tag 与 HEAD 没有共同祖先。这里补上机制与代价。
+
+**机制**：`v0.21.0` 指向的 `ec96c13` 是**上游真实的 release 提交**（有父提交 `e597dd94`、有 PGP 签名），但它只作为本仓库的 shallow 边界存在，不属于任何分支。本仓库 HEAD 线的根提交 `577694c` 是它的**内容等价副本**（tree 同为 `dd4ac30`，单提交引入 575 个文件 / 201562 行插入），父提交被截断、PGP 签名被剥除。这是一次历史重写的产物。
+
+**代价**：`git rebase upstream/v0.21.0` 会把**整棵树**重放一遍，而不是应用一小段增量差异。git 也无法帮你算 diff —— 没有共同祖先，就没有可用的 merge base。
+
+**所以同步上游是一次文件级搬运，不是版本控制操作。** 开始之前至少要清楚三件事：
+
+1. **上游文件改动最小化**这条纪律（§3.8）在搬运时会直接兑现价值：上游文件越少，要人工比对的面越小。
+2. **先 unshallow 再比对。** 在 shallow 仓库里看到的上游历史是截断的，任何基于 `git log upstream/...` 的判断都缺上下文。
+3. **搬运后不要试图「修好」历史。** `ec96c13` 与 `577694c` 同 tree 这件事是可核对的事实，但它们**不同源**；文档里凡是引用基线的地方，都只能声称「树等价」，不能声称「同源」→ §6 的依赖检查也是同理。
+
+⚠️ 本项目**没有**一套经过验证的上游同步流程 —— 这是一条尚未走过的路。任何声称「可以直接 rebase / merge 上游」的表述都与实测冲突。
 
 ---
 
@@ -177,6 +195,48 @@ v1 的废弃值藏在备份文件里。直接 grep 配置目录，会同时命�
   - **存活 mutant**（变异确实改了代码，测试却仍然全绿）→ 这才是真发现：**有测试没覆盖到的行为**，或者断言是装饰（回到 §3.3）。
 
 把这两者混为一谈，就会出现「我做了变异测试，全绿，说明测试很强」的错误结论 —— 而实际可能只是变异算子没生效。
+
+### 3.6.1 变异测试的真实口径（本项目实际发生过的事）
+
+这一节记的是**真实记录**，不是标准做法。写在这里是为了防止下一次有人把它读成「零存活」。
+
+**先把两类变异分开，它们不是一回事：**
+
+| 类别 | 被变异的是什么 | 说明什么 |
+|---|---|---|
+| **门禁自身的变异** | `make test` / `test-gate.sh` 的逻辑 | 证明「门禁该红的时候真的会红」。这是工具的自检 |
+| **产品代码的变异** | `agent/plus`、`internal/fanapi` 等业务逻辑 | 证明「这批测试钉住了这段行为」 |
+
+README 讨论的是后者。**前者的绿不代表后者的绿**，两者不可互相代替。
+
+**产品代码变异的历史结论是「有存活 mutant」，不是零存活。** 已记录在案的：
+
+- 有过「注入 15 → 红 12 / **存活 2**」的一轮。存活的两个都做了追查：一个是**分层限制**（该层的测试自己构造错误，不读被变异的那一层），一个是**等价变异**（改了写法但行为等价）。结论都是「不是覆盖缺口」，但它们**仍然是存活**，报告里就是这么记的。
+- 有过「19 个 mutant → **18 杀 / 1 存活**」的一轮。存活的那条经过追查后被证明指向的是**死代码**，同样不是测试缺口。
+- 另有一轮记为 `killed=28 survived=2`。
+- 还有一轮记为 `killed=37 survived=1`，另有 **5 条 stale 条目不计入任何统计**（见 §8）。
+
+**⚠️ 更该记住的是 harness 自己的失效记录 —— 这些才是「绿」的真正对立面：**
+
+1. **前缀匹配把 3 个变异漏掉了。** 一版 harness 用 `label.startswith("M1")` 判断该注入哪个变异，于是 `M10`/`M12`/`M13` 一起被命中，**这三个变异根本没被注入**，跑的是别的变异的树。表面上「12 存活」，实际是 3 个空跑。改法：用显式标记而不是前缀，并加 `git status --porcelain` 落地校验（没落地直接报 harness 失败，不再伪装成「测试存活」）。
+2. **整轮 12 个变异全部假红。** 一版 harness 在一个没有生成 locales 的 worktree 里跑，`tsc` 恒红，于是 12 个变异全部「被杀」—— 全是环境噪音，不是测试有效性。
+3. **整轮 12 个变异全部漏网。** 同一批的另一版 harness 在 `check()` 开头调了 `restore()`，**先把变异擦掉再测**，于是 12 个全「存活」。
+4. **9 个补丁静默不匹配。** 某一版 harness 漏了 preflight，结果 9 个补丁不匹配当前树而没有任何报错。补上 preflight（每个补丁都必须应用到一棵干净的树上且仍能构建）之后一次就抓全。
+
+⇒ **推论**：一个变异运行的数字只有在「preflight 通过 + 落地校验通过」之后才有意义。引用变异结论时，请连同 harness 的这两道校验一起引用。
+
+**做法**：拿到一份变异日志，先看它有没有 `preflight` 段、有没有落地校验、结论行有没有 `every mutation behaved as the harness declared`。这三样缺任何一样，数字都只能当参考。
+
+### 3.6.2 什么时候「存活」是可以接受的
+
+不是所有存活 mutant 都是缺陷，但**必须逐个定性并写进报告**，不能只报总数：
+
+- **等价变异**（换了写法、行为不变）—— 可接受，但要有说明，否则下一个人会以为这里没测。
+- **分层限制**（测试自己造输入、不经过被变异层）—— 可接受，前提是明确写出「这一层由谁测」。
+- **指向死代码**—— 可接受，但**死代码本身**是个待办，别让它以「变异存活」的形式长期挂着。
+- **真实的覆盖缺口**—— 不可接受，要补测试。
+
+⚠️ **不要为了「数字好看」把存活项归到前三类。** 定性必须给出理由；理由不成立的，就是缺口。
 
 ### 3.7 防线边界随包结构扩大
 
@@ -328,10 +388,15 @@ v1 的废弃值藏在备份文件里。直接 grep 配置目录，会同时命�
 - [ ] `make test` 退出码 0
 - [ ] `gofmt -l` 对改动过的 Go 文件无输出
 - [ ] 依赖未变：`git diff baseline-v0.21.0..HEAD -- go.mod go.sum` 为空
+      ⚠️ 这是**本地树比对**，两个 tag 推不上去（见 §1）。它比的是文件树，不是提交历史 ——
+      树等价这一点是被核对过的（基线副本与上游 release 提交同 tree），但它**不能**推出两者同源。
 - [ ] **wire 字段完好**：JSON tag 与 CBOR key 逐个核对，尤其是 `plus`（`json:"plus"` / `cbor:"41"`）与 `pl`（`json:"pl"` / `cbor:"28"`）
-- [ ] 前端：`bun test` + **`npm run build`** 全过
+- [ ] 前端：**`make test-site`** + **`bun run --cwd internal/site build`** 都过
       ⚠️ **`tsc -b` 单独跑不算门禁** —— 它不做 `lingui extract/compile`、不产出构建产物。
       「类型过了」与「能构建」是两回事，触及 i18n / 资源引用 / 打包配置时必须真跑 `build`。
+      ⚠️ **别拿裸 `bun test` 当门禁** —— 它不加载 preload，碰 `localStorage` 的用例会抛
+      `ReferenceError: localStorage is not defined`、若干文件整个加载失败。门禁跑的是
+      `bun test --preload ./tests/bun-preload.ts`，入口是 `make test-site` → §10
 - [ ] **构建后还原 `.po`，且只还原重排**：`git checkout -- internal/site/src/locales`
       ⚠️ `zh.po` 已提交过真实 i18n 变更，整目录 checkout 会一起抹掉 —— 逐文件比对 → §3.16
 - [ ] **不声称渲染层已测**：lingui 的 `t\`\`` 是编译期宏，测试跑在 Bun runner 上，不执行 SWC 插件
@@ -358,6 +423,9 @@ v1 的废弃值藏在备份文件里。直接 grep 配置目录，会同时命�
 8. **把「空变异」当成「测试很强」。** 变异算子没生效导致的绿灯，与存活 mutant 导致的绿灯，结论完全相反 → §3.6。
 9. **读 `0xFFFFFFFF` 时取低 16 位。** 低 16 位恰为 65535，会得到一个看起来像转速的值。只认「大于等于 `0xFFFFFFFF`」这个判定，不要试图解释这个数 → §1。
 10. **构建前端后把翻译 diff 带进提交。** `lingui extract --overwrite` 会重写全部 `.po`；跑完必须 `git checkout -- internal/site/src/locales` 还原 → §6。
+11. **在干净 clone 上把 `make test` 的红当成环境坏了。** `internal/site/dist` 被 gitignore 而 `embed.go` 又要 embed 它，10 个包会直接 `[setup failed]`。这是仓库结构，不是你的环境 → §10.1。
+12. **把裸 `bun test` 当门禁。** 不加载 preload ⇒ 碰 `localStorage` 的用例抛 `ReferenceError`，套件是红的 —— 于是你会去「修」那些其实没坏的测试。门禁跑的是 `bun test --preload ./tests/bun-preload.ts`，入口是 `make test-site` → §6、§10.3。
+13. **拿变异日志的数字当结论，不看 harness 的 preflight。** 没有 preflight 与落地校验的运行出过「9 个补丁静默不匹配」「12 个全假红」「12 个全漏网」→ §3.6.1。
 
 ---
 
@@ -397,10 +465,78 @@ v1 的废弃值藏在备份文件里。直接 grep 配置目录，会同时命�
 ## 9. 起步
 
 ```bash
-go test -tags='testing no_ui' ./...          # 后端
-cd internal/site && bun test && npm run build # 前端（build 才是门禁，见 §6）
+make test                                              # 门禁 = test-go + test-site
+cd internal/site && bun run build                      # build 才是前端门禁，见 §6
 ```
 
 ⚠️ 跑 `build` 会改脏 `.po`，还原时只还原重排 → §3.16。
+⚠️ 干净 clone 上 `make test` **直接是红的**（缺 `dist`、缺 `node_modules`）→ §10。
 
 改任何东西之前，先读对应模块的现有注释 —— 这个项目的注释密度异常高，因为它们记录的是**为什么**，而不只是**是什么**。尤其 `agent/plus/fork_policy_test.go` 的文件头注释，它解释的是一个真实事故。
+
+---
+
+## 10. 新 clone 从零跑通，以及门禁到底证明了什么
+
+### 10.1 干净检出上 `make test` 是红的
+
+这不是环境问题，是仓库结构决定的。两条独立原因：
+
+**（一）`internal/site/dist` 被 gitignore，但 Go 要 embed 它。**
+
+`internal/site/embed.go:9` 上有 `//go:embed all:dist`，而 `.gitignore` 里有一条 `dist/`（匹配任意层级）。干净检出的树上没有这个目录：
+
+```console
+$ go build -tags='testing no_ui' ./...
+internal/site/embed.go:9:12: pattern all:dist: no matching files found
+$ make test-go
+FAIL github.com/henrygd/beszel/internal/alerts            [setup failed]
+... 共 10 个包 [setup failed]
+```
+
+补上 `dist`（真构建，或 `mkdir -p internal/site/dist && touch internal/site/dist/index.html`）之后立刻恢复全绿。
+
+**这不是仓库自己发明的约定** —— `Makefile` 的 `build-hub-dev` 目标一直在用同样的桩，CI 也有对应的「Seed the embedded site directory」步骤。
+
+⚠️ **诚实边界**：正因为 CI 也是打桩过去的，**流水线从来没有验证过站点能否真正 `build` 出来**。Go 测试不读那个 bundle（`internal/tests/api.go` 把 `ui.DistDirFS` 置空了而不是加载它），所以桩对测试是诚实的，但「站点能构建」这件事目前**不受任何门禁保护**。想验它必须手动跑 `bun run --cwd internal/site build`。
+
+**（二）前端门禁是 bun-only，没有 npm 回退。**
+
+这一点与构建不对称：`Makefile` 的 `build-web-ui` 有 npm 分支，`test-site` 没有。缺 `bun` 或缺 `node_modules` 时，门禁**非零退出**，不降级。
+
+### 10.2 `bun` 不在非交互 shell 的 PATH 上
+
+`bun` 装在 `~/.bun/bin`。登录 shell 会把它加上 PATH；`ssh host 'cmd'`、cron、很多 CI runner 不会。
+
+这就是本项目发生过的那个故障的成因：**204 个前端测试从未运行，而构建仍然报告成功**。门禁现在会因此非零退出而不是静默跳过，但你若在终端之外跑，仍要自己补：
+
+```bash
+export PATH=$HOME/.bun/bin:$PATH
+bun install --cwd internal/site
+```
+
+门禁脚本自己也做了兜底：PATH 上找不到 `bun` 时，它会再探 `${HOME}/.bun/bin/bun`（PATH 本身就留下过盲区）。
+
+### 10.3 门禁的真实含义
+
+`make test` = `test-go` + `test-site`，**合取，且它自己不拥有任何跳过路径** —— 所以只能在两套都绿时退出 0。
+
+- 前端门禁**先跑它自己的自测**（一条会随实现增减的契约），确认「拒绝运行」这条路径不是靠信仰成立的，然后才跑真正的套件；结束时打印实测条数。
+- 缺 `bun` / 缺 `node_modules` ⇒ 打印 `NOT RUN` 到 **stderr** 并非零退出；它**不会**打印成功时那句话，所以一次拒绝不会被一眼看成一次运行。
+- 曾存在一个 `BESZEL_ALLOW_SITE_TESTS_NOT_RUN` 开关能把拒绝变回退出 0，已被**删除**而不是收紧。理由：装 bun 的成本远小于「报告成功却没有证据」这个缺陷本身。
+- `known-failures.txt` 当前是空的 —— 登记失败集里一条也没有。
+- CI 只跑一个 `make` 目标，`ci-gate-drift` 守卫这个事实，防止有人在 workflow 里手抄 `go test ./...` 把整条门禁悄悄削掉。
+
+**门禁证明了什么**：两个测试套件在当前树上通过，且门禁自身的拒绝路径有效。
+**门禁没有证明什么**：站点能构建（打桩）、渲染层行为正确（lingui 宏不执行）、任何硬件写入可用（替身上跑）。
+
+### 10.4 `EC_BACKEND=ec_sys` 在已发布的二进制里不可达
+
+`EC_BACKEND` 可以选出 `ec_sys` 或 `acpi` 两种 EC 读寄存器后端，配置解析接受它们。但：
+
+- 这两个后端只经由 `ReadEC76()` 到达，而 **`ReadEC76` 只有测试调用者**，没有任何生产调用点。
+- 核对已部署的两个二进制（hub 与 agent），`ReadEC76` / `newECReader` / `acpiECReader` / `ecSysReader` 符号数均为 **0**；写侧的 `SetFanLevel` 与 `internal/fanapi` 在 hub 二进制里存在。
+
+所以：**读 EC 寄存器这条路整体没有被链接进发行二进制；写 `_FSL` 那条路在 hub 里是有的。**
+
+⚠️ 顺带说明 `ec_sys` 的一个性质，避免误读成能力缺失：`ecReader` 接口**刻意没有写方法**（源码注释写明，ec_sys 本身是能写的，留着写方法就等于开出一条未经评审的硬件指令通路）。当前唯一被评审过的移动风扇的方式是 `_FSL`。

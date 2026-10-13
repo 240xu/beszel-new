@@ -1,3 +1,5 @@
 # <path relative to internal/site>::<bun test name> — hold green here, delete when it passes.
-src/lib/plus-fan-tab.guard.test.ts::a countdown exists only where a deadline produced one
-src/lib/plus-fan-tab.guard.test.ts::no wording that claims a write is running exists outside the two outcome tables
+# Empty: the two entries below were cleared in task P5. Both were stale guards, not product
+# defects — one pinned a phrase `a7680f0` had deliberately deleted, the other matched a true
+# sentence about firmware duty — so a red registry meant those two rules were enforcing
+# nothing while CI stayed green. The format stands; the list is empty.

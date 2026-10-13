@@ -414,7 +414,7 @@ MUTATIONS: list[Mutation] = K_PROBES + [
     Mutation(
         "M12b",
         "FAN_DEVICE normalised to EC_ROOT only when it already has that prefix",
-        "survived",
+        "killed",
         {
             PLAT: [
                 Edit(

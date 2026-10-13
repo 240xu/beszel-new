@@ -3,22 +3,29 @@ import { fileURLToPath } from "node:url"
 import { expect, test } from "bun:test"
 import { FAN_REJECT_CODES } from "@/lib/plus-refusals"
 
-/** `plus-fan-tab.tsx` cannot be imported here: `@lingui/core/macro` resolves to a
- *  babel plugin that needs `babel-plugin-macros`, which this project does not
- *  install. Everything this panel decides was pushed down into `plus-fan-view.ts`
- *  and is tested there against real behaviour. What is left in the component is
- *  wiring, and wiring is pinned against the source text of the file that owns it.
- *
- *  Say plainly what this is: each rule below proves the component still *contains*
- *  something. None of them proves a string reaches a screen. */
+/** `plus-fan-tab.tsx` cannot be imported here: `@lingui/core/macro` resolves to a babel
+ *  plugin needing `babel-plugin-macros`, which this project does not install. What this
+ *  panel decides was pushed into `plus-fan-view.ts` and is tested there; what is left is
+ *  wiring, pinned against the source text of the file owning it. Each rule proves the
+ *  component *contains* something -- never that a string reaches a screen. */
 const read = async (relative: string) => readFileSync(fileURLToPath(new URL(relative, import.meta.url)), "utf8")
 
 const TAB = "../components/routes/system/plus-fan-tab.tsx"
 
-/** The body of the regress line, which is the only place allowed to decide what
- *  an operator is told about a hand-set duty. */
+/** The regress line's body: the only place allowed to decide what an operator is told
+ *  about a hand-set duty. Split on the kind test, not the prose, so a wording change
+ *  cannot slide a claim into a neighbour's slice. */
 const regressArm = (source: string) =>
 	source.slice(source.indexOf("function RegressLine"), source.indexOf("function CurveEditor"))
+
+const regressArms = (source: string): { kind: string; text: string }[] => {
+	const body = regressArm(source)
+	const marks = [...body.matchAll(/if \(regress\.kind === "([a-z_]+)"/g)]
+	return marks.map((mark, index) => ({
+		kind: mark[1] ?? "",
+		text: body.slice(mark.index ?? 0, marks[index + 1]?.index ?? body.length),
+	}))
+}
 
 const occurrences = (source: string, pattern: RegExp) =>
 	source
@@ -27,11 +34,18 @@ const occurrences = (source: string, pattern: RegExp) =>
 		.filter(({ text }) => pattern.test(text))
 		.map(({ line, text }) => `${line}: ${text.trim()}`)
 
-/** Wording that asserts the change is already cooling the machine. */
-const CLAIMS_IN_FORCE = /saved|applied|in force|running now|生效|已保存|已生效/i
+/** Wording asserting this panel's change is already cooling the machine. `in force`
+ *  counts only where a predicate credits a write for the state, or heads a bare value:
+ *  the bare substring also matched "it stays in force", a true sentence about a duty the
+ *  firmware already holds, which promises no return and claims no write of ours. */
+const CLAIMS_IN_FORCE =
+	/\bsaved\b|\bapplied\b|running\s+(?:this\s+)?now\b|in progress|生效|已保存|已生效|\b(?:is|are|was|were|now)\s+in\s+force\b|(?:^|[({?,\s])(?:t`|["'`])\s*in\s+force\b/i
 
-/** The two outcome tables are the only place a claim that something is running
- *  may be written down, and only for the applied arm. */
+/** Promises the fan comes back by itself: only an arm a live deadline reached may say it. */
+const PROMISES_A_RETURN = /countdown|reverts?\s|comes?\s+back|starts?\s+a\s+fresh/i
+
+/** The two outcome tables: the only place a claim that something is running may be
+ *  written down, and only for the applied arm. */
 const stripOutcomeTables = (source: string) =>
 	source.replace(/const OUTCOME_TEXT[^=]*= \{[^}]*\}/, "").replace(/const OUTCOME_BADGE[^=]*= \{[^}]*\}/, "")
 
@@ -54,8 +68,11 @@ test("a write no daemon is running is never described with wording that means it
 	const source = await read(TAB)
 	expect(tableEntry(source, "OUTCOME_BADGE", "pending_restart")).not.toMatch(CLAIMS_IN_FORCE)
 	expect(tableEntry(source, "OUTCOME_TEXT", "pending_restart")).not.toMatch(CLAIMS_IN_FORCE)
-	// The reverse: the applied arm does say so, or the pair proves nothing.
-	expect(tableEntry(source, "OUTCOME_BADGE", "applied")).toMatch(CLAIMS_IN_FORCE)
+	// The reverse, or the pair above proves nothing. The sentence carries the claim;
+	// the badge is a bare value, which this rule reads off a predicate rather than off
+	// the head of a literal, so it is pinned by existing instead of by the pattern.
+	expect(tableEntry(source, "OUTCOME_TEXT", "applied")).toMatch(CLAIMS_IN_FORCE)
+	expect(tableEntry(source, "OUTCOME_BADGE", "applied")).not.toBe("")
 })
 
 test("a pending write leaves the operator an outlet, and the outlet takes the confirm step", async () => {
@@ -133,24 +150,31 @@ test("a countdown exists only where a deadline produced one", async () => {
 	expect(occurrences(source, /regress_at/)).toEqual([])
 	expect(occurrences(source, /fanRegressView\(/)).not.toEqual([])
 	expect(occurrences(source, /regress\.kind === "counting_down"/)).not.toEqual([])
-	// Nothing on record, and a deadline lost to an agent restart, are the same
-	// bytes -- and a duty set before that restart is still in force, because it
-	// lives in the firmware and not in the agent. The arm that rendered nothing
-	// therefore left a possibly-held duty invisible, which is the whole failure.
+	// Nothing on record, and a deadline lost to an agent restart, are the same bytes --
+	// and a duty set before that restart is still in force, because it lives in the
+	// firmware and not in the agent. The arm that rendered nothing therefore left a
+	// possibly-held duty invisible, which is the whole failure.
 	expect(occurrences(regressArm(source), /return null/)).toEqual([])
 	expect(occurrences(source, /cannot see it/)).not.toEqual([])
-	// A regress with no deadline is not a thing this panel cannot act on: writing
-	// the duty again starts a fresh countdown, which guard.go schedules on every
-	// accepted level write.
 	expect(occurrences(source, /no deadline/)).not.toEqual([])
 	expect(occurrences(source, /cannot say when it ends/)).toEqual([])
-	expect(occurrences(source, /starts a fresh countdown/)).not.toEqual([])
+	// Only an arm a live deadline reached may promise the fan returns by itself. This
+	// replaces a pin on the phrase `a7680f0` deleted, and is not a request to put it back:
+	// it promised a countdown ending in a return to the curve, but the regress now
+	// declines to write, so it promised a revert no code performs -- zero was never an
+	// automatic handover, and "automatic" is the physical error in it. The invariant
+	// outlives the sentence; the sentence does not come back.
+	const arms = regressArms(source)
+	const kinds = arms.map((arm) => arm.kind)
+	expect(kinds).toContain("counting_down")
+	expect(kinds).toContain("no_deadline")
+	const undated = arms.filter((arm) => arm.kind !== "counting_down")
+	expect(occurrences(undated.map((arm) => arm.text).join("\n"), PROMISES_A_RETURN)).toEqual([])
 })
 
 test("no fan write is dispatched from this panel by hand", async () => {
-	// The confirm flag is asserted against the request that goes out in
-	// plus-fan-view.test.ts. What has to hold here is that the panel has no second
-	// way to reach a write route, where a flag could be chosen at the call site.
+	// The confirm flag is asserted against the request in plus-fan-view.test.ts. What
+	// holds here is that no second route out exists, where a flag could be chosen.
 	const source = await read(TAB)
 	expect(occurrences(source, /\bsetFanLevel\(|\bsetFanMode\(|\bsaveCurve\(/)).toEqual([])
 	expect(occurrences(source, /\bfetch\(/)).toEqual([])
@@ -161,8 +185,7 @@ test("no fan write is dispatched from this panel by hand", async () => {
 test("the duty shown as current is the one the server published", async () => {
 	const source = await read(TAB)
 	expect(occurrences(source, /fanLevelLabel\(state\)/).length).toBeGreaterThanOrEqual(2)
-	// A second implementation of the label would let a retuned firmware table
-	// and this panel disagree about what the fan is doing.
+	// A second label implementation would let a retuned firmware table disagree with this panel.
 	expect(occurrences(source, /\blevelLabel\(/)).toEqual([])
 	expect(occurrences(source, /(?:const|function)\s+\w*label/i)).toEqual([])
 })
@@ -181,8 +204,7 @@ test("the armed panel always has a way out", async () => {
 })
 
 test("no wording that claims a write is running exists outside the two outcome tables", async () => {
-	// Without this, a ternary can hand the in-force badge to the pending arm
-	// while both tables still read correctly.
+	// Without this a ternary can hand the in-force badge to the pending arm unread.
 	expect(occurrences(stripOutcomeTables(await read(TAB)), CLAIMS_IN_FORCE)).toEqual([])
 })
 

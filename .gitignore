@@ -5,3 +5,4 @@ dist/
 
 # Lox: build output (48MB production binaries)
 build/
+beszel_data/

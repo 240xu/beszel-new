@@ -58,6 +58,11 @@ const (
 	OutcomeApplied Outcome = "applied"
 	OutcomeRefused Outcome = "refused"
 	OutcomeFailed  Outcome = "failed"
+	// OutcomeHeld is a write the guard made to keep the fan safe without returning it
+	// to its curve: the emergency duty. It is neither refused (nothing was written) nor
+	// applied (the fan did not go back to its curve), so the trail names the write and
+	// the level now actually driving the fan instead of a refusal that hid it.
+	OutcomeHeld Outcome = "held"
 )
 
 // Event is one audited attempt. Every path emits exactly one, refusals included:
@@ -358,12 +363,21 @@ func (g *Guard) Regress() (bool, error) {
 	defer g.mu.Unlock()
 	now := g.d.Now()
 
-	did, held, err := g.regressLocked(now)
+	did, held, heldLevel, err := g.regressLocked(now)
 	if err == nil && !did {
 		// A safety gate stopped short of the device and nothing failed, so there is
 		// no error for audit to classify. Recording it as applied would tell an
 		// operator the fan went back to its curve when it is still held at a duty.
-		g.auditDeclined(OpRegress, "regress", held)
+		//
+		// The emergency gate is the one that wrote: it programmed the curve's own duty
+		// and proved it, so the trail must record that write -- held, at the duty now in
+		// force -- rather than a refusal at level zero that hid it. Every other gate
+		// wrote nothing, so refused at level 0 is the truth for them.
+		outcome, level := OutcomeRefused, 0
+		if held == DeclineAtEmergency {
+			outcome, level = OutcomeHeld, heldLevel
+		}
+		g.auditDeclined(OpRegress, "regress", held, outcome, level)
 		// Nothing pending and a daemon that owns the fan are both endings rather
 		// than refusals: there is nothing held to bring back, so retrying would be
 		// a duty the guard no longer has any business polling.
@@ -405,27 +419,28 @@ func (g *Guard) holdEmergencyLocked(now time.Time, duty int) error {
 	return nil
 }
 
-// regressLocked also names which gate declined, so a handover that did not happen is auditable.
-func (g *Guard) regressLocked(now time.Time) (bool, string, error) {
+// regressLocked also names which gate declined, and the duty an emergency hold wrote,
+// so a handover that did not happen is auditable.
+func (g *Guard) regressLocked(now time.Time) (bool, string, int, error) {
 	if g.regressAt.IsZero() || now.Before(g.regressAt) {
-		return false, DeclineNone, nil
+		return false, DeclineNone, 0, nil
 	}
 	// Two things can have changed while the duty was held. If the daemon is up it
 	// owns the fan and our write would be undone on its next tick, so the pending
 	// regress is dropped rather than fought over.
 	if g.d.PfandUp() {
 		g.clearRegressLocked()
-		return false, DeclineDaemon, nil
+		return false, DeclineDaemon, 0, nil
 	}
 	temp, c, err := g.temperature()
 	if err != nil {
-		return false, DeclineUnreadable, nil
+		return false, DeclineUnreadable, 0, nil
 	}
 	// At or past the emergency edge the answer is the curve's emergency duty, so this
 	// gate commands it rather than declining. It used to decline on the grounds that the
 	// daemon was driving full speed, but the check above returns if one is up, so none is.
 	if temp >= c.Emerg {
-		return false, DeclineAtEmergency, g.holdEmergencyLocked(now, c.E)
+		return false, DeclineAtEmergency, c.E, g.holdEmergencyLocked(now, c.E)
 	}
 	// There is no duty that hands this fan back to its curve. _FSL forwards its
 	// argument to an EC fan-duty write and has no case for zero, so a zero duty is a
@@ -438,9 +453,9 @@ func (g *Guard) regressLocked(now time.Time) (bool, string, error) {
 	// Admission last: a regress that declined to write never touched the device,
 	// and letting it spend the probe would leave the breaker waiting for a write.
 	if err := g.admit(now); err != nil {
-		return false, "", err
+		return false, "", 0, err
 	}
-	return false, DeclineNoHandover, nil
+	return false, DeclineNoHandover, 0, nil
 }
 
 func (g *Guard) scheduleRegressLocked(now time.Time, delay time.Duration) {
@@ -533,9 +548,11 @@ var declineMessages = map[string]string{
 }
 
 // auditDeclined records an attempt that stopped short of the device without failing.
-func (g *Guard) auditDeclined(op Op, actor, code string) {
+// outcome and level are the caller's to set: the emergency gate wrote the curve's duty
+// and reports held at that level; the gates that wrote nothing report refused at 0.
+func (g *Guard) auditDeclined(op Op, actor, code string, outcome Outcome, level int) {
 	g.d.Audit(Event{
-		Op: op, Outcome: OutcomeRefused, Actor: actor,
+		Op: op, Outcome: outcome, Level: level, Actor: actor,
 		Code: code, Message: declineMessages[code], At: g.d.Now(),
 	})
 }

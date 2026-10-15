@@ -1,6 +1,6 @@
 import type { RecordModel } from "pocketbase"
 import type { Unit, Os, BatteryState, HourFormat, ConnectionType, ServiceStatus, ServiceSubState } from "@/lib/enums"
-import type { FanRejectCode } from "@/lib/plus-refusals"
+import type { FanRejectCode, FanDeclineCode } from "@/lib/plus-refusals"
 
 // global window properties
 declare global {
@@ -911,8 +911,9 @@ export interface FanAuditEntry {
 	/** RFC3339. */
 	at: string
 	actor?: string
-	/** The refusal identifier, absent when the attempt was applied. */
-	code?: FanRejectCode
+	/** The refusal identifier on a refused write, or the regress decline identifier a
+	 *  stopped-short handover is audited under; absent when the attempt was applied. */
+	code?: FanRejectCode | FanDeclineCode
 	message?: string
 }
 

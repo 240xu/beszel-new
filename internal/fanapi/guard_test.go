@@ -925,8 +925,10 @@ func TestARegressThatDidNotWriteIsNotAuditedAsApplied(t *testing.T) {
 	}{
 		{"nothing was pending", false, func(*fixture) {}, "no manual duty was pending"},
 		{"the daemon took over", true, func(f *fixture) { f.pfand = true }, "the daemon owns the fan"},
-		{"the emergency edge is reached", true, func(f *fixture) { f.temp = 80 }, "emergency edge"},
 		{"the temperature is unknown", true, func(f *fixture) { f.tempErr = errors.New("zone gone") }, "temperature"},
+		// The emergency gate is deliberately absent: it writes the curve's own duty
+		// rather than declining, so it is a held write covered by
+		// TestTheEmergencyHoldIsAuditedAsHeldAtTheDutyItWrote, not a "did not write" case.
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newFixture(t)
@@ -955,10 +957,11 @@ func TestARegressThatDidNotWriteIsNotAuditedAsApplied(t *testing.T) {
 }
 
 // The emergency hold writes a duty, but it is not a handover, so the attempt ends
-// as a refusal with a named reason. An operator reading the log has to be able to
-// tell "held at the emergency duty" from "nothing was watched", and an applied
-// event would claim the fan went back to its curve.
-func TestTheEmergencyEdgeIsAuditedAsRefusedNotApplied(t *testing.T) {
+// as held -- not applied (the fan did not go back to its curve) and not refused
+// (a duty was written and landed). The event names the duty now in force, so an
+// operator reading the trail can tell "held at the emergency duty" from both
+// "refused, nothing written" and "applied, back on the curve".
+func TestTheEmergencyEdgeIsAuditedAsHeldNotAppliedOrRefused(t *testing.T) {
 	f := newFixture(t)
 	_, err := f.g.SetManualLevel(70, confirmed)
 	require.NoError(t, err)
@@ -969,8 +972,10 @@ func TestTheEmergencyEdgeIsAuditedAsRefusedNotApplied(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, did, "the hold is a duty, not a handover")
 	require.NotEmpty(t, f.writeCalls, "the emergency duty did reach the device")
+	c := mustCurve(t)
 	last := f.lastEvent()
-	assert.Equal(t, OutcomeRefused, last.Outcome)
+	assert.Equal(t, OutcomeHeld, last.Outcome)
+	assert.Equal(t, c.E, last.Level, "the trail names the duty now actually driving the fan")
 	assert.Equal(t, DeclineAtEmergency, last.Code)
 }
 

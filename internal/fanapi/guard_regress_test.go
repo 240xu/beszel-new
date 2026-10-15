@@ -193,3 +193,33 @@ func TestADaemonThatTakesOverEndsTheRegress(t *testing.T) {
 	assert.True(t, f.g.PendingRegressAt().IsZero(),
 		"the daemon owns the fan, so there is no pending handover left to promise")
 }
+
+// The emergency hold writes the curve's own duty and proves it landed. It is not a
+// refusal and it is not a handover, so an audit that says "refused, level 0" hides
+// the duty now actually driving the fan from the operator reading the trail: R6
+// caught a real probe that recorded a device write while the trail said nothing was
+// written. The event must read as the write it is, at the level that was written.
+func TestTheEmergencyHoldIsAuditedAsHeldAtTheDutyItWrote(t *testing.T) {
+	f := newFixture(t)
+	_, err := f.g.SetManualLevel(70, confirmed)
+	require.NoError(t, err)
+	f.advance(10 * time.Minute)
+	f.temp = 85
+
+	did, rerr := f.g.Regress()
+	require.NoError(t, rerr, "holding the emergency duty is not a failure")
+	require.False(t, did, "the hold is a duty, not a handover back to the curve")
+
+	c := mustCurve(t)
+	require.NotEmpty(t, f.writeCalls, "the emergency duty reached the device")
+	written := f.writeCalls[len(f.writeCalls)-1]
+	assert.Equal(t, c.E, written, "the regress wrote the curve's own emergency duty")
+
+	last := f.lastEvent()
+	assert.Equal(t, "held", string(last.Outcome),
+		"a duty that was written is not a refusal, and an applied outcome would claim a handover that did not happen")
+	assert.NotEqual(t, OutcomeRefused, last.Outcome, "refused at level 0 hid the write from the operator")
+	assert.NotEqual(t, OutcomeApplied, last.Outcome, "the fan did not go back to its curve, so the hold is not applied")
+	assert.Equal(t, written, last.Level, "the audit names the duty actually in force, not a zero that reads as auto")
+	assert.Equal(t, DeclineAtEmergency, last.Code)
+}

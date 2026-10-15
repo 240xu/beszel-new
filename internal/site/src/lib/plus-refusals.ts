@@ -20,7 +20,32 @@ export const FAN_REJECT_CODES = [
 
 export type FanRejectCode = (typeof FAN_REJECT_CODES)[number]
 
+/** The five codes a regress decline is audited under: a gate that stopped the handover
+ *  short. A hand-written mirror of the closed set in internal/fanapi/guard.go (the
+ *  DeclineNone..DeclineNoHandover constants), not a second source: both languages check
+ *  the literals against that file. These ride the audit trail, never a refusal response,
+ *  so they are kept apart from FAN_REJECT_CODES, whose values and meanings must not move. */
+export const FAN_DECLINE_CODES = [
+	"regress_nothing_pending",
+	"regress_daemon_owns_fan",
+	"regress_temperature_unreadable",
+	"regress_at_emergency_edge",
+	"regress_no_handover_value",
+] as const
+
+export type FanDeclineCode = (typeof FAN_DECLINE_CODES)[number]
+
 const REJECT_CODES: ReadonlySet<string> = new Set(FAN_REJECT_CODES)
+
+/** Every code the audit trail may carry: the refusal set plus the regress decline set.
+ *  A decline dropped here left `code` undefined and lost its message, so a panel could
+ *  not tell which gate held the fan. Returns undefined for a code neither set publishes,
+ *  so an unknown one stays absent instead of invented. */
+const FAN_CODES: ReadonlySet<string> = new Set<string>([...FAN_REJECT_CODES, ...FAN_DECLINE_CODES])
+
+export function readFanAuditCode(raw: string | undefined): FanRejectCode | FanDeclineCode | undefined {
+	return raw !== undefined && FAN_CODES.has(raw) ? (raw as FanRejectCode | FanDeclineCode) : undefined
+}
 
 /** A refusal. `message` is a constant, not the server's text, so reaching for
  *  it as a translation key fails visibly instead of silently rendering a

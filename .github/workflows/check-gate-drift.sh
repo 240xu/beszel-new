@@ -134,6 +134,27 @@ closure_of() {
 
 declare -A SEEN=()
 
+# A gate nothing triggers is a gate nothing enforces. This fork's default branch is
+# beszel-new, so a workflow watching only main has already shipped this exact defect
+# once: every push to the branch under test skipped the suite and stayed green.
+default_branch="$(git symbolic-ref --short HEAD 2>/dev/null || echo beszel-new)"
+
+# The branch list is read with awk, the same tool the Makefile inventory above uses:
+# no YAML dependency is guaranteed on a runner and the block shape is fixed.
+push_branches=$(awk '
+		/^[ \t]*push:/ { in_push = 1; next }
+		in_push && /^[ \t]*branches:/ { in_branches = 1; next }
+		in_push && in_branches && /^[ \t]*-/ { print $2; next }
+		in_push && /^[ \t]*[A-Za-z]/ { in_push = 0 }
+	' "$workflow")
+
+if ! printf '%s\n' "$push_branches" | grep -qx -- "$default_branch"; then
+	fail "the push trigger does not cover the default branch ${default_branch} (covers: ${push_branches:-none}), so pushes to the branch under test run no gate"
+fi
+if ! grep -qE '^[ \t]*pull_request:' "$workflow"; then
+	fail "the workflow has no pull_request trigger, so review is gated by nothing"
+fi
+
 if grep -q 'continue-on-error' "$workflow"; then
 	fail "${workflow} sets continue-on-error; a step allowed to fail is not a gate"
 fi

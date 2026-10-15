@@ -508,7 +508,7 @@ FAIL github.com/henrygd/beszel/internal/alerts            [setup failed]
 
 `bun` 装在 `~/.bun/bin`。登录 shell 会把它加上 PATH；`ssh host 'cmd'`、cron、很多 CI runner 不会。
 
-这就是本项目发生过的那个故障的成因：**204 个前端测试从未运行，而构建仍然报告成功**。门禁现在会因此非零退出而不是静默跳过，但你若在终端之外跑，仍要自己补：
+这就是本项目发生过的那个故障的成因：**当时 204 个前端测试从未运行，而构建仍然报告成功**（条数以 `make test` 的实跑输出为准）。门禁现在会因此非零退出而不是静默跳过，但你若在终端之外跑，仍要自己补：
 
 ```bash
 export PATH=$HOME/.bun/bin:$PATH

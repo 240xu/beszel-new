@@ -122,7 +122,7 @@ export PATH=$HOME/.bun/bin:$PATH     # 见下面的 PATH 陷阱
 bun install --cwd internal/site
 ```
 
-⚠️ **`bun` 默认不在非交互 shell 的 `PATH` 上** —— 它装在 `~/.bun/bin`。`ssh host 'make test'`、cron、CI runner 这类不经过登录 shell 的场景都拿不到它。这正是本项目曾经发生过的故障的成因：**204 个前端测试从未运行，而构建仍然报告成功**。门禁现在会因此**非零退出**而不是静默跳过，但你若在本地终端之外跑，务必自己先 `export PATH=$HOME/.bun/bin:$PATH`。
+⚠️ **`bun` 默认不在非交互 shell 的 `PATH` 上** —— 它装在 `~/.bun/bin`。`ssh host 'make test'`、cron、CI runner 这类不经过登录 shell 的场景都拿不到它。这正是本项目曾经发生过的故障的成因：**当时 204 个前端测试从未运行，而构建仍然报告成功**（条数以 `make test` 的实跑输出为准）。门禁现在会因此**非零退出**而不是静默跳过，但你若在本地终端之外跑，务必自己先 `export PATH=$HOME/.bun/bin:$PATH`。
 
 **第二步：处理 `internal/site/dist`。**
 

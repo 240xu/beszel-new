@@ -11,6 +11,7 @@ gate="${here}/test-gate.sh"
 repo="$(cd "${here}/../../.." && pwd)"
 valve='BESZEL_ALLOW_SITE_TESTS_NOT_RUN'
 
+EXPECTED_ASSERTIONS=38
 passed=0
 failed=0
 seq_no=0
@@ -402,16 +403,22 @@ else
 	no "make test-go did not invoke go test, calls: $(cat "${root}/go-calls" 2>&1) err: $(cat "${root}/err")"
 fi
 
-# 13. `make test` is the conjunction and owns no skip of its own: the recipes must not
-# tolerate failure, and the plan must contain both halves.
-test_plan="$(cd "$repo" && make --no-print-directory -n test 2>&1; grep -E '^(test|test-go|test-site):' Makefile)"
+# 13. `make test` is the conjunction and owns no skip of its own. Reachability is
+# asserted on what the plan actually runs, never on a target name: make -n
+# prints recipes, not the prerequisites that reached them, so a rule that is
+# only named in a comment cannot satisfy this.
+test_plan="$(cd "$repo" && make --no-print-directory -n test 2>&1)"
 case "$test_plan" in
 *"go test -tags='testing no_ui' ./..."*) ok "make test includes the Go suite" ;;
 *) no "make test must run the Go suite, got: ${test_plan}" ;;
 esac
 case "$test_plan" in
-*test-site*) ok "make test includes the site gate" ;;
-*) no "make test must delegate to the site gate, got: ${test_plan}" ;;
+*test-gate.sh*) ok "make test runs the site gate script" ;;
+*) no "make test must run the site gate script, got: ${test_plan}" ;;
+esac
+case "$test_plan" in
+*test-gate.test.sh*) ok "make test runs the site gate self-test first" ;;
+*) no "make test must run the site gate self-test first, got: ${test_plan}" ;;
 esac
 recipes="$(awk '/^(test|test-go|test-site):/{f=1;next} /^[^\t].*:/{f=0} f' "${repo}/Makefile")"
 if printf '%s\n' "$recipes" | grep -qE '^[[:space:]]*-| \|\| '; then
@@ -434,5 +441,12 @@ for target in test test-go test-site; do
 	esac
 done
 
+# The count is part of the contract. A gate whose own suite can silently shrink
+# to "true" prints the same green line while asserting nothing, which is the
+# failure mode this arrangement exists to make impossible.
 printf '\n# gate self-test: %d passed, %d failed\n' "$passed" "$failed"
+if [ "$passed" -ne "$EXPECTED_ASSERTIONS" ]; then
+	echo "gate self-test: expected ${EXPECTED_ASSERTIONS} assertions, ran ${passed}" >&2
+	exit 1
+fi
 [ "$failed" -eq 0 ]

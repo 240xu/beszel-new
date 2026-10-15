@@ -9,7 +9,10 @@ on:
   pull_request:
   push:
     branches:
+        # beszel-new is this fork's default branch; main is kept so the
+        # gate still holds if the branch is ever renamed back.
       - main
+      - beszel-new
 
 permissions:
   contents: read

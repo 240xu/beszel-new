@@ -968,10 +968,14 @@ func TestTheEmergencyEdgeIsAuditedAsHeldNotAppliedOrRefused(t *testing.T) {
 	f.advance(10 * time.Minute)
 	f.temp = 85
 
+	// Setting the manual level already wrote, so the log is not empty before this gate
+	// runs. Only the writes the regress itself makes are evidence that the emergency
+	// branch reached the device.
+	writesBefore := len(f.writeCalls)
 	did, err := f.g.Regress()
 	require.NoError(t, err)
 	require.False(t, did, "the hold is a duty, not a handover")
-	require.NotEmpty(t, f.writeCalls, "the emergency duty did reach the device")
+	require.Greater(t, len(f.writeCalls), writesBefore, "the emergency duty reached the device during the regress, not before it")
 	c := mustCurve(t)
 	last := f.lastEvent()
 	assert.Equal(t, OutcomeHeld, last.Outcome)

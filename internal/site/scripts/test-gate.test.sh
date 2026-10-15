@@ -441,12 +441,31 @@ for target in test test-go test-site; do
 	esac
 done
 
-# The count is part of the contract. A gate whose own suite can silently shrink
-# to "true" prints the same green line while asserting nothing, which is the
+
+# The count is part of the contract. A gate whose own suite can silently shrink to
+# a bare `true` prints the same green line while asserting nothing, which is the
 # failure mode this arrangement exists to make impossible.
 printf '\n# gate self-test: %d passed, %d failed\n' "$passed" "$failed"
 if [ "$passed" -ne "$EXPECTED_ASSERTIONS" ]; then
 	echo "gate self-test: expected ${EXPECTED_ASSERTIONS} assertions, ran ${passed}" >&2
 	exit 1
 fi
-[ "$failed" -eq 0 ]
+
+# A gate that has never been seen to fail has not been tested, only run. This block
+# makes one assertion fail on purpose and requires the run to exit non-zero because
+# of it, so a green gate is evidence about failures and not only about successes.
+if [ "${BESZEL_GATE_SELFFAIL:-}" = 1 ]; then
+	no "deliberate failure, to prove the verdict line still decides green"
+fi
+
+# The verdict line is pinned. Replacing it with `true` is the one mutation every other
+# assertion survives, because nothing failed and so nothing was counted to contradict
+# it; a gate that stops deciding by its failures has stopped deciding anything.
+if [ "$failed" -ne 0 ]; then
+	exit 1
+fi
+if ! grep -qF '[ "$failed" -ne 0 ]; then' "$0"; then
+	echo "gate self-test: the failure verdict was replaced; green is no longer decided by a failure" >&2
+	exit 1
+fi
+exit 0

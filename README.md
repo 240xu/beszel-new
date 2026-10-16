@@ -51,9 +51,9 @@ $ git rev-list --count v0.21.0..HEAD
 
 ### ⚠️ 两个 baseline tag 仍未推到远端
 
-`v0.21.0` 与 `baseline-v0.21.0` 都在本地、都指向 `ec96c13`，而 `240xu/beszel-new` 远端**一个 tag 都没有**（`git ls-remote --tags origin` 返回 0 行）。
+`v0.21.0` 与 `baseline-v0.21.0` 都指向 `ec96c13`，且**都已在远端**（`git ls-remote origin` 列出 `refs/tags/v0.21.0` 与 `refs/tags/baseline-v0.21.0`）。
 
-⚠️ 旧版本把原因写成「shallow update not allowed」。**那个原因已经失效** —— 仓库不再是 shallow 克隆，所以现在推不上去的原因没有被验证过，不要照抄旧结论，也不要假设 `git push --tags` 一定会失败。真实情况需要实测。
+旧版本把原因写成「shallow update not allowed」。那个原因已失效 —— 仓库是完整克隆，而这两个 tag 及其它 78 个上游 tag 都已成功推到远端。
 
 无论原因是什么，「tag 推送失败而分支推送成功」这个组合仍然最容易误判：命令报了错、退出码非零，但**仓库其实已经发布了一部分**。要判断发布是否成功，看 `git ls-remote origin refs/heads/beszel-new` 有没有你的提交，而不是看 `git push` 的退出码。
 

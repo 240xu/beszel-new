@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -50,7 +51,10 @@ var (
 
 // registerPlusFanRoutes binds the plus fan routes under the hub's own router.
 func (h *Hub) registerPlusFanRoutes(se *core.ServeEvent) error {
-	trail := newFanAudit()
+	// In the hub's own data directory, because the record has to outlive the process
+	// that wrote it: the floor writes with nobody watching, and the guard holding it is
+	// this process, so a restart is exactly when the trail is worth having.
+	trail := newFanAudit(filepath.Join(se.App.DataDir(), "fan-audit.jsonl"))
 	fc := &fanRoutes{
 		deps:  fanDeps(trail.add),
 		trail: trail,
@@ -470,11 +474,131 @@ func (r *curveRequest) curve() *plus.Curve {
 type fanAudit struct {
 	mu     sync.Mutex
 	events []fanapi.Event
+	// path is where the trail is kept between processes, and onDisk how many lines the
+	// file holds, so the trim that bounds it does not re-read the file to find out.
+	path   string
+	onDisk int
+}
+
+// auditRecord is what one line of the trail file holds, spelled with the field names the
+// route serves rather than the Go ones: an operator handed fan-audit.jsonl can then match
+// every line against the endpoint that produced it.
+type auditRecord struct {
+	Op      string `json:"op"`
+	Outcome string `json:"outcome"`
+	Level   int    `json:"level"`
+	At      string `json:"at"`
+	Actor   string `json:"actor,omitempty"`
+	Code    string `json:"code,omitempty"`
+	Message string `json:"message,omitempty"`
+}
+
+func recordOf(e fanapi.Event) auditRecord {
+	return auditRecord{
+		Op: string(e.Op), Outcome: string(e.Outcome), Level: e.Level,
+		At: e.At.UTC().Format(time.RFC3339), Actor: e.Actor,
+		Code: e.Code, Message: e.Message,
+	}
+}
+
+func eventOf(r auditRecord) fanapi.Event {
+	at, err := time.Parse(time.RFC3339, r.At)
+	if err != nil {
+		// A record whose timestamp will not parse is still a record of a write that
+		// happened. Dropping it would lose the event to a formatting problem.
+		at = time.Time{}
+	}
+	return fanapi.Event{
+		Op: fanapi.Op(r.Op), Outcome: fanapi.Outcome(r.Outcome), Level: r.Level,
+		At: at, Actor: r.Actor, Code: r.Code, Message: r.Message,
+	}
 }
 
 const fanAuditLimit = 200
 
-func newFanAudit() *fanAudit { return &fanAudit{} }
+// newFanAudit opens the trail at path, reading back what the last process left there.
+//
+// The read is best-effort in both directions, deliberately. A hub that refused to start
+// because its audit file was unreadable would trade a fan that runs for a fan nobody can
+// account for, and a trail that cannot be written is no reason to stop writing to the
+// device: the ring holds the live window either way, and the failure is logged where an
+// operator can find it.
+func newFanAudit(path string) *fanAudit {
+	a := &fanAudit{path: path}
+	a.load()
+	return a
+}
+
+// load seeds the ring from the file, skipping any line it cannot read. A line cut in half
+// by a kill during an append is the normal crash artefact, so it is dropped on its own
+// rather than taking the whole trail down with it.
+func (a *fanAudit) load() {
+	raw, err := os.ReadFile(a.path)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			slog.Warn("fan audit trail unreadable, starting empty", "path", a.path, "err", err)
+		}
+		return
+	}
+	for _, line := range strings.Split(strings.TrimRight(string(raw), "\n"), "\n") {
+		if line == "" {
+			continue
+		}
+		var r auditRecord
+		if err := json.Unmarshal([]byte(line), &r); err != nil {
+			slog.Warn("fan audit line skipped", "path", a.path, "err", err)
+			continue
+		}
+		a.events = append(a.events, eventOf(r))
+		a.onDisk++
+	}
+	a.trimLocked()
+}
+
+// appendLocked puts one event on disk. Every error is logged and swallowed: the trail
+// records what happened, it never gates whether it may happen.
+func (a *fanAudit) appendLocked(e fanapi.Event) {
+	line, err := json.Marshal(recordOf(e))
+	if err != nil {
+		slog.Warn("fan audit event not serialisable", "op", string(e.Op), "err", err)
+		return
+	}
+	f, err := os.OpenFile(a.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		slog.Warn("fan audit trail not writable", "path", a.path, "err", err)
+		return
+	}
+	defer f.Close()
+	if _, err := f.Write(append(line, '\n')); err != nil {
+		slog.Warn("fan audit append failed", "path", a.path, "err", err)
+		return
+	}
+	a.onDisk++
+	a.trimLocked()
+}
+
+// trimLocked keeps the file to the same window the route serves. Rewriting rather than
+// rotating is deliberate: the window is small, the writes are rare, and a second file is
+// a second thing to go missing.
+func (a *fanAudit) trimLocked() {
+	if a.onDisk <= fanAuditLimit {
+		return
+	}
+	keep := a.events[len(a.events)-fanAuditLimit:]
+	var body strings.Builder
+	for _, e := range keep {
+		if line, err := json.Marshal(recordOf(e)); err == nil {
+			body.Write(line)
+			body.WriteByte(10)
+		}
+	}
+	if err := os.WriteFile(a.path, []byte(body.String()), 0o600); err != nil {
+		slog.Warn("fan audit trim failed", "path", a.path, "err", err)
+		return
+	}
+	a.events = keep
+	a.onDisk = len(keep)
+}
 
 func (a *fanAudit) add(e fanapi.Event) {
 	a.mu.Lock()
@@ -483,6 +607,7 @@ func (a *fanAudit) add(e fanapi.Event) {
 	if len(a.events) > fanAuditLimit {
 		a.events = a.events[len(a.events)-fanAuditLimit:]
 	}
+	a.appendLocked(e)
 }
 
 // entries renders the trail. The reason is already a code and its own text, set

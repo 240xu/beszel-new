@@ -40,6 +40,17 @@ const (
 	pfandUnit = "pfand.service"
 )
 
+// seenGuard is the hook a route test installs to capture the guard its routes were
+// built with. The guard is created inside registerPlusFanRoutes and never handed out,
+// and the thermal floor writes nothing until the package is past the emergency edge --
+// which is not something a route test can arrange by waiting.
+//
+// It is declared here rather than beside the other seams on purpose: production code
+// reads it, and the file the setters live in carries the testing build tag, so a
+// declaration over there compiles under `go test -tags=testing` and breaks every release
+// build. Nil in production, and the one call site checks it before using it.
+var seenGuard func(*fanapi.Guard) *fanapi.Guard
+
 // Seams. A route test must not be able to reach the fan, so the seams and the
 // daemon are reached through variables a test can replace. Nothing here is a
 // mutable setting an operator can turn: they exist so that exercising these

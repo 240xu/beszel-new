@@ -41,7 +41,7 @@ endif
 # Set executable extension based on target OS
 EXE_EXT := $(if $(filter windows,$(OS)),.exe,)
 
-.PHONY: tidy test test-go test-site ci-gate-drift build-agent build-hub build-hub-dev build clean lint dev-server dev-agent dev-hub dev generate-locales fetch-smartctl-conditional
+.PHONY: tidy test test-build test-go test-site ci-gate-drift build-agent build-hub build-hub-dev build clean lint dev-server dev-agent dev-hub dev generate-locales fetch-smartctl-conditional
 .DEFAULT_GOAL := build
 
 clean:
@@ -55,7 +55,16 @@ lint:
 # exit 0 with both suites green. The gate below is the piece that used to be a skip which
 # exited 0, and a build that reports success without running tests is the failure mode this
 # arrangement exists to make impossible.
-test: test-go test-site
+# The suite below builds the tree with `-tags 'testing no_ui'`, which is not the tree a
+# release ships. A symbol that only exists behind that tag reads fine here and breaks
+# `make build`, and nothing caught it: seenGuard was declared in a testing-tagged file and
+# referenced unconditionally, so every test passed while every release build failed. This
+# builds the configuration that actually ships, and it is first so a broken release build
+# is reported before a suite that cannot be trusted to have seen it.
+test-build:
+	go build ./...
+
+test: test-build test-go test-site
 
 # Split out so a Go-only contributor does not have to stand up a 505MB bun install to check
 # a Go change. Cost of merging these two again: 5.78s plus 505MB per Go-only change, which

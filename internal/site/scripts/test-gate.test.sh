@@ -11,7 +11,7 @@ gate="${here}/test-gate.sh"
 repo="$(cd "${here}/../../.." && pwd)"
 valve='BESZEL_ALLOW_SITE_TESTS_NOT_RUN'
 
-EXPECTED_ASSERTIONS=38
+EXPECTED_ASSERTIONS=40
 passed=0
 failed=0
 seq_no=0
@@ -412,6 +412,13 @@ case "$test_plan" in
 *"go test -tags='testing no_ui' ./..."*) ok "make test includes the Go suite" ;;
 *) no "make test must run the Go suite, got: ${test_plan}" ;;
 esac
+# The suite runs with -tags 'testing no_ui', which is not the tree a release ships.
+# Without this the gate is blind to a seam or fixture that leaked into production
+# code, which is exactly how seenGuard shipped a build that could not compile.
+case "$test_plan" in
+*"go build ./..."*) ok "make test builds the release configuration, not only the tagged one" ;;
+*) no "make test must build the tree without the testing tags, got: ${test_plan}" ;;
+esac
 case "$test_plan" in
 *test-gate.sh*) ok "make test runs the site gate script" ;;
 *) no "make test must run the site gate script, got: ${test_plan}" ;;
@@ -420,17 +427,17 @@ case "$test_plan" in
 *test-gate.test.sh*) ok "make test runs the site gate self-test first" ;;
 *) no "make test must run the site gate self-test first, got: ${test_plan}" ;;
 esac
-recipes="$(awk '/^(test|test-go|test-site):/{f=1;next} /^[^\t].*:/{f=0} f' "${repo}/Makefile")"
+recipes="$(awk '/^(test|test-build|test-go|test-site):/{f=1;next} /^[^\t].*:/{f=0} f' "${repo}/Makefile")"
 if printf '%s\n' "$recipes" | grep -qE '^[[:space:]]*-| \|\| '; then
 	no "the test recipes must contain no ignored or tolerated failure, got: ${recipes}"
 else
 	ok "the test recipes contain no ignored or tolerated failure"
 fi
 
-# A stray file named `test`, `test-go` or `test-site` would shadow the target and let
+# A stray file named `test`, `test-build`, `test-go` or `test-site` would shadow the target and let
 # `make test` do something other than run tests: the same lie from a new direction.
 phony="$(grep -m1 '^\.PHONY:' "${repo}/Makefile")"
-for target in test test-go test-site; do
+for target in test test-build test-go test-site; do
 	case " $phony " in
 	*" ${target} "*)
 		ok "Makefile declares ${target} .PHONY, so a file cannot shadow it"

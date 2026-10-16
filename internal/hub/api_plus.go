@@ -57,6 +57,18 @@ func (h *Hub) registerPlusFanRoutes(se *core.ServeEvent) error {
 		pfand: pfandAction,
 	}
 	fc.guard = fanapi.New(fc.deps)
+	if seenGuard != nil {
+		seenGuard(fc.guard)
+	}
+
+	// A daemon that is not running has nobody else watching the fan, and the guard that
+	// watches it lives in this process and dies with it. The floor is therefore armed
+	// from the device rather than from memory: whatever a restart did to the pending
+	// state, the daemon being down is visible right now, and that alone is reason to
+	// hold a floor.
+	if !fc.deps.PfandUp() {
+		fc.guard.ArmThermalFloor()
+	}
 
 	g := se.Router.Group("/api/plus/fan")
 	g.Bind(apis.RequireAuth())
@@ -257,6 +269,15 @@ func (fc *fanRoutes) mode(e *core.RequestEvent) error {
 		return coded(e, http.StatusInternalServerError,
 			"could not change the curve daemon's state", fanapi.InternalFault.Code)
 	}
+	// Manual took pfand's control loop away, so the floor takes over watching the
+	// fan. Arming follows the daemon actually stopping, so a stop that failed leaves
+	// no floor: a floor outliving its own daemon would be a second writer on one fan.
+	if req.Mode == "manual" {
+		fc.guard.ArmThermalFloor()
+	} else {
+		fc.guard.DisarmThermalFloor()
+	}
+
 	return e.JSON(http.StatusOK, map[string]any{
 		"mode":         req.Mode,
 		"pfand_active": fc.deps.PfandUp(),

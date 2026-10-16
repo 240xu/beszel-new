@@ -194,6 +194,11 @@ type fanHarness struct {
 	handler http.Handler
 	rig     *fanRig
 	tokens  map[string]string
+	// guard is the guard these routes were built with. Captured through the guard seam
+	// because registerPlusFanRoutes builds it and never hands it out, and the thermal
+	// floor writes nothing until the package is past the emergency edge -- which a route
+	// test cannot arrange by waiting.
+	guard *fanapi.Guard
 }
 
 // newFanHarness builds a hub whose fan routes are faked. The seam is replaced
@@ -204,7 +209,11 @@ type fanHarness struct {
 // fake. t.Parallel is not used anywhere in this file for the same reason.
 var seamMu sync.Mutex
 
-func newFanHarness(t *testing.T) *fanHarness {
+func newFanHarness(t *testing.T, opts ...func(*fanRig)) *fanHarness {
+	// opts adjust the rig before the routes are built. The daemon state has to be set
+	// here rather than after the harness returns, because registerPlusFanRoutes reads
+	// it while registering: a test that wants to prove the mode endpoint armed the
+	// floor cannot have had it armed for it at startup.
 	t.Helper()
 	seamMu.Lock()
 	t.Cleanup(seamMu.Unlock)
@@ -215,6 +224,9 @@ func newFanHarness(t *testing.T) *fanHarness {
 	t.Cleanup(testHub.Cleanup)
 
 	rig := &fanRig{level: 25, temp: 46, curve: []byte(testCurveSource)}
+	for _, opt := range opts {
+		opt(rig)
+	}
 
 	admin, err := beszelTests.CreateUserWithRole(testHub, "admin@example.com", "password123", "admin")
 	require.NoError(t, err)
@@ -236,6 +248,11 @@ func newFanHarness(t *testing.T) *fanHarness {
 	}}
 
 	restore := hub.SetFanSeams(rig.deps, rig.pfandAction)
+	restoreGuard := hub.SetGuardSeam(func(g *fanapi.Guard) *fanapi.Guard {
+		h.guard = g
+		return g
+	})
+	t.Cleanup(restoreGuard)
 	t.Cleanup(restore)
 
 	router, err := apis.NewRouter(testHub.TestApp)

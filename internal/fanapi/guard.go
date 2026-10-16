@@ -21,6 +21,12 @@ const (
 	regressRetryMax  = 5 * time.Minute
 )
 
+// How often an armed thermal floor reads the package temperature. Deliberately its own
+// number rather than a reuse of regressRetryBase: that one grows to five minutes to stop
+// hammering a device, and the floor exists precisely for the stretch where nothing else
+// is looking at the fan, so its cadence answers the fan and not a retry policy.
+const thermalFloorInterval = 30 * time.Second
+
 const (
 	// breakerThreshold is how many writes in a row must fail before the control
 	// path is presumed broken. A guard's refusal does not count: that is the guard
@@ -49,6 +55,10 @@ const (
 	OpSetLevel   Op = "set_level"
 	OpRegress    Op = "regress"
 	OpWriteCurve Op = "write_curve"
+	// OpThermalFloor is the floor that stands in for a daemon nobody is running.
+	// It is a separate op because it writes the fan without any operator
+	// having asked, which is not what regress or set_level describe.
+	OpThermalFloor Op = "thermal_floor"
 )
 
 // Outcome separates "we said no" from "we tried and could not".
@@ -139,6 +149,12 @@ type Guard struct {
 	timer     *time.Timer
 	// declines counts consecutive refusals, so the wait can grow
 	declines int
+
+	// floorOn and floorTimer are the manual-mode thermal floor. Kept apart from
+	// regressAt on purpose: a regress hands the fan back to its curve and ends,
+	// while the floor stays armed for as long as the daemon is gone.
+	floorOn    bool
+	floorTimer *time.Timer
 }
 
 // New builds a guard over the given seams.
@@ -493,6 +509,16 @@ func (g *Guard) clearRegressLocked() {
 	}
 }
 
+// ThermalFloorArmed reports whether the floor is currently standing in for a
+// curve daemon. Additive alongside PendingRegressAt so a panel can tell the two
+// apart: a regress deadline is a duty going home, an armed floor is a fan being
+// watched while it stays put.
+func (g *Guard) ThermalFloorArmed() bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.floorOn
+}
+
 // PendingRegressAt reports when the fan is due back on its curve, if at all.
 func (g *Guard) PendingRegressAt() time.Time {
 	g.mu.Lock()
@@ -525,6 +551,122 @@ func (g *Guard) audit(op Op, req Request, level, got int, err error) {
 	}
 	if e.Outcome == OutcomeApplied {
 		e.Level = got
+	}
+	g.d.Audit(e)
+}
+
+// thermalFloorActor names the writer in an audit trail, since no operator asked for this
+// write and a record with an empty actor is a record nobody can trace back.
+const thermalFloorActor = "thermal-floor"
+
+// ArmThermalFloor guarantees a thermal bottom line while no curve daemon is running.
+//
+// Manual mode stops pfand, and pfand is the only control loop in the process: nothing
+// else reads the package temperature, so a duty left in force would sit there for ever
+// with no path to the emergency duty. This arms a timer that does one thing -- read the
+// temperature, and at or past the edge put the fan on the curve's own emergency duty.
+// Below the edge it writes nothing at all.
+//
+// It deliberately does not return the fan to its curve and does not expire. Manual means
+// manual: the operator chose this duty, and taking it away on a timer would be the guard
+// overruling them. Only the emergency edge moves the fan, because only the emergency edge
+// is the guard's business.
+//
+// Arming twice keeps the single timer, so a caller that arms on every poll cannot stack
+// writes onto the same duty.
+func (g *Guard) ArmThermalFloor() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.floorOn {
+		return
+	}
+	g.floorOn = true
+	g.armFloorLocked(g.d.Now())
+}
+
+// DisarmThermalFloor stands the floor down. Safe to call when it was never armed, so a
+// caller restoring the daemon does not have to know whether it had been holding a floor.
+func (g *Guard) DisarmThermalFloor() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.disarmFloorLocked()
+}
+
+func (g *Guard) disarmFloorLocked() {
+	g.floorOn = false
+	if g.floorTimer != nil {
+		g.floorTimer.Stop()
+		g.floorTimer = nil
+	}
+}
+
+// armFloorLocked puts the next look on the schedule. Called with the lock held, and
+// tolerant of a disarmed floor so a tick that raced a disarm cannot resurrect itself.
+func (g *Guard) armFloorLocked(now time.Time) {
+	if !g.floorOn {
+		return
+	}
+	if g.floorTimer != nil {
+		g.floorTimer.Stop()
+	}
+	g.floorTimer = g.d.AfterFunc(thermalFloorInterval, func() { g.floorTick() })
+}
+
+// floorTick is the floor's only action. It re-arms itself on every path out, including
+// the ones where it declined to write: a floor that stopped checking because one read
+// went wrong would be the one failure it exists to prevent.
+func (g *Guard) floorTick() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	if !g.floorOn {
+		return
+	}
+	now := g.d.Now()
+
+	// The floor stands in for a daemon that was asked to stop. If the daemon is running
+	// it is the control loop again, and the floor writes to a fan somebody else owns.
+	if g.d.PfandUp() {
+		g.disarmFloorLocked()
+		return
+	}
+
+	// The curve is read on its own because a missing curve and a missing sensor are not
+	// the same failure: without the curve there is no emergency duty to justify writing,
+	// while without the sensor there is every reason to write the one we already know.
+	c, cerr := g.d.ReadCurve()
+	if cerr != nil || c == nil {
+		g.armFloorLocked(now)
+		return
+	}
+	temp, terr := g.d.ReadTempC()
+
+	// An unreadable sensor is not proof the edge is clear. pfand treats the same reading
+	// as the hottest it can prove and holds full speed; a floor that went quiet on a dead
+	// sensor would be less safe than the daemon it replaced.
+	if terr != nil || temp >= c.Emerg {
+		g.holdFloorLocked(now, c.E, temp, terr)
+	}
+	g.armFloorLocked(now)
+}
+
+// holdFloorLocked writes the emergency duty and says so. A failed write is recorded as
+// failed rather than dropped, because an operator looking at a cooling fan needs to see
+// that the floor tried and could not.
+func (g *Guard) holdFloorLocked(now time.Time, duty, temp int, readErr error) {
+	err := g.holdEmergencyLocked(now, duty)
+	e := Event{
+		Op: OpThermalFloor, Actor: thermalFloorActor, Level: duty, At: g.d.Now(),
+	}
+	if err != nil {
+		e.Outcome = OutcomeFailed
+		e.Reason = err.Error()
+		if readErr != nil {
+			e.Reason = "the package temperature could not be read: " + readErr.Error()
+		}
+	} else {
+		e.Outcome = OutcomeHeld
+		e.Reason = "the curve daemon is not running; the emergency duty is held by the guard"
 	}
 	g.d.Audit(e)
 }

@@ -34,39 +34,32 @@
 
 本 fork 未修改上游的模块路径（`github.com/henrygd/beszel`）。
 
-### ⚠️ 与上游同步：没有共同祖先，**不能**直接 rebase
+### 与上游同步：普通 rebase / merge 即可
 
-这一条写在这里是因为「改了模块路径所以能 rebase」是一个很容易被默认成立的假设。它在这里**不成立**：
+这一节曾经写着相反的话，说本仓库与上游**没有共同祖先**、因此不能直接 rebase。那是本仓库历史被重写、只保留一份上游树的内容等价副本时的状态。它已经不是了 —— 项目提交已重放到真实上游 `v0.21.0`（`ec96c13`）之上，所以共同祖先存在，向上游同步是一次普通的 rebase 或 merge：
 
 ```console
-$ git merge-base HEAD v0.21.0     # 无输出，退出码 1
+$ git merge-base HEAD v0.21.0
+ec96c134660c998f7eb044e349e3715b65733fe1
+$ git rev-list --count v0.21.0..HEAD
+97
 ```
 
-原因是本仓库的历史**被重写过**。仓库里的 `v0.21.0` / `baseline-v0.21.0` 两个 tag 指向 `ec96c13`（上游的 release 0.21.0 提交，带 PGP 签名），而本仓库 HEAD 线的根提交是 `577694c`：
+核对用的事实（2026-10-16 实测）：仓库是**完整克隆**（1842 个提交，无 `.git/shallow`）；HEAD 线的根提交是上游自己的 `93e94bde`（"first commit"，Henry Dollman），不是本仓库造的孤根；`ec96c13` **在 `beszel-new` 分支的历史里**，不是悬空的边界。
 
-| | `ec96c13`（tag 指向） | `577694c`（HEAD 根提交） |
-|---|---|---|
-| tree | `dd4ac30` | `dd4ac30`（**完全相同**） |
-| parent | `e597dd94…` | **无**（成了根提交） |
-| gpgsig | 有 | **无** |
+所以「改了模块路径所以能 rebase」这个假设在今天**是成立的** —— 曾经不成立，是当时的历史状态决定的，而现在那个状态已经不在了。
 
-即 `577694c` 是上游 v0.21.0 的**内容等价副本**（单提交引入 575 个文件），但父提交被截断、PGP 签名被剥除。`ec96c13` 只作为 shallow 边界存在，**不属于任何分支**，所以 git 找不到共同祖先。
+### ⚠️ 两个 baseline tag 仍未推到远端
 
-**后果**：把本仓库 rebase 到上游 `v0.21.0` 之上，重放的是**整棵树**而不是一小段增量差异 —— 这不是「rebase」，是把上游重新导入一遍。同步上游需要按文件比对人工搬运，细节与代价见 [DEVELOPMENT.md](./DEVELOPMENT.md)。
+`v0.21.0` 与 `baseline-v0.21.0` 都在本地、都指向 `ec96c13`，而 `240xu/beszel-new` 远端**一个 tag 都没有**（`git ls-remote --tags origin` 返回 0 行）。
 
-### ⚠️ 两个 baseline tag 是本地参考点，不是可用的对比基线
+⚠️ 旧版本把原因写成「shallow update not allowed」。**那个原因已经失效** —— 仓库不再是 shallow 克隆，所以现在推不上去的原因没有被验证过，不要照抄旧结论，也不要假设 `git push --tags` 一定会失败。真实情况需要实测。
 
-`v0.21.0` 与 `baseline-v0.21.0` 都指向 shallow 边界 `ec96c13`。凡是指向该边界的 ref，推送时会被远端拒绝：
+无论原因是什么，「tag 推送失败而分支推送成功」这个组合仍然最容易误判：命令报了错、退出码非零，但**仓库其实已经发布了一部分**。要判断发布是否成功，看 `git ls-remote origin refs/heads/beszel-new` 有没有你的提交，而不是看 `git push` 的退出码。
 
-```
-! [remote rejected] v0.21.0 -> v0.21.0 (shallow update not allowed)
-```
+这两个 tag 仍然可以用于**本地树比对**（`git diff baseline-v0.21.0..HEAD -- go.mod go.sum`）；但不能把它们当作「别人能检出的对比基线」。
 
-所以：**它们推不上去**，`git push --tags` 会因此退出 1。而分支能正常推送 —— 这组合最容易误判：命令报了错、退出码非零，但**仓库其实已经发布了一半**。（`git push --follow-tags` 退出 0，但只推得动分支。）
-
-可以用它们做**本地树比对**（`git diff baseline-v0.21.0..HEAD -- go.mod go.sum` 这类），这是有效的；不能把它们当作「已发布的、可被别人检出的对比基线」。
-
-⚠️ 另有一个操作陷阱：本仓库 `origin` 的 fetch refspec 被设成了 tag-only（只抓 `v0.21.0` 这一个 tag）。这意味着 `git fetch origin` **永远不会更新分支**，只更新那个推不上去的 tag。
+origin 的 fetch refspec 是正常的（`+refs/heads/*` 加 `+refs/tags/*`），`git fetch origin` 会同时更新分支与 tag。
 
 ---
 
@@ -216,7 +209,7 @@ bun run --cwd internal/site build   # lingui extract + lingui compile + tsc -b +
 - **第二台机器上的 DMI 匹配** —— 没有第二台可匹配。
 - **`ec_sys` 后端** —— 在已发布的二进制里不可达；这属于开发细节，记在 [DEVELOPMENT.md](./DEVELOPMENT.md)，此处不展开。
 - **站点能否真正构建** —— CI 打桩通过，从未验证过真实构建。
-- **`git rebase` 到上游** —— 不存在共同祖先，做不到；见「与上游同步」一节。
+- **上游同步的实操验证** —— 共同祖先已存在（`merge-base HEAD v0.21.0` = `ec96c13`），rebase 是可行的；但**在真实的新版本上跑过一次完整 rebase 还没有做过**，见「与上游同步」一节。
 
 ---
 

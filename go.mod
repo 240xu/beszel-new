@@ -7,7 +7,7 @@ require (
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/distribution/reference v0.6.0
 	github.com/ebitengine/purego v0.11.1
-	github.com/fxamacker/cbor/v2 v2.9.4
+	github.com/fxamacker/cbor/v2 v2.9.6
 	github.com/gliderlabs/ssh v0.3.8
 	github.com/lxzan/gws v1.10.2
 	github.com/mdlayher/genetlink v1.4.0
@@ -30,6 +30,7 @@ require (
 	golang.org/x/sys v0.48.0
 	gopkg.in/yaml.v3 v3.0.1
 	howett.net/plist v1.0.1
+	modernc.org/sqlite v1.57.0
 )
 
 require (
@@ -78,5 +79,4 @@ require (
 	modernc.org/libc v1.74.4 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
-	modernc.org/sqlite v1.57.0 // indirect
 )

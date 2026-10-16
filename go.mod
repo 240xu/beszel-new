@@ -16,7 +16,7 @@ require (
 	github.com/nicholas-fedor/shoutrrr v0.21.1
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/pocketbase/dbx v1.12.0
-	github.com/pocketbase/pocketbase v0.40.4
+	github.com/pocketbase/pocketbase v0.40.5
 	github.com/safchain/ethtool v0.7.0
 	github.com/shirou/gopsutil/v4 v4.26.9
 	github.com/spf13/cast v1.10.0
@@ -30,7 +30,7 @@ require (
 	golang.org/x/sys v0.49.0
 	gopkg.in/yaml.v3 v3.0.1
 	howett.net/plist v1.0.1
-	modernc.org/sqlite v1.57.0
+	modernc.org/sqlite v1.60.1
 )
 
 require (
@@ -54,7 +54,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/compress v1.20.1 // indirect
 	github.com/lufia/plan9stats v0.0.0-20260802145828-341c2f0c90b5 // indirect
-	github.com/mattn/go-colorable v0.1.15 // indirect
+	github.com/mattn/go-colorable v0.1.16 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/mdlayher/socket v0.7.0 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
@@ -76,7 +76,7 @@ require (
 	mellium.im/sasl v0.3.2 // indirect
 	mellium.im/xmlstream v0.15.4 // indirect
 	mellium.im/xmpp v0.23.0 // indirect
-	modernc.org/libc v1.74.4 // indirect
+	modernc.org/libc v1.77.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 )

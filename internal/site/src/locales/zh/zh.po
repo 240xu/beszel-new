@@ -1334,11 +1334,11 @@ msgstr "有可用的映像檔更新"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "In force"
-msgstr "已生效"
+msgstr "保持中"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "In force — the fan is running this now."
-msgstr "已生效 — 风扇当前正按此运行。"
+msgstr "保持中—风扇当前正按此运行。"
 
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Inactive"

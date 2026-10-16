@@ -287,6 +287,94 @@ for (const locale of CHINESE_LOCALES) {
 			/(请先|请|應先|应先|应该|應該|需要)[^，。]*降温|cooling the machine|cool the machine/i
 		)
 	})
+	/** The clause each safety prompt must actually SAY, as opposed to the words it
+	 *  must avoid. A forbidden list is the wrong instrument and this suite has the
+	 *  scar to prove it: the hand-back check below only ever looked for
+	 *  自动 / 自動 / auto, and seven synonymous renderings claiming the firmware will
+	 *  return the fan all passed it -- 自行归还, 无需人工干预, 已启用, 冷却,
+	 *  守护进程会接管, 到达时限后即恢复, 已确认并写入. A gate that only forbids a
+	 *  vocabulary is one reword away from green again.
+	 *
+	 *  So each prompt here names the clause that carries its meaning, and dropping the
+	 *  clause fails instead of a choice of words. The markers are the ones the shipped
+	 *  catalog already uses -- zh-CN reads 需要由你自己来操作, 本代理不会写入,
+	 *  返回曲线, 保持中 -- so nothing here asks a translator for a vocabulary the
+	 *  product has never used. */
+	const REQUIRED_CLAUSES: ReadonlyArray<readonly [string, RegExp, string]> = [
+		[
+			"Duty written to the firmware. Nothing writes it back afterwards: the firmware reads zero as zero percent, so returning the fan to its curve is yours to do.",
+			/你自己|由你(来)?操作|你的(操作|事)/,
+			"the operator, not the firmware, owns the hand-back",
+		],
+		[
+			"A hand-set duty is on record with no deadline on file. It stays in force: this agent writes no duty to hand it back, so use Return to the curve.",
+			/本代理不会|不会写入任何/,
+			"the sentence that nothing will hand the fan back is the warning itself",
+		],
+		[
+			"A hand-set duty is on record. It stays in force: this agent writes no duty to hand it back, so use Return to the curve.",
+			/本代理不会|不会写入任何/,
+			"the sentence that nothing will hand the fan back is the warning itself",
+		],
+		[
+			"The package is at or above the emergency edge in the curve, so no duty was written. Let it cool, or raise emerg in the curve, before writing again.",
+			/没有写入|沒有寫入/,
+			"the write did not happen, and an operator who thinks it did will not cool the machine",
+		],
+		[
+			"The package temperature could not be read, so no duty was written and the reading cannot be trusted. Check the sensor and the zone it names rather than cooling the machine.",
+			/没有写入|沒有寫入/,
+			"the write did not happen, and the reading is not to be trusted",
+		],
+		[
+			"In force",
+			/保持|仍在/,
+			"the duty is retained by firmware; 生效 would say a policy took effect instead",
+		],
+		[
+			"In force — the fan is running this now.",
+			/保持|仍在/,
+			"the duty is retained by firmware; 生效 would say a policy took effect instead",
+		],
+	]
+
+	/** Renderings that carry the wrong claim. Kept beside the required clauses rather
+	 *  than folded into the hand-back word list, because each of these is the safe
+	 *  sentence rendered as an unsafe one rather than a stray danger word. */
+	const FORBIDDEN_CLAUSES: ReadonlyArray<readonly [string, RegExp, string]> = [
+		["In force", /生效/, "已生效 reads as a policy having taken effect; nothing is applying this duty"],
+		["In force — the fan is running this now.", /生效/, "已生效 reads as a policy having taken effect"],
+		[
+			"Duty written to the firmware. Nothing writes it back afterwards: the firmware reads zero as zero percent, so returning the fan to its curve is yours to do.",
+			/自行归还|会自动|會自動/,
+			"the hand-back belongs to the operator",
+		],
+	]
+
+	test(`${locale} keeps the clause each safety prompt exists for`, () => {
+		const missing: string[] = []
+		for (const [msgid, marker, why] of REQUIRED_CLAUSES) {
+			const value = translated(locale, msgid)
+			if (value === undefined || value.length === 0) {
+				missing.push(`${msgid.slice(0, 40)}... (absent) -- ${why}`)
+				continue
+			}
+			if (!marker.test(value)) missing.push(`${msgid.slice(0, 40)}... -> ${value} -- ${why}`)
+		}
+		expect(missing).toEqual([])
+	})
+
+	test(`${locale} does not render a safety prompt as its unsafe twin`, () => {
+		const wrong: string[] = []
+		for (const [msgid, marker, why] of FORBIDDEN_CLAUSES) {
+			const value = translated(locale, msgid)
+			if (value === undefined || value.length === 0) continue
+			if (marker.test(value)) wrong.push(`${msgid.slice(0, 40)}... -> ${value} -- ${why}`)
+		}
+		expect(wrong).toEqual([])
+	})
+
+
 }
 
 /** The guard test that follows is not about counts. `plus-fan-view.ts` used to own

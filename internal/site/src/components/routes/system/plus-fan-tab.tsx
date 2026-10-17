@@ -296,6 +296,13 @@ export function PlusFanTab({ grid, dataEmpty }: { grid: boolean; dataEmpty: bool
 							<span className="font-mono">{fmtCelsius(state.pkg_temp_c)}</span>
 						</div>
 
+						{/* The agent reports the thermal floor on its own boolean, so a hold the daemon
+						 *  enforces is not one of this panel's writes: the badge rises from the state alone
+						 *  and skips when an older agent answers without the field. */}
+						{state.thermal_floor_armed === true && (
+							<span className="font-medium">{t`Thermal guard holding`}</span>
+						)}
+
 						<Button
 							variant={manual ? "default" : "outline"}
 							size="sm"

@@ -1334,6 +1334,9 @@ msgstr "In force"
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "In force — the fan is running this now."
 msgstr "In force — the fan is running this now."
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Thermal guard holding"
+msgstr "Thermal guard holding"
 
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Inactive"

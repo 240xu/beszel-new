@@ -363,9 +363,11 @@ func coded(e *core.RequestEvent, status int, message, code string) error {
 func decodeBody(e *core.RequestEvent, dst any) error {
 	body, err := readFanBody(e)
 	if err != nil {
+		slog.Warn("fan request body could not be read", "actor", actor(e), "err", err)
 		return e.BadRequestError("invalid body", nil)
 	}
 	if err := strictJSON(body, dst); err != nil {
+		slog.Warn("fan request body would not parse", "actor", actor(e), "err", err)
 		return e.BadRequestError("invalid body", nil)
 	}
 	return nil
@@ -450,9 +452,11 @@ func decodeCurveRequest(e *core.RequestEvent) (*curveRequest, error) {
 	// which is what curve_rejected already means, so it is named rather than guessed at.
 	body, err := readFanBody(e)
 	if err != nil {
+		slog.Warn("fan curve request body could not be read", "actor", actor(e), "err", err)
 		return nil, coded(e, http.StatusBadRequest, "invalid body", fanapi.Classify(fanapi.ErrCurveRejected).Code)
 	}
 	if err := strictJSON(body, &req); err != nil {
+		slog.Warn("fan curve request body would not parse", "actor", actor(e), "err", err)
 		return nil, coded(e, http.StatusBadRequest, "invalid body", fanapi.Classify(fanapi.ErrCurveRejected).Code)
 	}
 	for i, v := range req.values() {

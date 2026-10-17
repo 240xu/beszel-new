@@ -73,3 +73,33 @@ func TestStartingWithTheDaemonDownArmsTheThermalFloor(t *testing.T) {
 	assert.True(t, h.guard.ThermalFloorArmed(),
 		"a hub that starts with no daemon must still be watching the fan")
 }
+
+// The state read has to see the same floor the writes arm and disarm, so a panel
+// is never told one thing while the guard believes another.
+
+func TestStateThermalFloorDisarmedByDefault(t *testing.T) {
+	h := newFanHarness(t, withDaemonUp)
+	require.False(t, h.guard.ThermalFloorArmed(),
+		"precondition: the daemon is running and nothing has armed a floor")
+
+	rec := h.do(t, "admin", http.MethodGet, "/api/plus/fan/state", nil)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	assert.False(t, decodeBody(t, rec)["thermal_floor_armed"].(bool),
+		"with no armed floor, state must not report one")
+}
+
+func TestStateThermalFloorArmedAfterManualMode(t *testing.T) {
+	h := newFanHarness(t, withDaemonUp)
+
+	rec := h.do(t, "admin", http.MethodPost, "/api/plus/fan/mode",
+		map[string]any{"mode": "manual", "confirm": true})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.True(t, h.guard.ThermalFloorArmed(), "precondition: manual armed the floor")
+
+	rec = h.do(t, "admin", http.MethodGet, "/api/plus/fan/state", nil)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	assert.True(t, decodeBody(t, rec)["thermal_floor_armed"].(bool),
+		"state is the panel-visible side of the same floor the write armed")
+}

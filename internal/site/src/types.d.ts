@@ -900,6 +900,9 @@ export interface FanState {
 	pkg_temp_c: number | null
 	regress_pending: boolean
 	regress_at?: string
+	/** The thermal floor the agent enforces while heat forbids a lower duty;
+	 *  an older agent answers without it, so absent reads as not holding. */
+	thermal_floor_armed?: boolean
 	/** Rides along, so an editor cannot be built against a stale curve. */
 	curve: FanCurve | null
 }

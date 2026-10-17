@@ -1339,6 +1339,9 @@ msgstr "保持中"
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "In force — the fan is running this now."
 msgstr "保持中——风扇当前正按此运行。"
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Thermal guard holding"
+msgstr "温度防线持档"
 
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Inactive"

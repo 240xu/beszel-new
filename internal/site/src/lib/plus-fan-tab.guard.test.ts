@@ -217,3 +217,10 @@ test("no two refusals share a sentence in this panel either", async () => {
 test("the panel never names a write route, so a confirm flag cannot be chosen at a call site", async () => {
 	expect(occurrences(await read(TAB), /\bsetFanLevel\b|\bsetFanMode\b|\bsaveCurve\b/)).toEqual([])
 })
+
+test("the thermal floor the agent reports renders its own badge", async () => {
+	// The hold arrives on the fan state as its own boolean, so the badge is not
+	// bound to a write outcome and can surface while no write is in the air.
+	expect(occurrences(await read(TAB), /state\.thermal_floor_armed\s*===\s*true/)).not.toEqual([])
+	expect(occurrences(await read(TAB), /t`Thermal guard holding`/)).not.toEqual([])
+})

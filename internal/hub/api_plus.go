@@ -204,6 +204,8 @@ func (fc *fanRoutes) state(e *core.RequestEvent) error {
 	} else {
 		body["regress_pending"] = false
 	}
+	body["thermal_floor_armed"] = fc.guard.ThermalFloorArmed()
+
 	if c, cerr := fc.deps.ReadCurve(); cerr == nil {
 		body["curve"] = curveToWire(c)
 	} else {

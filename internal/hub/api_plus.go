@@ -555,6 +555,7 @@ func (a *fanAudit) load() {
 		}
 		return
 	}
+	skipped := 0
 	for _, line := range strings.Split(strings.TrimRight(string(raw), "\n"), "\n") {
 		if line == "" {
 			continue
@@ -562,10 +563,14 @@ func (a *fanAudit) load() {
 		var r auditRecord
 		if err := json.Unmarshal([]byte(line), &r); err != nil {
 			slog.Warn("fan audit line skipped", "path", a.path, "err", err)
+			skipped++
 			continue
 		}
 		a.events = append(a.events, eventOf(r))
 		a.onDisk++
+	}
+	if skipped > 0 {
+		slog.Warn("fan audit trail dropped lines it could not read", "path", a.path, "count", skipped)
 	}
 	a.trimLocked()
 }
@@ -601,11 +606,17 @@ func (a *fanAudit) trimLocked() {
 	}
 	keep := a.events[len(a.events)-fanAuditLimit:]
 	var body strings.Builder
+	dropped := 0
 	for _, e := range keep {
 		if line, err := json.Marshal(recordOf(e)); err == nil {
 			body.Write(line)
 			body.WriteByte(10)
+		} else {
+			dropped++
 		}
+	}
+	if dropped > 0 {
+		slog.Warn("fan audit trim dropped lines it could not write", "path", a.path, "count", dropped)
 	}
 	if err := os.WriteFile(a.path, []byte(body.String()), 0o600); err != nil {
 		slog.Warn("fan audit trim failed", "path", a.path, "err", err)

@@ -128,3 +128,20 @@ func TestDisarmingTheThermalFloorStopsIt(t *testing.T) {
 	assert.Len(t, f.writeCalls, writesBefore, "a disarmed floor must not write")
 	assert.Len(t, f.waits, waitsBefore, "a disarmed floor must not put itself back on the schedule")
 }
+
+func TestClosingTheGuardTakesTheFloorWithIt(t *testing.T) {
+	f := newFixture(t)
+	f.g.ArmThermalFloor()
+	require.True(t, f.g.ThermalFloorArmed(), "precondition: the floor must be live before Close")
+	f.g.Close()
+	assert.False(t, f.g.ThermalFloorArmed(),
+		"the floor must not outlive the guard that was watching the fan")
+	f.temp = 85
+	writesBefore := len(f.writeCalls)
+	waitsBefore := len(f.waits)
+	f.g.floorTick()
+	assert.Len(t, f.writeCalls, writesBefore,
+		"after Close no tick may write the emergency duty again")
+	assert.Len(t, f.waits, waitsBefore,
+		"after Close no tick may put the floor back on the schedule")
+}

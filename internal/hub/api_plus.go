@@ -363,9 +363,11 @@ func coded(e *core.RequestEvent, status int, message, code string) error {
 func decodeBody(e *core.RequestEvent, dst any) error {
 	body, err := readFanBody(e)
 	if err != nil {
+		slog.Warn("fan request body could not be read", "actor", actor(e), "err", err)
 		return e.BadRequestError("invalid body", nil)
 	}
 	if err := strictJSON(body, dst); err != nil {
+		slog.Warn("fan request body would not parse", "actor", actor(e), "err", err)
 		return e.BadRequestError("invalid body", nil)
 	}
 	return nil
@@ -450,9 +452,11 @@ func decodeCurveRequest(e *core.RequestEvent) (*curveRequest, error) {
 	// which is what curve_rejected already means, so it is named rather than guessed at.
 	body, err := readFanBody(e)
 	if err != nil {
+		slog.Warn("fan curve request body could not be read", "actor", actor(e), "err", err)
 		return nil, coded(e, http.StatusBadRequest, "invalid body", fanapi.Classify(fanapi.ErrCurveRejected).Code)
 	}
 	if err := strictJSON(body, &req); err != nil {
+		slog.Warn("fan curve request body would not parse", "actor", actor(e), "err", err)
 		return nil, coded(e, http.StatusBadRequest, "invalid body", fanapi.Classify(fanapi.ErrCurveRejected).Code)
 	}
 	for i, v := range req.values() {
@@ -551,6 +555,7 @@ func (a *fanAudit) load() {
 		}
 		return
 	}
+	skipped := 0
 	for _, line := range strings.Split(strings.TrimRight(string(raw), "\n"), "\n") {
 		if line == "" {
 			continue
@@ -558,10 +563,14 @@ func (a *fanAudit) load() {
 		var r auditRecord
 		if err := json.Unmarshal([]byte(line), &r); err != nil {
 			slog.Warn("fan audit line skipped", "path", a.path, "err", err)
+			skipped++
 			continue
 		}
 		a.events = append(a.events, eventOf(r))
 		a.onDisk++
+	}
+	if skipped > 0 {
+		slog.Warn("fan audit trail dropped lines it could not read", "path", a.path, "count", skipped)
 	}
 	a.trimLocked()
 }
@@ -597,11 +606,17 @@ func (a *fanAudit) trimLocked() {
 	}
 	keep := a.events[len(a.events)-fanAuditLimit:]
 	var body strings.Builder
+	dropped := 0
 	for _, e := range keep {
 		if line, err := json.Marshal(recordOf(e)); err == nil {
 			body.Write(line)
 			body.WriteByte(10)
+		} else {
+			dropped++
 		}
+	}
+	if dropped > 0 {
+		slog.Warn("fan audit trim dropped lines it could not write", "path", a.path, "count", dropped)
 	}
 	if err := os.WriteFile(a.path, []byte(body.String()), 0o600); err != nil {
 		slog.Warn("fan audit trim failed", "path", a.path, "err", err)

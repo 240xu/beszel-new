@@ -526,7 +526,8 @@ func (g *Guard) PendingRegressAt() time.Time {
 	return g.regressAt
 }
 
-// Close stops the pending regress timer.
+// Close stops the pending regress timer and any armed thermal floor: after Close
+// the process must leave the fan to whoever still owns it, not keep watching it.
 func (g *Guard) Close() {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -534,6 +535,7 @@ func (g *Guard) Close() {
 		g.timer.Stop()
 		g.timer = nil
 	}
+	g.disarmFloorLocked()
 }
 
 func (g *Guard) audit(op Op, req Request, level, got int, err error) {

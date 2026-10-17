@@ -42,22 +42,20 @@
 $ git merge-base HEAD v0.21.0
 ec96c134660c998f7eb044e349e3715b65733fe1
 $ git rev-list --count v0.21.0..HEAD
-97
+105
 ```
 
 核对用的事实（2026-10-16 实测）：仓库是**完整克隆**（1842 个提交，无 `.git/shallow`）；HEAD 线的根提交是上游自己的 `93e94bde`（"first commit"，Henry Dollman），不是本仓库造的孤根；`ec96c13` **在 `beszel-new` 分支的历史里**，不是悬空的边界。
 
 所以「改了模块路径所以能 rebase」这个假设在今天**是成立的** —— 曾经不成立，是当时的历史状态决定的，而现在那个状态已经不在了。
 
-### ⚠️ 两个 baseline tag 仍未推到远端
+### baseline tag 与上游 release tag 已在远端
 
 `v0.21.0` 与 `baseline-v0.21.0` 都指向 `ec96c13`，且**都已在远端**（`git ls-remote origin` 列出 `refs/tags/v0.21.0` 与 `refs/tags/baseline-v0.21.0`）。
 
-旧版本把原因写成「shallow update not allowed」。那个原因已失效 —— 仓库是完整克隆，而这两个 tag 及其它 78 个上游 tag 都已成功推到远端。
+旧版本把原因写成「shallow update not allowed」。那个原因已失效 —— 仓库是完整克隆。2026-10-17 起两个 baseline tag 与上游全部 release tag（`v0.0.1` … `v0.21.0`）均已推到远端（`git ls-remote origin refs/tags/` 核对）。
 
 无论原因是什么，「tag 推送失败而分支推送成功」这个组合仍然最容易误判：命令报了错、退出码非零，但**仓库其实已经发布了一部分**。要判断发布是否成功，看 `git ls-remote origin refs/heads/beszel-new` 有没有你的提交，而不是看 `git push` 的退出码。
-
-这两个 tag 仍然可以用于**本地树比对**（`git diff baseline-v0.21.0..HEAD -- go.mod go.sum`）；但不能把它们当作「别人能检出的对比基线」。
 
 origin 的 fetch refspec 是正常的（`+refs/heads/*` 加 `+refs/tags/*`），`git fetch origin` 会同时更新分支与 tag。
 

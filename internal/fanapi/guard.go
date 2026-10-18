@@ -155,6 +155,12 @@ type Guard struct {
 	// while the floor stays armed for as long as the daemon is gone.
 	floorOn    bool
 	floorTimer *time.Timer
+
+	// closed ends every watch this guard owns. Close sets it, and the entry
+	// points that could put work back on the schedule read it: a regress
+	// callback already in the air when Close ran must find a guard that is
+	// done, not rebuild the timer Close just stopped.
+	closed bool
 }
 
 // New builds a guard over the given seams.
@@ -377,6 +383,12 @@ func (g *Guard) record() {
 func (g *Guard) Regress() (bool, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	if g.closed {
+		// A callback in the air when Close ran lands here. Nothing is pending
+		// any more and nothing may be rescheduled: the handover it would try
+		// to run was ended on purpose, not forgotten.
+		return false, nil
+	}
 	now := g.d.Now()
 
 	did, held, heldLevel, err := g.regressLocked(now)
@@ -475,6 +487,9 @@ func (g *Guard) regressLocked(now time.Time) (bool, string, int, error) {
 }
 
 func (g *Guard) scheduleRegressLocked(now time.Time, delay time.Duration) {
+	if g.closed {
+		return
+	}
 	g.regressAt = now.Add(delay)
 	if g.timer != nil {
 		g.timer.Stop()
@@ -485,6 +500,9 @@ func (g *Guard) scheduleRegressLocked(now time.Time, delay time.Duration) {
 // retryLocked hands the decision on after a gate declined: one-shot timers meant a
 // handover that stopped short stayed stopped for good.
 func (g *Guard) retryLocked(now time.Time) {
+	if g.closed {
+		return
+	}
 	g.scheduleRegressLocked(now, regressRetryDelay(g.declines))
 	g.declines++
 }
@@ -528,13 +546,16 @@ func (g *Guard) PendingRegressAt() time.Time {
 
 // Close stops the pending regress timer and any armed thermal floor: after Close
 // the process must leave the fan to whoever still owns it, not keep watching it.
+//
+// Stopping the timers is not enough on its own: a regress callback that was
+// already queued when Close ran would run after it and rebuild the timer through
+// the retry path. closed is what those callbacks check, so closing is final
+// rather than merely up to date with the timers.
 func (g *Guard) Close() {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if g.timer != nil {
-		g.timer.Stop()
-		g.timer = nil
-	}
+	g.closed = true
+	g.clearRegressLocked()
 	g.disarmFloorLocked()
 }
 

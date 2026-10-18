@@ -122,7 +122,7 @@ test("a hot package and an unreadable sensor do not share a sentence", async () 
 
 test("every refusal the server can raise has a sentence of its own", async () => {
 	const source = await read(TAB)
-	const keys = new Set([...source.matchAll(/^\t([a-z_]+):\s*t`/gm)].map((m) => m[1]))
+	const keys = new Set([...source.matchAll(/^\t+([a-z_]+):\s*t`/gm)].map((m) => m[1]))
 	for (const code of FAN_REJECT_CODES) {
 		expect(keys.has(code)).toBe(true)
 	}

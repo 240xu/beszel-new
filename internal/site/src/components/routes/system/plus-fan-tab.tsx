@@ -21,41 +21,52 @@ import {
 import type { FanCurve, FanMode, FanState } from "@/types"
 import { ChartCard } from "./chart-card"
 
-/** Translations of the outcome wording `plus-fan-view.ts` owns. Typed against the
- *  outcome keys, so a kind cannot appear there without this failing to compile,
- *  and no arm can reach the badge of another. */
-const OUTCOME_TEXT: Record<FanOutcomeKind, string> = {
-	applied: t`In force — the fan is running this now.`,
-	pending_restart: t`Written to disk; the curve daemon has not picked it up.`,
-	daemon_running: t`The curve daemon is running and is driving the fan from the curve on disk.`,
-	daemon_stopped: t`The curve daemon is not running, so it is not driving the fan.`,
+/** The outcome wording `plus-fan-view.ts` owns, built where the panel renders. As
+ *  module-level tables these resolved once at import, so switching language later
+ *  left them in the language that was active at load; a function body re-reads the
+ *  literals on every render instead. Typed against the outcome keys, so a kind
+ *  cannot appear there without this failing to compile, and no arm can reach the
+ *  badge of another. */
+function outcomeCopy() {
+	const OUTCOME_TEXT: Record<FanOutcomeKind, string> = {
+		applied: t`In force — the fan is running this now.`,
+		pending_restart: t`Written to disk; the curve daemon has not picked it up.`,
+		daemon_running: t`The curve daemon is running and is driving the fan from the curve on disk.`,
+		daemon_stopped: t`The curve daemon is not running, so it is not driving the fan.`,
+	}
+
+	const OUTCOME_BADGE: Record<FanOutcomeKind, string> = {
+		applied: t`In force`,
+		pending_restart: t`Awaiting restart`,
+		daemon_running: t`Curve running`,
+		daemon_stopped: t`Curve stopped`,
+	}
+
+	return { OUTCOME_TEXT, OUTCOME_BADGE }
 }
 
-const OUTCOME_BADGE: Record<FanOutcomeKind, string> = {
-	applied: t`In force`,
-	pending_restart: t`Awaiting restart`,
-	daemon_running: t`Curve running`,
-	daemon_stopped: t`Curve stopped`,
-}
+/** The refusal wording, typed against `FanRefusalKey` for the same reason: a
+ *  refusal this build has a key for cannot fall through to a neighbour's sentence.
+ *  Built at render like the outcome copy above. */
+function refusalCopy() {
+	const REFUSAL_TEXT: Record<FanRefusalKey, string> = {
+		rollback_failed: t`The previous duty could not be restored: the fan is holding one you did not ask for.`,
+		write_unconfirmed: t`The fan is not holding the duty that was requested; the old one was put back.`,
+		write_failed: t`The fan control device refused the write.`,
+		confirm_required: t`The change was not confirmed, so the fan was left alone.`,
+		level_not_allowed: t`That duty is not one this firmware accepts.`,
+		curve_rejected: t`The curve failed validation and was rejected before anything was written.`,
+		pfand_active: t`The curve daemon owns the fan; stop it before setting a duty by hand.`,
+		package_too_hot: t`The package is at or above the emergency edge in the curve, so no duty was written. Let it cool, or raise emerg in the curve, before writing again.`,
+		temperature_unknown: t`The package temperature could not be read, so no duty was written and the reading cannot be trusted. Check the sensor and the zone it names rather than cooling the machine.`,
+		breaker_open: t`Fan control is latched open after repeated failures; nothing was written.`,
+		unsupported: t`Fan control is only implemented on Linux.`,
+		internal: t`The write did not complete.`,
+		unclassified: t`The server refused this without naming a reason, so nothing can be concluded about the fan.`,
+		unrecognised: t`The server refused this for a reason this build does not know.`,
+	}
 
-/** Translations of the refusal wording, typed against `FanRefusalKey` for the same
- *  reason: a refusal this build has a key for cannot fall through to a neighbour's
- *  sentence. */
-const REFUSAL_TEXT: Record<FanRefusalKey, string> = {
-	rollback_failed: t`The previous duty could not be restored: the fan is holding one you did not ask for.`,
-	write_unconfirmed: t`The fan is not holding the duty that was requested; the old one was put back.`,
-	write_failed: t`The fan control device refused the write.`,
-	confirm_required: t`The change was not confirmed, so the fan was left alone.`,
-	level_not_allowed: t`That duty is not one this firmware accepts.`,
-	curve_rejected: t`The curve failed validation and was rejected before anything was written.`,
-	pfand_active: t`The curve daemon owns the fan; stop it before setting a duty by hand.`,
-	package_too_hot: t`The package is at or above the emergency edge in the curve, so no duty was written. Let it cool, or raise emerg in the curve, before writing again.`,
-	temperature_unknown: t`The package temperature could not be read, so no duty was written and the reading cannot be trusted. Check the sensor and the zone it names rather than cooling the machine.`,
-	breaker_open: t`Fan control is latched open after repeated failures; nothing was written.`,
-	unsupported: t`Fan control is only implemented on Linux.`,
-	internal: t`The write did not complete.`,
-	unclassified: t`The server refused this without naming a reason, so nothing can be concluded about the fan.`,
-	unrecognised: t`The server refused this for a reason this build does not know.`,
+	return REFUSAL_TEXT
 }
 
 /** Threshold and duty fields an operator may retune. `t4` is the full-speed
@@ -91,10 +102,14 @@ const CURVE_CARRIED: Array<keyof FanCurve> = [
 	"iv",
 ]
 
-const ARMED_TITLE: Record<FanWrite["kind"], string> = {
-	level: t`Write this duty to the firmware`,
-	mode: t`Change the curve daemon's state`,
-	curve: t`Write this curve to the disk`,
+function armedCopy() {
+	const ARMED_TITLE: Record<FanWrite["kind"], string> = {
+		level: t`Write this duty to the firmware`,
+		mode: t`Change the curve daemon's state`,
+		curve: t`Write this curve to the disk`,
+	}
+
+	return ARMED_TITLE
 }
 
 /** The plus fan surface is a plain route rather than a collection, so this polls
@@ -161,6 +176,7 @@ function ArmedTarget({ write }: { write: FanWrite }) {
 }
 
 function OutcomeBanner({ outcome, onRestart }: { outcome: FanWriteOutcome; onRestart: () => void }) {
+	const { OUTCOME_TEXT, OUTCOME_BADGE } = outcomeCopy()
 	return (
 		<div className="mt-3 flex flex-wrap items-center gap-3 rounded-md border p-3 text-sm">
 			<span className="font-medium">{OUTCOME_BADGE[outcome.kind]}</span>
@@ -185,6 +201,7 @@ function ConfirmPanel({
 	onFire: () => void
 	onCancel: () => void
 }) {
+	const ARMED_TITLE = armedCopy()
 	return (
 		<div className="mt-3 flex flex-wrap items-center gap-3 rounded-md border p-3">
 			<span className="text-sm font-medium">{ARMED_TITLE[write.kind]}</span>
@@ -276,6 +293,7 @@ export function PlusFanTab({ grid, dataEmpty }: { grid: boolean; dataEmpty: bool
 	})
 
 	const manual = state ? !state.pfand_active : false
+	const REFUSAL_TEXT = refusalCopy()
 
 	return (
 		<ChartCard
@@ -383,6 +401,7 @@ export function PlusFanCurveTab({ grid, dataEmpty }: { grid: boolean; dataEmpty:
 	})
 
 	const curve = draft ?? state?.curve ?? null
+	const REFUSAL_TEXT = refusalCopy()
 
 	return (
 		<ChartCard

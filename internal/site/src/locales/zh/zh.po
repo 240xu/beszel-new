@@ -1339,9 +1339,6 @@ msgstr "保持中"
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "In force — the fan is running this now."
 msgstr "保持中—风扇当前正按此运行。"
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "Thermal guard holding"
-msgstr "温度防线持档"
 
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Inactive"
@@ -2507,6 +2504,10 @@ msgstr "本次写入没有完成。"
 #: src/components/login/forgot-pass-form.tsx
 msgid "Then log into the backend and reset your user account password in the users table."
 msgstr "然後登入後台並在使用者列表中重設您的帳號密碼。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Thermal guard holding"
+msgstr "温度防线持档"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Thermal Zones"

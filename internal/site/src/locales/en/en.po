@@ -2429,6 +2429,10 @@ msgid "The change was not confirmed, so the fan was left alone."
 msgstr "The change was not confirmed, so the fan was left alone."
 
 #: src/components/routes/system/plus-fan-tab.tsx
+msgid "The current duty could not be read; the fan's present duty is unknown."
+msgstr "The current duty could not be read; the fan's present duty is unknown."
+
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "The curve daemon is in control. Switch to manual before setting a duty by hand."
 msgstr "The curve daemon is in control. Switch to manual before setting a duty by hand."
 

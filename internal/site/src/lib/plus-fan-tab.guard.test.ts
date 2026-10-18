@@ -122,7 +122,7 @@ test("a hot package and an unreadable sensor do not share a sentence", async () 
 
 test("every refusal the server can raise has a sentence of its own", async () => {
 	const source = await read(TAB)
-	const keys = new Set([...source.matchAll(/^\t([a-z_]+):\s*t`/gm)].map((m) => m[1]))
+	const keys = new Set([...source.matchAll(/^\t+([a-z_]+):\s*t`/gm)].map((m) => m[1]))
 	for (const code of FAN_REJECT_CODES) {
 		expect(keys.has(code)).toBe(true)
 	}
@@ -223,4 +223,24 @@ test("the thermal floor the agent reports renders its own badge", async () => {
 	// bound to a write outcome and can surface while no write is in the air.
 	expect(occurrences(await read(TAB), /state\.thermal_floor_armed\s*===\s*true/)).not.toEqual([])
 	expect(occurrences(await read(TAB), /t`Thermal guard holding`/)).not.toEqual([])
+})
+
+test("the countdown the module computed reaches the arm that renders it", async () => {
+	// The counting arm alone may carry a countdown: a live deadline produced one,
+	// and the pin above keeps the word out of every other arm.
+	const source = await read(TAB)
+	expect(occurrences(source, /\{regress\.countdown\}/)).not.toEqual([])
+})
+
+test("the offline and refusal lines reach a reader as alerts, not as silent text", async () => {
+	// A failed write is announced: the offline line, a duty refusal and a curve
+	// refusal are the three places a screen reader has to hear the failure.
+	const source = await read(TAB)
+	expect(occurrences(source, /role="alert"/).length).toBeGreaterThanOrEqual(3)
+})
+
+test("a duty that could not be read says so where the reading is shown", async () => {
+	const source = await read(TAB)
+	expect(occurrences(source, /!state\.level_read\s*&&/)).not.toEqual([])
+	expect(occurrences(source, /could not be read; the fan's present duty is unknown/)).not.toEqual([])
 })

@@ -194,6 +194,11 @@ const SAFETY_PROMPTS = [
 	"The server refused this without naming a reason, so nothing can be concluded about the fan.",
 	// The button the "stays in force" prompts send the operator to by name.
 	"Return to the curve",
+	// The guard badge is an affirmative safety claim of its own: it tells the
+	// operator the fan is being held while the daemon is gone. A rendering that
+	// drifts into hand-back or "automatic" wording would claim a policy the
+	// guard exists to deny.
+	"Thermal guard holding",
 ] as const
 
 /** One locale's rendering of a msgid, straight from the catalog. `undefined` when
@@ -335,6 +340,11 @@ for (const locale of CHINESE_LOCALES) {
 			"In force — the fan is running this now.",
 			/保持|仍在/,
 			"the duty is retained by firmware; 生效 would say a policy took effect instead",
+		],
+		[
+			"Thermal guard holding",
+			/持|守护|托底/,
+			"the badge says the guard is holding the fan, not that some mode took over",
 		],
 	]
 

@@ -1334,9 +1334,6 @@ msgstr "In force"
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "In force — the fan is running this now."
 msgstr "In force — the fan is running this now."
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "Thermal guard holding"
-msgstr "Thermal guard holding"
 
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Inactive"
@@ -2502,6 +2499,10 @@ msgstr "The write did not complete."
 #: src/components/login/forgot-pass-form.tsx
 msgid "Then log into the backend and reset your user account password in the users table."
 msgstr "Then log into the backend and reset your user account password in the users table."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Thermal guard holding"
+msgstr "Thermal guard holding"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Thermal Zones"

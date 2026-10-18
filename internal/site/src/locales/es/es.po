@@ -2505,6 +2505,10 @@ msgstr ""
 msgid "Then log into the backend and reset your user account password in the users table."
 msgstr "Luego inicia sesión en el backend y restablece la contraseña de tu cuenta de usuario en la tabla de usuarios."
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Thermal guard holding"
+msgstr ""
+
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Thermal Zones"
 msgstr ""

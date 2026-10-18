@@ -488,6 +488,12 @@ func (r *curveRequest) curve() *plus.Curve {
 
 // fanAudit keeps the recent attempts, bounded: an unbounded log behind a JSON
 // endpoint in a long-lived hub is a memory leak with a read path.
+//
+// Trust model: the trail is best-effort evidence, not an integrity control. It
+// exists for whoever reads it after an incident, and anyone who can write this
+// machine's data directory can also edit the file underneath it. The trim
+// rewrites the file whole and the file is owner-only, but neither makes the
+// trail proof against a privileged attacker -- it makes it a record.
 type fanAudit struct {
 	mu     sync.Mutex
 	events []fanapi.Event
@@ -541,6 +547,15 @@ const fanAuditLimit = 200
 // device: the ring holds the live window either way, and the failure is logged where an
 // operator can find it.
 func newFanAudit(path string) *fanAudit {
+	// The data directory is created by the app under the process umask rather
+	// than at a permission of ours, so the trail's owner-only file can sit in a
+	// directory wider than itself. Narrow it best-effort here: a directory that
+	// refuses the change is still no reason to refuse the trail.
+	if dir := filepath.Dir(path); dir != "." && dir != "/" {
+		if err := os.Chmod(dir, 0o700); err != nil {
+			slog.Warn("fan audit directory could not be narrowed to 0700", "dir", dir, "err", err)
+		}
+	}
 	a := &fanAudit{path: path}
 	a.load()
 	return a
@@ -620,8 +635,18 @@ func (a *fanAudit) trimLocked() {
 	if dropped > 0 {
 		slog.Warn("fan audit trim dropped lines it could not write", "path", a.path, "count", dropped)
 	}
-	if err := os.WriteFile(a.path, []byte(body.String()), 0o600); err != nil {
+	// Write beside the trail and rename over it: the rename is atomic, so a kill
+	// in the middle of a rewrite leaves either the old window or the new one,
+	// never a truncated file. Writing in place truncated first, which is one
+	// crash away from costing the whole trail the rewrite was meant to bound.
+	tmp := a.path + ".tmp"
+	if err := os.WriteFile(tmp, []byte(body.String()), 0o600); err != nil {
 		slog.Warn("fan audit trim failed", "path", a.path, "err", err)
+		return
+	}
+	if err := os.Rename(tmp, a.path); err != nil {
+		slog.Warn("fan audit trim failed", "path", a.path, "err", err)
+		os.Remove(tmp)
 		return
 	}
 	a.events = keep

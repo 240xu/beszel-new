@@ -103,3 +103,28 @@ func TestStateThermalFloorArmedAfterManualMode(t *testing.T) {
 	assert.True(t, decodeBody(t, rec)["thermal_floor_armed"].(bool),
 		"state is the panel-visible side of the same floor the write armed")
 }
+
+// A start that fails leaves the daemon down, so the floor that stands in for it
+// stays armed. Disarming on the mode switch rather than on the daemon actually
+// running would leave the fan watched by nobody.
+func TestAFailedStartKeepsTheThermalFloorArmed(t *testing.T) {
+	h := newFanHarness(t, withDaemonUp)
+
+	rec := h.do(t, "admin", http.MethodPost, "/api/plus/fan/mode",
+		map[string]any{"mode": "manual", "confirm": true})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.True(t, h.guard.ThermalFloorArmed(), "precondition: manual armed the floor")
+
+	h.rig.pfandFail = errFanRigBusy
+	rec = h.do(t, "admin", http.MethodPost, "/api/plus/fan/mode",
+		map[string]any{"mode": "auto", "confirm": true})
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+
+	assert.True(t, h.guard.ThermalFloorArmed(),
+		"the daemon never started, so the floor is still the only thing watching the fan")
+
+	rec = h.do(t, "admin", http.MethodGet, "/api/plus/fan/state", nil)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.True(t, decodeBody(t, rec)["thermal_floor_armed"].(bool),
+		"state must report the floor the failed start left standing")
+}

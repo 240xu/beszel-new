@@ -223,3 +223,36 @@ func TestTheEmergencyHoldIsAuditedAsHeldAtTheDutyItWrote(t *testing.T) {
 	assert.Equal(t, written, last.Level, "the audit names the duty actually in force, not a zero that reads as auto")
 	assert.Equal(t, DeclineAtEmergency, last.Code)
 }
+
+// Close is final. The floor has floorOn to stop a tick from resurrecting it after
+// Close; the regress had nothing, so a callback already in the air when Close ran
+// would rebuild the timer through the retry path and put the guard back on watch
+// after it promised to stop.
+func TestClosingTheGuardAlsoEndsTheRegress(t *testing.T) {
+	f := newFixture(t)
+	_, err := f.g.SetManualLevel(70, confirmed)
+	require.NoError(t, err)
+	require.False(t, f.g.PendingRegressAt().IsZero(), "precondition: a handover is pending")
+
+	f.g.Close()
+	assert.True(t, f.g.PendingRegressAt().IsZero(),
+		"a closed guard has no handover left to promise")
+
+	// The callback that was in the air when Close ran, fired late.
+	f.advance(11 * time.Minute)
+	waitsBefore := len(f.waits)
+	writesBefore := len(f.writeCalls)
+	did, err := f.g.Regress()
+	require.NoError(t, err)
+	assert.False(t, did)
+	assert.Len(t, f.waits, waitsBefore,
+		"a late callback must not rebuild the timer the Close stopped")
+	assert.Len(t, f.writeCalls, writesBefore, "and must not reach the device")
+
+	// A callback already past its deadline check when Close ran reaches the
+	// retry path through code the entry check never sees, so that path is
+	// pinned directly: it must be dead after Close too.
+	f.g.retryLocked(f.now)
+	assert.Len(t, f.waits, waitsBefore,
+		"the retry path must not rebuild the timer after Close either")
+}

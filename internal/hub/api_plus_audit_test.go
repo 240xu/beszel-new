@@ -3,6 +3,7 @@
 package hub
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -101,4 +102,43 @@ func TestTheAuditTrailKeepsReadingPastALineItCannotParse(t *testing.T) {
 	require.Len(t, items, 2, "one unreadable line must not cost the records written after it")
 	assert.Equal(t, "set_level", items[0]["op"])
 	assert.Equal(t, "thermal_floor", items[1]["op"])
+}
+
+// The trim rewrites the trail, and the rewrite must not be observable as a gap:
+// writing in place truncates first, so a kill inside that window loses records
+// the rewrite was going to keep. The rewritten trail is swapped in by rename
+// instead, and the swap leaves nothing of itself behind.
+func TestTheAuditTrimSwapsTheTrailIntoPlace(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "fan-audit.jsonl")
+	trail := newFanAudit(path)
+	for i := 0; i < fanAuditLimit+40; i++ {
+		trail.add(fanapi.Event{Op: fanapi.OpThermalFloor, Outcome: fanapi.OutcomeHeld, Level: 100, At: time.Now()})
+	}
+
+	_, err := os.Stat(path + ".tmp")
+	assert.True(t, os.IsNotExist(err),
+		"the temporary file belongs to a rewrite in flight; one left behind is a rewrite that leaked")
+
+	lines := trailLine(t, path)
+	require.Len(t, lines, fanAuditLimit, "the trim keeps the window it claims to keep")
+	for i, line := range lines {
+		assert.True(t, json.Valid([]byte(line)),
+			"line %d must be a whole record: the swap cannot leave half a line behind", i)
+	}
+}
+
+// The app creates the data directory under the process umask, so the trail can
+// sit in a directory wider than itself. The directory is narrowed when the
+// trail opens, so the file's 0600 is not the only thing between it and every
+// other account on the machine.
+func TestTheAuditDirectoryIsNarrowedAtOpen(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.Chmod(dir, 0o755), "precondition: a directory wider than the trail")
+
+	newFanAudit(filepath.Join(dir, "fan-audit.jsonl"))
+
+	fi, err := os.Stat(dir)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o700), fi.Mode().Perm(),
+		"the trail is owner-only, and the directory around it has to be too")
 }

@@ -209,7 +209,8 @@ function RegressLine({ state }: { state: FanState }) {
 	if (regress.kind === "counting_down") {
 		return (
 			<p className="mt-2 text-xs text-muted-foreground">
-				{t`A hand-set duty is on record. It stays in force: this agent writes no duty to hand it back, so use Return to the curve.`}
+				{t`A hand-set duty is on record. It stays in force: this agent writes no duty to hand it back, so use Return to the curve.`}{" "}
+				<span className="font-mono">{regress.countdown}</span>
 			</p>
 		)
 	}
@@ -296,6 +297,12 @@ export function PlusFanTab({ grid, dataEmpty }: { grid: boolean; dataEmpty: bool
 							<span className="font-mono">{fmtCelsius(state.pkg_temp_c)}</span>
 						</div>
 
+						{!state.level_read && (
+							<p className="mt-2 text-xs text-muted-foreground">
+								{t`The current duty could not be read; the fan's present duty is unknown.`}
+							</p>
+						)}
+
 						{/* The agent reports the thermal floor on its own boolean, so a hold the daemon
 						 *  enforces is not one of this panel's writes: the badge rises from the state alone
 						 *  and skips when an older agent answers without the field. */}
@@ -341,9 +348,9 @@ export function PlusFanTab({ grid, dataEmpty }: { grid: boolean; dataEmpty: bool
 
 					{outcome && <OutcomeBanner outcome={outcome} onRestart={() => setArmed(modeIntent("auto"))} />}
 
-					{offline && <p className="mt-2 text-sm text-destructive">{t`The request never reached the server.`}</p>}
+					{offline && <p role="alert" className="mt-2 text-sm text-destructive">{t`The request never reached the server.`}</p>}
 					{refusal && (
-						<p className="mt-2 text-sm text-destructive">
+						<p role="alert" className="mt-2 text-sm text-destructive">
 							{REFUSAL_TEXT[refusal.key]}
 							{refusal.detail && <span className="ms-2 font-mono text-xs opacity-70">{refusal.detail}</span>}
 						</p>
@@ -417,7 +424,7 @@ export function PlusFanCurveTab({ grid, dataEmpty }: { grid: boolean; dataEmpty:
 					{outcome && <OutcomeBanner outcome={outcome} onRestart={() => setArmed(modeIntent("auto"))} />}
 
 					{refusal && (
-						<p className="mt-2 text-sm text-destructive">
+						<p role="alert" className="mt-2 text-sm text-destructive">
 							{REFUSAL_TEXT[refusal.key]}
 							{refusal.detail && <span className="ms-2 font-mono text-xs opacity-70">{refusal.detail}</span>}
 						</p>

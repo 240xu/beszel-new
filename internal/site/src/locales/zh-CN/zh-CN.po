@@ -2434,6 +2434,10 @@ msgid "The change was not confirmed, so the fan was left alone."
 msgstr "更改未获确认，因此没有对风扇做任何改动。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
+msgid "The current duty could not be read; the fan's present duty is unknown."
+msgstr "当前占空比无法读取——风扇实际占空比未知。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "The curve daemon is in control. Switch to manual before setting a duty by hand."
 msgstr "曲线守护进程正在控制风扇。请先切换到手动模式，再手动设置占空比。"
 

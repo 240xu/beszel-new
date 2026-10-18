@@ -224,3 +224,23 @@ test("the thermal floor the agent reports renders its own badge", async () => {
 	expect(occurrences(await read(TAB), /state\.thermal_floor_armed\s*===\s*true/)).not.toEqual([])
 	expect(occurrences(await read(TAB), /t`Thermal guard holding`/)).not.toEqual([])
 })
+
+test("the countdown the module computed reaches the arm that renders it", async () => {
+	// The counting arm alone may carry a countdown: a live deadline produced one,
+	// and the pin above keeps the word out of every other arm.
+	const source = await read(TAB)
+	expect(occurrences(source, /\{regress\.countdown\}/)).not.toEqual([])
+})
+
+test("the offline and refusal lines reach a reader as alerts, not as silent text", async () => {
+	// A failed write is announced: the offline line, a duty refusal and a curve
+	// refusal are the three places a screen reader has to hear the failure.
+	const source = await read(TAB)
+	expect(occurrences(source, /role="alert"/).length).toBeGreaterThanOrEqual(3)
+})
+
+test("a duty that could not be read says so where the reading is shown", async () => {
+	const source = await read(TAB)
+	expect(occurrences(source, /!state\.level_read\s*&&/)).not.toEqual([])
+	expect(occurrences(source, /could not be read; the fan's present duty is unknown/)).not.toEqual([])
+})

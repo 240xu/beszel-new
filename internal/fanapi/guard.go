@@ -218,7 +218,14 @@ func (g *Guard) setLevelLocked(level int, req Request, now time.Time) (Result, e
 
 	prev, err := g.d.GetLevel()
 	if err != nil {
-		g.fail(now)
+		// A platform without fan control will not grow one during a cooldown.
+		// Charging this read to the breaker would turn the honest unsupported
+		// answer into a breaker_open latch after three tries, telling the
+		// operator to wait for a device that will never answer. The count is
+		// for faults that may clear; this one is a fact about the host.
+		if !errors.Is(err, plus.ErrFanControlUnsupported) {
+			g.fail(now)
+		}
 		return Result{}, fmt.Errorf("read the duty to restore: %w", err)
 	}
 	if err := g.d.SetLevel(level); err != nil {
@@ -429,7 +436,7 @@ func (g *Guard) holdEmergencyLocked(now time.Time, duty int) error {
 	}
 	if err := g.d.SetLevel(duty); err != nil {
 		g.fail(now)
-		return fmt.Errorf("hold the emergency duty %d: %w", duty, err)
+		return fmt.Errorf("program duty %d: %w", duty, err)
 	}
 	got, err := g.d.GetLevel()
 	if err != nil || got != duty {

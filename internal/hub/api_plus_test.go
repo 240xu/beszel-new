@@ -947,3 +947,30 @@ func TestFanHarnessReportsWritesItSaw(t *testing.T) {
 	assert.Equal(t, []int{70}, h.rig.writes(),
 		"if the harness cannot see a write then the refusals above prove nothing")
 }
+
+// TestHubTerminateClosesTheGuard pins the shutdown wiring. The guard owns the only
+// timers watching the fan while the curve daemon is down, and a regress callback
+// already queued when the hub stops would otherwise rebuild its timer during
+// teardown. The terminate hook is the one place the process says it is done.
+func TestHubTerminateClosesTheGuard(t *testing.T) {
+	h := newFanHarness(t)
+
+	rec := h.do(t, "admin", http.MethodPost, "/api/plus/fan/level",
+		map[string]any{"level": 70, "confirm": true})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.False(t, h.guard.PendingRegressAt().IsZero(),
+		"the write must leave a regress pending, or this test proves nothing")
+
+	h.guard.ArmThermalFloor()
+	require.True(t, h.guard.ThermalFloorArmed())
+
+	event := &core.TerminateEvent{App: h.hub.TestApp}
+	require.NoError(t, h.hub.TestApp.OnTerminate().Trigger(event, func(e *core.TerminateEvent) error {
+		return e.Next()
+	}))
+
+	assert.True(t, h.guard.PendingRegressAt().IsZero(),
+		"shutdown must end the pending regress rather than let it fire during teardown")
+	assert.False(t, h.guard.ThermalFloorArmed(),
+		"shutdown must stand the thermal floor down")
+}

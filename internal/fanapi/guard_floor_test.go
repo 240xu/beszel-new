@@ -164,7 +164,7 @@ func TestAFailedFloorHoldIsAuditedAsFailed(t *testing.T) {
 	assert.Equal(t, OpThermalFloor, last.Op)
 	assert.Equal(t, OutcomeFailed, last.Outcome,
 		"the duty did not land, and held would report a fan nobody is driving")
-	assert.Contains(t, last.Reason, "hold", "the reason names the attempt that failed")
+	assert.Contains(t, last.Reason, "program", "the reason names the attempt that failed")
 	assert.Greater(t, len(f.waits), waitsBefore,
 		"a failed hold is exactly when the next look matters")
 	assert.Equal(t, thermalFloorInterval, f.waits[len(f.waits)-1])

@@ -95,7 +95,7 @@ test("the collapsed card is withheld when the preview is empty", async () => {
  *  being used. */
 test("the translation map covers exactly the declared static keys", async () => {
 	const text = await read(SHEET)
-	const declared = [...text.matchAll(/^\t"([a-z]+\.[a-z0-9_]+)": t`/gm)].map((match) => match[1])
+	const declared = [...text.matchAll(/^\t+"([a-z]+\.[a-z0-9_]+)": t`/gm)].map((match) => match[1])
 	expect(declared.length).toBeGreaterThan(0)
 	expect([...declared].sort()).toEqual([...STATIC_LABEL_KEYS].sort())
 })

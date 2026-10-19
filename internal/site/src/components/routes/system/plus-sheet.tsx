@@ -29,37 +29,41 @@ import { ChartCard } from "./chart-card"
  *  only discriminator a row needs: rows keyed by a device name — a zone, an
  *  interface, a cpu number — are absent here and fall back to that name. Typed
  *  against `StaticLabelKey`, so a key the sheet fails to cover is a build error
- *  rather than an English string that quietly survives a locale. */
-const LABELS: Record<StaticLabelKey, string> = {
-	"nvme.model": t`Model`,
-	"nvme.temp_c": t`Temperature`,
-	"nvme.percentage_used_pct": t`Percentage Used`,
-	"nvme.available_spare_pct": t`Available Spare`,
-	"nvme.unsafe_shutdowns": t`Unsafe Shutdowns`,
-	"nvme.media_errors": t`Media Errors`,
-	"nvme.power_on_hours": t`Power On Hours`,
-	"nvme.power_cycles": t`Power Cycles`,
-	"nvme.controller_busy_min": t`Controller Busy (min)`,
-	"nvme.critical_comp_time_min": t`Critical Comp Time (min)`,
-	"nvme.data_units_read": t`Data Read (cumulative)`,
-	"nvme.data_units_written": t`Data Written (cumulative)`,
-	"cpufreq.governor": t`Governor`,
-	"cpufreq.epp": t`EPP`,
-	"cpufreq.pstate_status": t`P-State`,
-	"cpufreq.no_turbo": t`No Turbo`,
-	"cpufreq.hwp_dynamic_boost": t`HWP Dynamic Boost`,
-	"wifi.iface": t`Interface`,
-	"wifi.signal_dbm": t`Signal`,
-	"wifi.freq_mhz": t`Frequency`,
-	"wifi.tx_mbit": t`Transmit Rate`,
-	"wifi.retry_delta": t`Retry since previous sample`,
-	"fan.set_level_pct": t`Programmed Level`,
-	"fan.ec76_pct": t`Applied Duty`,
-	"fan.temp_c": t`Temperature`,
-	"fan.gov": t`Mode`,
-}
+ *  rather than an English string that quietly survives a locale. Built in the
+ *  component's render like the fan panel's copy tables: a module-level table
+ *  resolved `t` once at import, so switching language later left it behind. */
+function labelCopy(): Record<StaticLabelKey, string> {
+	const LABELS: Record<StaticLabelKey, string> = {
+		"nvme.model": t`Model`,
+		"nvme.temp_c": t`Temperature`,
+		"nvme.percentage_used_pct": t`Percentage Used`,
+		"nvme.available_spare_pct": t`Available Spare`,
+		"nvme.unsafe_shutdowns": t`Unsafe Shutdowns`,
+		"nvme.media_errors": t`Media Errors`,
+		"nvme.power_on_hours": t`Power On Hours`,
+		"nvme.power_cycles": t`Power Cycles`,
+		"nvme.controller_busy_min": t`Controller Busy (min)`,
+		"nvme.critical_comp_time_min": t`Critical Comp Time (min)`,
+		"nvme.data_units_read": t`Data Read (cumulative)`,
+		"nvme.data_units_written": t`Data Written (cumulative)`,
+		"cpufreq.governor": t`Governor`,
+		"cpufreq.epp": t`EPP`,
+		"cpufreq.pstate_status": t`P-State`,
+		"cpufreq.no_turbo": t`No Turbo`,
+		"cpufreq.hwp_dynamic_boost": t`HWP Dynamic Boost`,
+		"wifi.iface": t`Interface`,
+		"wifi.signal_dbm": t`Signal`,
+		"wifi.freq_mhz": t`Frequency`,
+		"wifi.tx_mbit": t`Transmit Rate`,
+		"wifi.retry_delta": t`Retry since previous sample`,
+		"fan.set_level_pct": t`Programmed Level`,
+		"fan.ec76_pct": t`Applied Duty`,
+		"fan.temp_c": t`Temperature`,
+		"fan.gov": t`Mode`,
+	}
 
-const labelFor = (row: MetricRow): string => LABELS[row.key as StaticLabelKey] ?? row.label
+	return LABELS
+}
 
 /** The words a qualifier is said in. `plus-metrics.ts` names which qualifier a row
  *  carries and cannot speak here — it is pure and runs where `@lingui/core/macro`
@@ -78,6 +82,8 @@ function noteText(note: RowNote): string {
 }
 
 function MetricGrid({ rows }: { rows: MetricRow[] }) {
+	const LABELS = labelCopy()
+	const labelFor = (row: MetricRow): string => LABELS[row.key as StaticLabelKey] ?? row.label
 	return (
 		<div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
 			{rows.map((row) => (

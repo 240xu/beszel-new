@@ -127,6 +127,30 @@ func TestTheAuditTrimSwapsTheTrailIntoPlace(t *testing.T) {
 	}
 }
 
+// A rewrite that never reached the rename must not leave its temporary behind: the
+// next trim would overwrite it, but a directory that only ever grows temporary files
+// is still a leak, and each one is a rewrite that failed.
+func TestAFailedAuditTrimLeavesNoTemporaryBehind(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "fan-audit.jsonl")
+	trail := newFanAudit(path)
+	for i := 0; i < fanAuditLimit; i++ {
+		trail.add(fanapi.Event{Op: fanapi.OpThermalFloor, Outcome: fanapi.OutcomeHeld, Level: 100, At: time.Now()})
+	}
+
+	// A directory where the temporary belongs fails the write on any platform, the
+	// same fake the append test uses. What must not survive the failure is the name.
+	require.NoError(t, os.Mkdir(path+".tmp", 0o700))
+	trail.add(fanapi.Event{Op: fanapi.OpThermalFloor, Outcome: fanapi.OutcomeHeld, Level: 100, At: time.Now()})
+
+	_, err := os.Stat(path + ".tmp")
+	assert.True(t, os.IsNotExist(err),
+		"a rewrite that failed must not leave its temporary behind")
+
+	lines := trailLine(t, path)
+	assert.Len(t, lines, fanAuditLimit+1,
+		"the failed rewrite must leave the trail it could not replace untouched")
+}
+
 // The app creates the data directory under the process umask, so the trail can
 // sit in a directory wider than itself. The directory is narrowed when the
 // trail opens, so the file's 0600 is not the only thing between it and every

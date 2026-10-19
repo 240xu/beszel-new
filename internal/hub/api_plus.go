@@ -642,6 +642,7 @@ func (a *fanAudit) trimLocked() {
 	tmp := a.path + ".tmp"
 	if err := os.WriteFile(tmp, []byte(body.String()), 0o600); err != nil {
 		slog.Warn("fan audit trim failed", "path", a.path, "err", err)
+		os.Remove(tmp)
 		return
 	}
 	if err := os.Rename(tmp, a.path); err != nil {

@@ -85,6 +85,15 @@ func (h *Hub) registerPlusFanRoutes(se *core.ServeEvent) error {
 		fc.guard.ArmThermalFloor()
 	}
 
+	// The guard's timers are the only thing watching the fan when the daemon is
+	// down, and they die with the process anyway. Closing first is what keeps a
+	// regress callback already in the air from rebuilding its timer while the
+	// hub is leaving the fan to whoever still owns it.
+	se.App.OnTerminate().BindFunc(func(e *core.TerminateEvent) error {
+		fc.guard.Close()
+		return e.Next()
+	})
+
 	g := se.Router.Group("/api/plus/fan")
 	g.Bind(apis.RequireAuth())
 	g.GET("/state", fc.state).BindFunc(requireAdminRole)

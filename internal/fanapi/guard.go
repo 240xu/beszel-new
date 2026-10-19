@@ -429,7 +429,7 @@ func (g *Guard) holdEmergencyLocked(now time.Time, duty int) error {
 	}
 	if err := g.d.SetLevel(duty); err != nil {
 		g.fail(now)
-		return fmt.Errorf("hold the emergency duty %d: %w", duty, err)
+		return fmt.Errorf("program duty %d: %w", duty, err)
 	}
 	got, err := g.d.GetLevel()
 	if err != nil || got != duty {

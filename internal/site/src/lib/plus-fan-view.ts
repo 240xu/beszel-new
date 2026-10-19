@@ -134,11 +134,17 @@ export function fanRefusal(error: FanRefusalError): FanRefusalView {
  *  is true when the banner from the last write describes the action that has just
  *  failed or gone unanswered, so it must go: "Awaiting restart" printed above "the
  *  restart failed" states the operator's next step twice, once of them known
- *  broken. A duty or curve refusal says nothing about the write before it, which
- *  is still in force. */
+ *  broken. A refusal that only says this request was turned away (a hot package, a
+ *  rejected curve, a device that refused it) leaves the write before it in force,
+ *  so its banner stays. One that says the fan is no longer holding what that write
+ *  put there takes the banner down with it. */
 export type FanWriteSettled =
 	| { ok: true; outcome: FanWriteOutcome }
 	| { ok: false; offline: boolean; refusal: FanRefusalView | null; dropBanner: boolean }
+
+/** A refusal that reports the fan no longer holds the duty the last banner claimed:
+ *  the restore failed, or the write could not be confirmed and may not have landed. */
+const LOST_THE_LAST_WRITE: ReadonlySet<FanRefusalKey> = new Set(["rollback_failed", "write_unconfirmed"])
 
 /** There is no `if (result)` for a caller to write: a write that could return
  *  nothing is a write whose banner can be silently suppressed. */
@@ -148,7 +154,13 @@ export function fanWriteSettled(result: FanWriteResult): FanWriteSettled {
 
 export function fanWriteRefused(write: FanWrite, error: unknown): FanWriteSettled {
 	if (error instanceof FanApiError) {
-		return { ok: false, offline: false, refusal: fanRefusal(error), dropBanner: write.kind === "mode" }
+		const refusal = fanRefusal(error)
+		return {
+			ok: false,
+			offline: false,
+			refusal,
+			dropBanner: write.kind === "mode" || LOST_THE_LAST_WRITE.has(refusal.key),
+		}
 	}
 	return { ok: false, offline: true, refusal: null, dropBanner: true }
 }

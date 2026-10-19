@@ -277,6 +277,50 @@ describe("a refused write says whether the last banner still holds", () => {
 		expect(failure.refusal?.key).toBe("package_too_hot")
 	})
 
+	test("a duty whose old value could not be restored drops the banner that claimed it", () => {
+		// The fan is now holding a duty nobody asked for, so "In force" over it
+		// describes a state the server has just said it could not produce.
+		const failure = refusalOf(
+			fanWriteRefused(REFUSALS[1].write, readFanRefusal(500, JSON.stringify({ data: { code: "rollback_failed" } })))
+		)
+		expect(failure.refusal?.key).toBe("rollback_failed")
+		expect(failure.dropBanner).toBe(true)
+	})
+
+	test("an unconfirmed duty drops the banner too, because the fan did not keep it", () => {
+		const failure = refusalOf(
+			fanWriteRefused(REFUSALS[1].write, readFanRefusal(500, JSON.stringify({ data: { code: "write_unconfirmed" } })))
+		)
+		expect(failure.refusal?.key).toBe("write_unconfirmed")
+		expect(failure.dropBanner).toBe(true)
+	})
+
+	test("a curve whose old value could not be restored drops the banner as well", () => {
+		for (const code of ["rollback_failed", "write_unconfirmed"] as const) {
+			const failure = refusalOf(
+				fanWriteRefused(REFUSALS[2].write, readFanRefusal(500, JSON.stringify({ data: { code } })))
+			)
+			expect(failure.refusal?.key).toBe(code)
+			expect(failure.dropBanner).toBe(true)
+		}
+	})
+
+	test("a device that refused the write outright leaves the last write standing", () => {
+		// Nothing moved, so the banner from the write before it still describes
+		// the duty in the firmware; dropping it would hide a real state.
+		const failure = refusalOf(
+			fanWriteRefused(REFUSALS[1].write, readFanRefusal(500, JSON.stringify({ data: { code: "write_failed" } })))
+		)
+		expect(failure.refusal?.key).toBe("write_failed")
+		expect(failure.dropBanner).toBe(false)
+	})
+
+	test("a write that lands still settles in force with no banner to drop", () => {
+		const settled = fanWriteSettled(APPLIED)
+		expect(outcomeOf(settled).kind).toBe("applied")
+		expect("dropBanner" in settled).toBe(false)
+	})
+
 	test("a request that never left has nothing to say about the last one either", () => {
 		const failure = refusalOf(fanWriteRefused(REFUSALS[0].write, new TypeError("fetch failed")))
 		expect(failure.offline).toBe(true)

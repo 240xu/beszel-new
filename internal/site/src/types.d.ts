@@ -903,6 +903,12 @@ export interface FanState {
 	/** The thermal floor the agent enforces while heat forbids a lower duty;
 	 *  an older agent answers without it, so absent reads as not holding. */
 	thermal_floor_armed?: boolean
+	/** What the display may trust: ok (both readings real), stale (one reading
+	 *  failed), failsafe (the guard is acting on an unreadable value). An older
+	 *  hub omits it; treat absent as ok. */
+	health?: "ok" | "stale" | "failsafe"
+	/** Which reading failed: level_unreadable, temperature_unreadable, or both. */
+	failsafe_reason?: "" | "level_unreadable" | "temperature_unreadable" | "level_and_temperature_unreadable"
 	/** Rides along, so an editor cannot be built against a stale curve. */
 	curve: FanCurve | null
 }

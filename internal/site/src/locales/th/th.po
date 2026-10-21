@@ -18,6 +18,11 @@ msgstr ""
 "X-Crowdin-File: /main/internal/site/src/locales/en/en.po\n"
 "X-Crowdin-File-ID: 32\n"
 
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The hub is acting on a reading it could not verify. The emergency duty is held until the sensor recovers."
+msgstr ""
+
 #. placeholder {0}: data.length
 #: src/components/systems-table/systems-table.tsx
 msgid "{0, plural, one {# system} other {# systems}}"

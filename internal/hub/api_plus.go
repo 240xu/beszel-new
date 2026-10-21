@@ -109,44 +109,59 @@ func (h *Hub) registerPlusFanRoutes(se *core.ServeEvent) error {
 // The zone is read from the platform file rather than written down here. That
 // file exists to name this machine's zone, and a literal index in code is the
 // one thing that turns a moved sensor into a silently wrong refusal.
-func productionDeps(audit func(fanapi.Event)) fanapi.Deps {
+// ecBackend is this chassis's fan control: ACPI EC through /dev/pfanctl, the
+// _FSL/_FPS firmware interface, and pfand's curve file. It is the only Backend
+// wired in production today; a different machine adds another implementation
+// and a profile, not a branch in the guard.
+type ecBackend struct{}
+
+func (ecBackend) ReadTempC() (int, error) {
 	// A sysfs read can block (e.g. a wedged thermal zone during resume). The
 	// guard holds its mutex while it reads, so an unbounded read would freeze the
 	// floor and /state together. Treat a timeout as an unreadable sensor: the
 	// floor then holds the emergency duty rather than going quiet.
-	readTemp := func() (int, error) {
-		type result struct {
-			temp int
-			err  error
-		}
-		ch := make(chan result, 1)
-		go func() {
-			t, err := readPackageTempC()
-			ch <- result{t, err}
-		}()
-		select {
-		case r := <-ch:
-			return r.temp, r.err
-		case <-time.After(500 * time.Millisecond):
-			return 0, fmt.Errorf("package temperature read timed out")
-		}
+	type result struct {
+		temp int
+		err  error
 	}
-	return fanapi.Deps{
-		Now:            time.Now,
-		ReadTempC:      readTemp,
-		ReadCurve:      func() (*plus.Curve, error) { return plus.ReadCurveFile(plus.ProdCurveConf) },
-		SetLevel:       plus.SetFanLevel,
-		GetLevel:       plus.GetFanLevel,
-		PfandUp:        plus.PfandActive,
-		ResolveDutySet: plus.ResolveDutySet,
-		ReadCurveBytes: func() ([]byte, error) {
-			return os.ReadFile(plus.ProdCurveConf)
-		},
-		WriteCurveBytes: func(raw []byte) error {
-			return plus.WriteCurveBytesFile(plus.ProdCurveConf, raw)
-		},
-		Audit: audit,
+	ch := make(chan result, 1)
+	go func() {
+		t, err := readPackageTempC()
+		ch <- result{t, err}
+	}()
+	select {
+	case r := <-ch:
+		return r.temp, r.err
+	case <-time.After(500 * time.Millisecond):
+		return 0, fmt.Errorf("package temperature read timed out")
 	}
+}
+
+func (ecBackend) SetLevel(level int) error { return plus.SetFanLevel(level) }
+func (ecBackend) GetLevel() (int, error)   { return plus.GetFanLevel() }
+func (ecBackend) PfandUp() bool            { return plus.PfandActive() }
+func (ecBackend) ResolveDutySet() (plus.DutySet, error) {
+	return plus.ResolveDutySet()
+}
+func (ecBackend) ReadCurve() (*plus.Curve, error) {
+	return plus.ReadCurveFile(plus.ProdCurveConf)
+}
+func (ecBackend) ReadCurveBytes() ([]byte, error) {
+	return os.ReadFile(plus.ProdCurveConf)
+}
+func (ecBackend) WriteCurveBytes(raw []byte) error {
+	return plus.WriteCurveBytesFile(plus.ProdCurveConf, raw)
+}
+
+// Capabilities records what this chassis cannot measure: it reports no fan
+// tachometer (fan_speed_rpm is 0xFFFFFFFF), so any RPM shown is derived from the
+// duty byte and must be labelled an estimate.
+func (ecBackend) Capabilities() fanapi.Capabilities {
+	return fanapi.Capabilities{RealRPM: false, ReadBack: true, CurveFile: true}
+}
+
+func productionDeps(audit func(fanapi.Event)) fanapi.Deps {
+	return fanapi.DepsFromBackend(ecBackend{}, time.Now, audit, nil)
 }
 
 // readPackageTempC reads the package temperature from the zone the platform file
@@ -236,12 +251,42 @@ func (fc *fanRoutes) state(e *core.RequestEvent) error {
 	}
 	body["thermal_floor_armed"] = fc.guard.ThermalFloorArmed()
 
+	// Health is a state, not an inference the client makes from two booleans.
+	// ok: both readings are real; stale: a reading failed but the other is
+	// real; failsafe: the guard is acting on a value it could not read (the
+	// floor holds the emergency duty). It is separate from a refusal code: this
+	// says what the display may trust, not why a write was rejected.
+	switch {
+	case terr != nil && err != nil:
+		body["health"] = "failsafe"
+	case terr != nil || err != nil:
+		body["health"] = "stale"
+	default:
+		body["health"] = "ok"
+	}
+	body["failsafe_reason"] = failsafeReason(err, terr)
+
 	if c, cerr := fc.deps.ReadCurve(); cerr == nil {
 		body["curve"] = curveToWire(c)
 	} else {
 		body["curve"] = nil
 	}
 	return e.JSON(http.StatusOK, body)
+}
+
+// failsafeReason names what could not be read, so a panel can say "temperature
+// unavailable" rather than a generic degraded badge. Empty when both readings
+// succeeded.
+func failsafeReason(levelErr, tempErr error) string {
+	switch {
+	case levelErr != nil && tempErr != nil:
+		return "level_and_temperature_unreadable"
+	case levelErr != nil:
+		return "level_unreadable"
+	case tempErr != nil:
+		return "temperature_unreadable"
+	}
+	return ""
 }
 
 func curveToWire(c *plus.Curve) map[string]int {

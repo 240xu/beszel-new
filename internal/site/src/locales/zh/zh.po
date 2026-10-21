@@ -39,6 +39,11 @@ msgid "Reveal token"
 msgstr "顯示權杖"
 
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The hub is acting on a reading it could not verify. The emergency duty is held until the sensor recovers."
+msgstr "中樞正在依據一項無法驗證的讀數動作。中樞正在依據一項無法驗證的讀數動作。在感測器恢復前，會持續保持緊急檔位。"
+
+
 #: src/components/token-value.tsx
 msgid "Token hidden"
 msgstr "權杖已隱藏"

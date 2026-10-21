@@ -39,6 +39,11 @@ msgid "Reveal token"
 msgstr ""
 
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The hub is acting on a reading it could not verify. The emergency duty is held until the sensor recovers."
+msgstr ""
+
+
 #: src/components/token-value.tsx
 msgid "Token hidden"
 msgstr ""

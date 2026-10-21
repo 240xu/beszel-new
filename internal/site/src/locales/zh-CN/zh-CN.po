@@ -18,6 +18,36 @@ msgstr ""
 "X-Crowdin-File: /main/internal/site/src/locales/en/en.po\n"
 "X-Crowdin-File-ID: 32\n"
 
+
+#: src/components/token-value.tsx
+msgid "Agent token"
+msgstr "代理程序令牌"
+
+
+#: src/components/token-value.tsx
+msgid "Copy token"
+msgstr "复制令牌"
+
+
+#: src/components/token-value.tsx
+msgid "Hide token"
+msgstr "隐藏令牌"
+
+
+#: src/components/token-value.tsx
+msgid "Reveal token"
+msgstr "显示令牌"
+
+
+#: src/components/token-value.tsx
+msgid "Token hidden"
+msgstr "令牌已隐藏"
+
+#. placeholder {0}: data.length
+#: src/components/systems-table/systems-table.tsx
+msgid "{0, plural, one {# system} other {# systems}}"
+msgstr "{0, plural, one {# 个系统} other {# 个系统}}"
+
 #. placeholder {0}: newVersion.v
 #: src/components/footer-repo-link.tsx
 msgctxt "New version available"
@@ -66,7 +96,7 @@ msgstr "{daysLeft, plural, other {# 天}}"
 
 #: src/components/routes/system/charts/disk-charts.tsx
 msgid "{diskName} I/O"
-msgstr ""
+msgstr "{diskName} I/O"
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "{numFailed, plural, one {# failed service} other {# failed services}}"
@@ -176,12 +206,18 @@ msgstr "添加 {foo}"
 #: src/components/add-system.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
+#: src/components/systems-table/systems-table.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Add System"
 msgstr "添加 系统"
 
 #: src/components/routes/settings/notifications.tsx
 msgid "Add URL"
 msgstr "添加 URL"
+
+#: src/components/systems-table/systems-table.tsx
+msgid "Add your first system"
+msgstr "添加第一台系统"
 
 #: src/components/routes/settings/general.tsx
 msgid "Adjust display options for charts."
@@ -245,6 +281,7 @@ msgstr "所有客户端"
 msgid "Also written unchanged:"
 msgstr "以下字段也将原样写入："
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Applied Duty"
 msgstr "实际占空比"
@@ -258,17 +295,21 @@ msgstr "您确定要删除 {name} 吗？"
 msgid "Are you sure?"
 msgstr "您确定吗？"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Auto"
+msgstr "自动"
+
 #: src/components/copy-to-clipboard.tsx
 msgid "Automatic copy requires a secure context."
 msgstr "自动复制所需的安全上下文。"
 
-#: src/components/routes/system/storage-pools-table.tsx
-msgctxt "Disk space available"
+#. Package version available to install
+#: src/components/routes/system/package-updates-table.tsx
 msgid "Available"
 msgstr "可用"
 
-#. Package version available to install
-#: src/components/routes/system/package-updates-table.tsx
+#: src/components/routes/system/storage-pools-table.tsx
+msgctxt "Disk space available"
 msgid "Available"
 msgstr "可用"
 
@@ -383,7 +424,6 @@ msgstr "Beszel 支持 OpenID Connect 和其他 OAuth2 认证方式。"
 msgid "Beszel uses <0>Shoutrrr</0> to integrate with popular notification services."
 msgstr "Beszel 使用 <0>Shoutrrr</0> 以实现与常见的通知服务集成。"
 
-#: src/components/routes/system/plus-sheet.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "beszel-new"
 msgstr "beszel-new"
@@ -559,8 +599,8 @@ msgid "Click on a pool to view vdev and dataset details."
 msgstr "点击存储池以查看 vdev 和数据集详情。"
 
 #: src/components/systems-table/systems-table.tsx
-msgid "Click on a system to view more information."
-msgstr "点击系统查看更多信息。"
+#~ msgid "Click on a system to view more information."
+#~ msgstr "点击系统查看更多信息。"
 
 #: src/components/ui/input-copy.tsx
 msgid "Click to copy"
@@ -592,7 +632,6 @@ msgid "Confirm"
 msgstr "确认写入"
 
 #: src/components/login/auth-form.tsx
-#: src/components/login/auth-form.tsx
 msgid "Confirm password"
 msgstr "确认密码"
 
@@ -616,6 +655,7 @@ msgstr "容器"
 msgid "Container Health"
 msgstr "容器健康"
 
+#: src/components/navbar.tsx
 #: src/components/routes/system.tsx
 msgid "Containers"
 msgstr "容器"
@@ -674,6 +714,7 @@ msgid "Copy name"
 msgstr "复制名称"
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
+#: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Copy public key"
 msgstr "复制公钥"
 
@@ -699,10 +740,11 @@ msgid "Core"
 msgstr "核心"
 
 #: src/components/containers-table/containers-table-columns.tsx
+#: src/components/routes/system/info-bar.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "CPU"
-msgstr ""
+msgstr "CPU"
 
 #: src/components/routes/system/cpu-sheet.tsx
 msgid "CPU Cores"
@@ -790,7 +832,6 @@ msgstr "写入总量"
 
 #. Current package version
 #: src/components/routes/system/package-updates-table.tsx
-#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Current"
 msgstr "当前"
 
@@ -802,9 +843,11 @@ msgid "Current state"
 msgstr "当前状态"
 
 #: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Curve running"
 msgstr "曲线运行中"
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Curve stopped"
 msgstr "曲线已停止"
@@ -838,6 +881,7 @@ msgstr "默认时间段"
 
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
+#: src/components/routes/settings/notifications.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/systems-table/systems-table-columns.tsx
@@ -870,6 +914,7 @@ msgid "Discharging"
 msgstr "放电中"
 
 #: src/components/routes/system.tsx
+#: src/components/routes/system/info-bar.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Disk"
 msgstr "磁盘"
@@ -918,10 +963,10 @@ msgstr "Docker 网络 I/O"
 msgid "Documentation"
 msgstr "文档"
 
-#. Context: System is down
 #: src/components/alerts-history-columns.tsx
-#: src/components/routes/system/info-bar.tsx
+#: src/components/system-status.tsx
 #: src/components/systems-table/systems-table-columns.tsx
+#: src/components/systems-table/systems-table.tsx
 #: src/lib/alerts.ts
 msgid "Down"
 msgstr "离线"
@@ -938,6 +983,8 @@ msgstr "下载"
 msgid "Duration"
 msgstr "持续时间"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Duty"
 msgstr "占空比"
@@ -1040,6 +1087,10 @@ msgstr "EPP"
 msgid "Error"
 msgstr "错误"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Every value beyond the preview card. A reading the agent did not report is absent, not zero."
+msgstr "预览卡之外的每个值。Agent 未上报的读数显示为缺失，而不是零。"
+
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Example:"
 msgstr "示例："
@@ -1083,6 +1134,10 @@ msgstr "导出配置"
 msgid "Export your current systems configuration."
 msgstr "导出您当前的系统配置。"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Extended metrics"
+msgstr "扩展指标"
+
 #: src/components/routes/settings/general.tsx
 msgid "Fahrenheit (°F)"
 msgstr "华氏度 (°F)"
@@ -1103,6 +1158,10 @@ msgstr "认证失败"
 msgid "Failed to delete monitors."
 msgstr "删除监控失败。"
 
+#: src/components/routes/settings/quiet-hours.tsx
+msgid "Failed to delete quiet hours."
+msgstr "删除静默时段失败。"
+
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Failed to load logs."
@@ -1111,6 +1170,10 @@ msgstr "加载日志失败。"
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Failed to load package updates"
 msgstr "加载软件包更新失败"
+
+#: src/components/systems-table/systems-table.tsx
+msgid "Failed to load systems."
+msgstr "加载系统失败。"
 
 #: src/components/routes/settings/layout.tsx
 #: src/components/routes/settings/notifications.tsx
@@ -1161,6 +1224,7 @@ msgstr "风扇"
 
 #: src/components/containers-table/containers-table.tsx
 #: src/components/network-monitors-table/network-monitors-table.tsx
+#: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/system/chart-card.tsx
 #: src/components/routes/system/package-updates-table.tsx
@@ -1214,6 +1278,10 @@ msgstr "频率"
 msgid "Full"
 msgstr "全宽"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Full-speed backstop: the firmware carries this value, so it is fixed here."
+msgstr "全速兜底：固件自带此值，因此在此固定。"
+
 #: src/components/containers-table/containers-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Fullscreen"
@@ -1228,6 +1296,22 @@ msgstr "常规"
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Global"
 msgstr "全局"
+
+#: src/components/routes/settings/alerts-history-data-table.tsx
+msgid "Go to first page"
+msgstr "第一页"
+
+#: src/components/routes/settings/alerts-history-data-table.tsx
+msgid "Go to last page"
+msgstr "最后一页"
+
+#: src/components/routes/settings/alerts-history-data-table.tsx
+msgid "Go to next page"
+msgstr "下一页"
+
+#: src/components/routes/settings/alerts-history-data-table.tsx
+msgid "Go to previous page"
+msgstr "上一页"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Governor"
@@ -1275,6 +1359,10 @@ msgstr "心跳发送成功"
 msgid "Hide timestamps"
 msgstr "隐藏时间戳"
 
+#: src/components/navbar.tsx
+msgid "Home"
+msgstr "首页"
+
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgctxt "Button to copy install command"
@@ -1313,6 +1401,7 @@ msgid "I/O Utilization"
 msgstr "I/O 利用率"
 
 #. Context: Battery state
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/lib/i18n.ts
 msgid "Idle"
 msgstr "闲置"
@@ -1333,6 +1422,7 @@ msgid "Image update available"
 msgstr "有可用的镜像更新"
 
 #: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "In force"
 msgstr "保持中"
 
@@ -1343,6 +1433,10 @@ msgstr "保持中——风扇当前正按此运行。"
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Inactive"
 msgstr "非活跃"
+
+#: src/components/systems-table/systems-table.tsx
+msgid "Install the agent on a machine to start monitoring it here."
+msgstr "在机器上安装 Agent 后即可在此开始监控。"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Intel DPTF sensors. A zone the collector could not read is left out rather than shown as zero."
@@ -1414,8 +1508,13 @@ msgstr "加载状态"
 
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Loading..."
 msgstr "加载中..."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Locked"
+msgstr "已锁定"
 
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
@@ -1464,6 +1563,10 @@ msgstr "主要"
 #: src/components/routes/settings/layout.tsx
 msgid "Manage display and notification preferences."
 msgstr "管理显示和通知偏好。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Manual"
+msgstr "手动"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
@@ -1520,6 +1623,8 @@ msgstr "1 小时最小"
 msgid "Minor"
 msgstr "次要"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Mode"
 msgstr "模式"
@@ -1558,6 +1663,7 @@ msgid "Net"
 msgstr "网络"
 
 #: src/components/routes/system.tsx
+#: src/components/routes/system/info-bar.tsx
 msgid "Network"
 msgstr "网络"
 
@@ -1571,6 +1677,7 @@ msgid "Network Monitor Loss"
 msgstr "网络监控丢包"
 
 #: src/components/command-palette.tsx
+#: src/components/navbar.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
@@ -1602,9 +1709,17 @@ msgstr "网络单位"
 msgid "No"
 msgstr "否"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "No curve on record."
+msgstr "暂无曲线记录。"
+
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "No detail data for this pool."
 msgstr "此存储池没有可用的详细数据。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "No fan state is on record."
+msgstr "暂无风扇状态记录。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "No hand-set duty is on record. One set before an agent restarted would still be driving the fan, and this panel cannot see it."
@@ -1693,9 +1808,11 @@ msgid "One-time"
 msgstr "一次性"
 
 #: src/components/login/auth-form.tsx
+#: src/components/login/otp-forms.tsx
 msgid "One-time password"
 msgstr "一次性密码"
 
+#: src/components/navbar.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
@@ -1713,6 +1830,10 @@ msgstr "可选。默认使用 Agent 的系统解析器。"
 #: src/components/login/auth-form.tsx
 msgid "Or continue with"
 msgstr "或使用以下方式登录"
+
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "OS"
+msgstr "系统"
 
 #. Package version
 #: src/components/routes/system/cpu-sheet.tsx
@@ -1733,15 +1854,15 @@ msgstr "覆盖现有警报"
 msgid "P-State"
 msgstr "P 状态"
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgctxt "CPU package"
-msgid "Package"
-msgstr "封装"
-
 #. Software package
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Package"
 msgstr "软件包"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgctxt "CPU package"
+msgid "Package"
+msgstr "封装"
 
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Package Updates"
@@ -1772,7 +1893,6 @@ msgid "Pages / Settings"
 msgstr "页面 / 设置"
 
 #: src/components/login/auth-form.tsx
-#: src/components/login/auth-form.tsx
 msgid "Password"
 msgstr "密码"
 
@@ -1788,6 +1908,10 @@ msgstr "密码必须小于 72 字节。"
 msgid "Password reset request received"
 msgstr "已收到密码重置请求"
 
+#: src/components/login/auth-form.tsx
+msgid "Passwords must match"
+msgstr "两次输入的密码不一致"
+
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Past"
 msgstr "过去"
@@ -1802,7 +1926,9 @@ msgstr "补丁"
 msgid "Pause"
 msgstr "暂停"
 
+#: src/components/system-status.tsx
 #: src/components/systems-table/systems-table-columns.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Paused"
 msgstr "已暂停"
 
@@ -1813,6 +1939,11 @@ msgstr "已暂停 ({pausedSystemsLength})"
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Payload format"
 msgstr "有效载荷 (Payload) 格式"
+
+#. Context: System status is pending its first connection
+#: src/components/system-status.tsx
+msgid "Pending"
+msgstr "等待中"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Per core, named by cpu number, plus the active tuning policy"
@@ -1995,7 +2126,12 @@ msgstr "读取"
 msgid "Read errors"
 msgstr "读取错误"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Reading the fan state…"
+msgstr "正在读取风扇状态…"
+
 #: src/components/routes/system/charts/network-charts.tsx
+#: src/components/routes/system/info-bar.tsx
 msgid "Received"
 msgstr "接收"
 
@@ -2062,10 +2198,24 @@ msgstr "重启次数"
 msgid "Resume"
 msgstr "恢复"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/systems-table/systems-table.tsx
+msgid "Retry"
+msgstr "重试"
+
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Retry since previous sample"
 msgstr "自上次采样以来的重试"
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Return to the curve"
 msgstr "返回曲线"
@@ -2074,6 +2224,10 @@ msgstr "返回曲线"
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Revision"
 msgstr "修订"
+
+#: src/components/routes/system/info-bar.tsx
+msgid "Root"
+msgstr "根目录"
 
 #: src/components/routes/system/charts/disk-charts.tsx
 #: src/components/routes/system/charts/disk-charts.tsx
@@ -2137,6 +2291,7 @@ msgid "Schedule quiet hours where notifications will not be sent."
 msgstr "安排静默时间，在此期间不会发送通知。"
 
 #: src/components/navbar.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Search"
 msgstr "搜索"
 
@@ -2155,6 +2310,10 @@ msgstr "搜索目标"
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Seconds between pings (default: 60)"
 msgstr "Ping 之间的秒数 (默认：60)"
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Sections"
+msgstr "分区"
 
 #. Security update
 #: src/components/routes/system/package-updates-table.tsx
@@ -2180,6 +2339,7 @@ msgstr "选择系统"
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "Select all"
 msgstr "全选"
 
@@ -2187,7 +2347,12 @@ msgstr "全选"
 msgid "Select matches"
 msgstr "选择匹配项"
 
+#: src/components/routes/settings/sidebar-nav.tsx
+msgid "Select page"
+msgstr "选择页面"
+
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "Select row"
 msgstr "选择行"
 
@@ -2212,6 +2377,7 @@ msgid "Send test heartbeat"
 msgstr "发送测试 心跳"
 
 #: src/components/routes/system/charts/network-charts.tsx
+#: src/components/routes/system/info-bar.tsx
 msgid "Sent"
 msgstr "发送"
 
@@ -2240,11 +2406,17 @@ msgstr "在您的 Beszel hub 上设置以下环境变量以启用 heartbeat 监�
 #: src/components/command-palette.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
+#: src/components/navbar.tsx
 #: src/components/routes/settings/layout.tsx
 #: src/components/routes/settings/layout.tsx
+#: src/components/routes/settings/sidebar-nav.tsx
 #: src/components/routes/system/info-bar.tsx
 msgid "Settings"
 msgstr "设置"
+
+#: src/components/routes/settings/sidebar-nav.tsx
+msgid "Settings navigation"
+msgstr "设置导航"
 
 #: src/components/routes/settings/layout.tsx
 msgid "Settings saved"
@@ -2267,6 +2439,10 @@ msgstr "信号"
 msgid "Signal strength of connected Wi-Fi interfaces"
 msgstr "已连接 Wi-Fi 接口的信号强度"
 
+#: src/main.tsx
+msgid "Skip to content"
+msgstr "跳到主要内容"
+
 #: src/components/routes/system/plus-sheet.tsx
 msgid "SMART log. A field the drive omits reads as unknown, not as zero."
 msgstr "SMART 日志。驱动器未提供的字段显示为未知，而不是零。"
@@ -2284,6 +2460,11 @@ msgstr "排序依据"
 msgid "stale"
 msgstr "已过期"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Stale"
+msgstr "数据过期"
+
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Start Time"
@@ -2300,6 +2481,7 @@ msgstr "状态"
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
+#: src/components/systems-table/systems-table-columns.tsx
 #: src/components/systems-table/systems-table.tsx
 #: src/lib/alerts.ts
 msgid "Status"
@@ -2370,19 +2552,26 @@ msgid "Tabs"
 msgstr "标签页"
 
 #: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Take manual control"
 msgstr "接管手动控制"
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Target"
 msgstr "目标"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Target duty"
+msgstr "目标占空比"
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
 msgid "target[,protocol[,port[,interval[,server]]]]"
-msgstr ""
+msgstr "target[,protocol[,port[,interval[,server]]]]"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Tasks"
@@ -2395,6 +2584,8 @@ msgid "Temp"
 msgstr "温度"
 
 #: src/components/routes/system/charts/sensor-charts.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-sheet.tsx
 #: src/components/routes/system/plus-sheet.tsx
 #: src/lib/alerts.ts
@@ -2458,6 +2649,10 @@ msgid "The curve failed validation and was rejected before anything was written.
 msgstr "曲线未通过校验，在写入任何内容之前就已被拒绝。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
+msgid "The daemon picks the curve up on its next restart."
+msgstr "守护进程将在下次重启时读取该曲线。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "the edited curve"
 msgstr "编辑后的曲线"
 
@@ -2468,6 +2663,18 @@ msgstr "风扇控制设备拒绝了本次写入。"
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The fan is not holding the duty that was requested; the old one was put back."
 msgstr "风扇并未保持所请求的占空比；原来的占空比已被恢复。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The fan state could not be read."
+msgstr "无法读取风扇状态。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The fan state could not be refreshed. Showing the last reading."
+msgstr "无法刷新风扇状态，显示上次读数。"
+
+#: src/components/systems-table/systems-table.tsx
+msgid "The hub could not be reached. Check the connection and try again."
+msgstr "无法连接 Hub，请检查连接后重试。"
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
@@ -2482,9 +2689,14 @@ msgid "The package temperature could not be read, so no duty was written and the
 msgstr "无法读取封装温度，因此没有写入任何占空比，且该读数不可信。请检查传感器及其所指向的区域，而不是给机器降温。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
+msgid "The package temperature could not be read."
+msgstr "无法读取封装温度。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "The previous duty could not be restored: the fan is holding one you did not ask for."
 msgstr "无法恢复之前的占空比：风扇当前保持着一个你并未请求的占空比。"
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The request never reached the server."
 msgstr "该请求根本没有到达服务器。"
@@ -2565,6 +2777,7 @@ msgstr "令牌允许客户端连接和注册。指纹是每个系统唯一的稳
 msgid "Tokens and fingerprints are used to authenticate WebSocket connections to the hub."
 msgstr "令牌与指纹用于验证到中心的 WebSocket 连接。"
 
+#: src/components/routes/system/info-bar.tsx
 #: src/components/ui/chart.tsx
 #: src/components/ui/chart.tsx
 msgid "Total"
@@ -2673,6 +2886,12 @@ msgstr "当任何磁盘的使用率超过阈值时触发"
 msgid "Type"
 msgstr "类型"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Unavailable"
+msgstr "不可用"
+
 #: src/lib/alerts.ts
 msgid "Unhealthy"
 msgstr "不健康"
@@ -2687,6 +2906,7 @@ msgid "Unit preferences"
 msgstr "单位偏好"
 
 #: src/components/command-palette.tsx
+#: src/components/routes/settings/tokens-fingerprints.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Universal token"
 msgstr "通用令牌"
@@ -2707,9 +2927,13 @@ msgstr "无限制"
 msgid "Unsafe Shutdowns"
 msgstr "非正常关机次数"
 
-#. Context: System is up
-#: src/components/routes/system/info-bar.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Unsaved changes"
+msgstr "未保存的更改"
+
+#: src/components/system-status.tsx
 #: src/components/systems-table/systems-table-columns.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Up"
 msgstr "在线"
 
@@ -2729,9 +2953,13 @@ msgstr "更新"
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/system/info-bar.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/routes/system/storage-pools-table.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
+#: src/components/systems-table/systems-table-columns.tsx
 msgid "Updated"
 msgstr "更新于"
 
@@ -2775,6 +3003,10 @@ msgstr "存储池 {displayName} 的使用量"
 msgid "Used"
 msgstr "已用"
 
+#: src/components/navbar.tsx
+msgid "User actions"
+msgstr "用户操作"
+
 #: src/components/command-palette.tsx
 #: src/components/navbar.tsx
 msgid "Users"
@@ -2805,6 +3037,7 @@ msgstr "查看详情"
 #: src/components/routes/system/cpu-sheet.tsx
 #: src/components/routes/system/disk-io-sheet.tsx
 #: src/components/routes/system/network-sheet.tsx
+#: src/components/routes/system/plus-sheet.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "View more"
 msgstr "查看更多"
@@ -2841,6 +3074,10 @@ msgstr "警告阈值"
 #: src/components/routes/settings/notifications.tsx
 msgid "Webhook / Push notifications"
 msgstr "Webhook / 推送通知"
+
+#: src/components/routes/settings/notifications.tsx
+msgid "Webhook URL"
+msgstr "Webhook 地址"
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "When enabled, this token allows agents to self-register without prior system creation."
@@ -2880,13 +3117,15 @@ msgid "Write errors"
 msgstr "写入错误"
 
 #: src/components/routes/system/plus-fan-tab.tsx
-msgid "Write this curve"
-msgstr "写入此曲线"
+#~ msgid "Write this curve"
+#~ msgstr "写入此曲线"
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Write this curve to the disk"
 msgstr "将此曲线写入磁盘"
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Write this duty to the firmware"
 msgstr "将此占空比写入固件"
@@ -2899,6 +3138,7 @@ msgstr "已写入磁盘；曲线守护进程尚未读取它。"
 msgid "YAML Config"
 msgstr "YAML 配置"
 
+#: src/components/routes/settings/config-yaml.tsx
 #: src/components/routes/settings/config-yaml.tsx
 msgid "YAML Configuration"
 msgstr "YAML 配置"

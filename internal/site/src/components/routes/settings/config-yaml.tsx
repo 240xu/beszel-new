@@ -40,15 +40,15 @@ export default function ConfigYaml() {
 
 	return (
 		<div>
-			<div>
-				<h3 className="text-xl font-medium mb-2">
+			<section className="grid gap-2">
+				<h2 className="text-lg font-semibold tracking-tight">
 					<Trans>YAML Configuration</Trans>
-				</h3>
+				</h2>
 				<p className="text-sm text-muted-foreground leading-relaxed">
 					<Trans>Export your current systems configuration.</Trans>
 				</p>
-			</div>
-			<Separator className="my-4" />
+			</section>
+			<Separator />
 			<div className="space-y-2">
 				<div className="mb-4">
 					<p className="text-sm text-muted-foreground leading-relaxed my-1">
@@ -80,6 +80,7 @@ export default function ConfigYaml() {
 					<Textarea
 						dir="ltr"
 						autoFocus
+						aria-label={t`YAML Configuration`}
 						defaultValue={configContent}
 						spellCheck="false"
 						rows={Math.min(25, configContent.split("\n").length)}
@@ -87,7 +88,7 @@ export default function ConfigYaml() {
 					/>
 				)}
 			</div>
-			<Separator className="my-5" />
+			<Separator />
 			<Button type="button" className="mt-2 flex items-center gap-1" onClick={fetchConfig} disabled={isLoading}>
 				<ButtonIcon className={clsx("h-4 w-4 me-0.5", isLoading && "animate-spin")} />
 				<Trans>Export configuration</Trans>

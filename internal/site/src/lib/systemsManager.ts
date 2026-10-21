@@ -1,5 +1,5 @@
 /** biome-ignore-all lint/suspicious/noAssignInExpressions: it's fine :) */
-import type { PreinitializedMapStore } from "nanostores"
+import { atom, type PreinitializedMapStore } from "nanostores"
 import { pb } from "@/lib/api"
 import {
 	$allSystemsById,
@@ -16,6 +16,9 @@ import { SystemStatus } from "./enums"
 
 const COLLECTION = pb.collection<SystemRecord>("systems")
 const FIELDS_DEFAULT = "id,name,host,port,info,status"
+
+/** First-load state for the systems overview. "loading" until the first refresh settles. */
+export const $systemsStatus = atom<"loading" | "ready" | "error">("loading")
 
 let initialized = false
 // biome-ignore lint/suspicious/noConfusingVoidType: typescript rocks
@@ -103,14 +106,10 @@ function findLongestName(systems: Record<string, SystemRecord>): string {
 	return longest
 }
 
-/** Fetch systems from collection */
+/** Fetch systems from collection. Errors propagate so callers can distinguish an
+ *  unreachable hub from an account with no systems. */
 async function fetchSystems(): Promise<SystemRecord[]> {
-	try {
-		return await COLLECTION.getFullList({ sort: "+name", fields: FIELDS_DEFAULT })
-	} catch (error) {
-		console.error("Failed to fetch systems:", error)
-		return []
-	}
+	return await COLLECTION.getFullList({ sort: "+name", fields: FIELDS_DEFAULT })
 }
 
 /** Makes sure the system has valid info object and throws if not */
@@ -186,8 +185,10 @@ export async function refresh() {
 		for (const record of records) {
 			add(record)
 		}
+		$systemsStatus.set("ready")
 	} catch (error) {
 		console.error("Failed to refresh systems:", error)
+		$systemsStatus.set("error")
 	}
 }
 

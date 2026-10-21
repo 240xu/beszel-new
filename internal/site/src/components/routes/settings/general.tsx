@@ -1,11 +1,11 @@
 /** biome-ignore-all lint/correctness/useUniqueElementIds: component is only rendered once */
 import { Trans, useLingui } from "@lingui/react/macro"
-import { LanguagesIcon, LoaderCircleIcon, SaveIcon } from "lucide-react"
+import { LoaderCircleIcon, SaveIcon } from "lucide-react"
 import { useState } from "react"
 import { useStore } from "@nanostores/react"
 import { Button } from "@/components/ui/button"
+import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import Slider from "@/components/ui/slider"
@@ -16,6 +16,7 @@ import { $chartTime, $userSettings, defaultLayoutWidth, getUserChartTime } from 
 import { chartTimeData, currentHour12 } from "@/lib/utils"
 import type { UserSettings } from "@/types"
 import { saveSettings } from "./layout"
+import { SettingsSaveBar } from "./save-bar"
 
 export default function SettingsProfilePage({ userSettings }: { userSettings: UserSettings }) {
 	const [isLoading, setIsLoading] = useState(false)
@@ -38,21 +39,20 @@ export default function SettingsProfilePage({ userSettings }: { userSettings: Us
 	}
 
 	return (
-		<div>
-			<div>
-				<h3 className="text-xl font-medium mb-2">
+		<div className="grid gap-6">
+			<section className="grid gap-2">
+				<h2 className="text-lg font-semibold tracking-tight">
 					<Trans>General</Trans>
-				</h3>
+				</h2>
 				<p className="text-sm text-muted-foreground leading-relaxed">
 					<Trans>Change general application options.</Trans>
 				</p>
-			</div>
-			<Separator className="my-4" />
-			<form onSubmit={handleSubmit} className="space-y-5">
-				<div className="grid gap-2">
-					<div className="mb-2">
-						<h3 className="mb-1 text-lg font-medium flex items-center gap-2">
-							<LanguagesIcon className="h-4 w-4" />
+			</section>
+			<Separator />
+			<form onSubmit={handleSubmit} className="grid gap-6">
+				<section className="grid gap-4">
+					<div className="grid gap-1">
+						<h3 className="text-sm font-semibold">
 							<Trans>Language</Trans>
 						</h3>
 						<p className="text-sm text-muted-foreground leading-relaxed">
@@ -65,57 +65,56 @@ export default function SettingsProfilePage({ userSettings }: { userSettings: Us
 							</Trans>
 						</p>
 					</div>
-					<Label className="block" htmlFor="lang">
-						<Trans>Preferred Language</Trans>
-					</Label>
-					<Select name="lang" value={i18n.locale} onValueChange={(lang: string) => dynamicActivate(lang)}>
-						<SelectTrigger id="lang">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							{languages.map(([lang, label, e]) => (
-								<SelectItem key={lang} value={lang}>
-									<span className="me-2.5">
-										{e || (
-											<code
-												aria-hidden="true"
-												className="font-mono bg-muted text-[.65em] w-5 h-4 inline-grid place-items-center"
-											>
-												{lang}
-											</code>
-										)}
-									</span>
-									{label}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-				</div>
+					<FormField id="lang" label={<Trans>Preferred Language</Trans>}>
+						<Select name="lang" value={i18n.locale} onValueChange={(lang: string) => dynamicActivate(lang)}>
+							<SelectTrigger id="lang">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								{languages.map(([lang, label, e]) => (
+									<SelectItem key={lang} value={lang}>
+										<span className="me-2.5">
+											{e || (
+												<code
+													aria-hidden="true"
+													className="font-mono bg-muted text-xs w-5 h-4 inline-grid place-items-center"
+												>
+													{lang}
+												</code>
+											)}
+										</span>
+										{label}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</FormField>
+				</section>
 				<Separator />
-				<div className="grid gap-2">
-					<div className="mb-2">
-						<h3 className="mb-1 text-lg font-medium">
-							<Trans>Layout width</Trans>
-						</h3>
-						<Label htmlFor="layoutWidth" className="text-sm text-muted-foreground leading-relaxed">
-							<Trans>Adjust the width of the main layout</Trans> ({layoutWidth}px)
-						</Label>
-					</div>
-					<Slider
+				<section className="grid gap-4">
+					<h3 className="text-sm font-semibold">
+						<Trans>Layout width</Trans>
+					</h3>
+					<FormField
 						id="layoutWidth"
-						name="layoutWidth"
-						value={[layoutWidth]}
-						onValueChange={(val) => $userSettings.setKey("layoutWidth", val[0])}
-						min={1000}
-						max={2000}
-						step={10}
-						className="w-full mb-1"
-					/>
-				</div>
+						label={<Trans>Adjust the width of the main layout</Trans>}
+						hint={<span className="tabular-nums">{layoutWidth}px</span>}
+					>
+						<Slider
+							name="layoutWidth"
+							value={[layoutWidth]}
+							onValueChange={(val) => $userSettings.setKey("layoutWidth", val[0])}
+							min={1000}
+							max={2000}
+							step={10}
+							className="w-full"
+						/>
+					</FormField>
+				</section>
 				<Separator />
-				<div className="grid gap-2">
-					<div className="mb-2">
-						<h3 className="mb-1 text-lg font-medium">
+				<section className="grid gap-4">
+					<div className="grid gap-1">
+						<h3 className="text-sm font-semibold">
 							<Trans>Chart options</Trans>
 						</h3>
 						<p className="text-sm text-muted-foreground leading-relaxed">
@@ -123,10 +122,7 @@ export default function SettingsProfilePage({ userSettings }: { userSettings: Us
 						</p>
 					</div>
 					<div className="grid sm:grid-cols-3 gap-4">
-						<div className="grid gap-2">
-							<Label className="block" htmlFor="chartTime">
-								<Trans>Default time period</Trans>
-							</Label>
+						<FormField id="chartTime" label={<Trans>Default time period</Trans>}>
 							<Select name="chartTime" key={chartTime} defaultValue={chartTime}>
 								<SelectTrigger id="chartTime">
 									<SelectValue />
@@ -139,11 +135,8 @@ export default function SettingsProfilePage({ userSettings }: { userSettings: Us
 									))}
 								</SelectContent>
 							</Select>
-						</div>
-						<div className="grid gap-2">
-							<Label className="block" htmlFor="hourFormat">
-								<Trans>Time format</Trans>
-							</Label>
+						</FormField>
+						<FormField id="hourFormat" label={<Trans>Time format</Trans>}>
 							<Select
 								name="hourFormat"
 								key={userSettings.hourFormat}
@@ -160,13 +153,13 @@ export default function SettingsProfilePage({ userSettings }: { userSettings: Us
 									))}
 								</SelectContent>
 							</Select>
-						</div>
+						</FormField>
 					</div>
-				</div>
+				</section>
 				<Separator />
-				<div className="grid gap-2">
-					<div className="mb-2">
-						<h3 className="mb-1 text-lg font-medium">
+				<section className="grid gap-4">
+					<div className="grid gap-1">
+						<h3 className="text-sm font-semibold">
 							<Trans comment="Temperature / network units">Unit preferences</Trans>
 						</h3>
 						<p className="text-sm text-muted-foreground leading-relaxed">
@@ -174,10 +167,7 @@ export default function SettingsProfilePage({ userSettings }: { userSettings: Us
 						</p>
 					</div>
 					<div className="grid sm:grid-cols-3 gap-4">
-						<div className="grid gap-2">
-							<Label className="block" htmlFor="unitTemp">
-								<Trans>Temperature unit</Trans>
-							</Label>
+						<FormField id="unitTemp" label={<Trans>Temperature unit</Trans>}>
 							<Select
 								name="unitTemp"
 								key={userSettings.unitTemp}
@@ -195,11 +185,8 @@ export default function SettingsProfilePage({ userSettings }: { userSettings: Us
 									</SelectItem>
 								</SelectContent>
 							</Select>
-						</div>
-						<div className="grid gap-2">
-							<Label className="block" htmlFor="unitNet">
-								<Trans comment="Context: Bytes or bits">Network unit</Trans>
-							</Label>
+						</FormField>
+						<FormField id="unitNet" label={<Trans comment="Context: Bytes or bits">Network unit</Trans>}>
 							<Select
 								name="unitNet"
 								key={userSettings.unitNet}
@@ -217,11 +204,8 @@ export default function SettingsProfilePage({ userSettings }: { userSettings: Us
 									</SelectItem>
 								</SelectContent>
 							</Select>
-						</div>
-						<div className="grid gap-2">
-							<Label className="block" htmlFor="unitDisk">
-								<Trans>Disk unit</Trans>
-							</Label>
+						</FormField>
+						<FormField id="unitDisk" label={<Trans>Disk unit</Trans>}>
 							<Select
 								name="unitDisk"
 								key={userSettings.unitDisk}
@@ -239,13 +223,13 @@ export default function SettingsProfilePage({ userSettings }: { userSettings: Us
 									</SelectItem>
 								</SelectContent>
 							</Select>
-						</div>
+						</FormField>
 					</div>
-				</div>
+				</section>
 				<Separator />
-				<div className="grid gap-2">
-					<div className="mb-2">
-						<h3 className="mb-1 text-lg font-medium">
+				<section className="grid gap-4">
+					<div className="grid gap-1">
+						<h3 className="text-sm font-semibold">
 							<Trans>Warning thresholds</Trans>
 						</h3>
 						<p className="text-sm text-muted-foreground leading-relaxed">
@@ -253,12 +237,8 @@ export default function SettingsProfilePage({ userSettings }: { userSettings: Us
 						</p>
 					</div>
 					<div className="grid grid-cols-2 lg:grid-cols-3 gap-4 items-end">
-						<div className="grid gap-2">
-							<Label htmlFor="colorWarn">
-								<Trans>Warning (%)</Trans>
-							</Label>
+						<FormField id="colorWarn" label={<Trans>Warning (%)</Trans>}>
 							<Input
-								id="colorWarn"
 								name="colorWarn"
 								type="number"
 								min={1}
@@ -266,13 +246,9 @@ export default function SettingsProfilePage({ userSettings }: { userSettings: Us
 								className="min-w-24"
 								defaultValue={userSettings.colorWarn ?? 65}
 							/>
-						</div>
-						<div className="grid gap-1">
-							<Label htmlFor="colorCrit">
-								<Trans>Critical (%)</Trans>
-							</Label>
+						</FormField>
+						<FormField id="colorCrit" label={<Trans>Critical (%)</Trans>}>
 							<Input
-								id="colorCrit"
 								name="colorCrit"
 								type="number"
 								min={1}
@@ -280,14 +256,16 @@ export default function SettingsProfilePage({ userSettings }: { userSettings: Us
 								className="min-w-24"
 								defaultValue={userSettings.colorCrit ?? 90}
 							/>
-						</div>
+						</FormField>
 					</div>
-				</div>
+				</section>
 				<Separator />
-				<Button type="submit" className="flex items-center gap-1.5 disabled:opacity-100" disabled={isLoading}>
-					{isLoading ? <LoaderCircleIcon className="h-4 w-4 animate-spin" /> : <SaveIcon className="h-4 w-4" />}
-					<Trans>Save Settings</Trans>
-				</Button>
+				<SettingsSaveBar>
+					<Button type="submit" className="flex items-center gap-1.5 disabled:opacity-100" disabled={isLoading}>
+						{isLoading ? <LoaderCircleIcon className="h-4 w-4 animate-spin" /> : <SaveIcon className="h-4 w-4" />}
+						<Trans>Save Settings</Trans>
+					</Button>
+				</SettingsSaveBar>
 			</form>
 		</div>
 	)

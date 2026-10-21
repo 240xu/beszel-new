@@ -6,65 +6,105 @@
 @custom-variant safari (@supports (hanging-punctuation: first) and (-webkit-appearance: none));
 
 :root {
-	--background: hsl(30 8% 98%);
-	--foreground: hsl(30 0% 10%);
-	--card: hsl(30 0% 100%);
-	--card-foreground: hsl(240 6% 12%);
-	--popover: hsl(30 0% 100%);
-	--popover-foreground: hsl(240 10% 6.2%);
-	--primary: hsl(240 5.88% 10%);
-	--primary-foreground: hsl(30 0% 100%);
-	--secondary: hsl(240 4.76% 95.88%);
-	--secondary-foreground: hsl(240 5.88% 10%);
-	--muted: hsl(26 6% 94%);
-	--muted-foreground: hsl(24 2.79% 35.1%);
-	--accent: hsl(20 23.08% 94%);
-	--accent-foreground: hsl(240 5.88% 10%);
-	--destructive: hsl(0 66% 53%);
-	--destructive-foreground: hsl(0 0% 97%);
-	--border: hsl(30 8.11% 85.49%);
-	--input: hsl(30 4.29% 72.55%);
-	--ring: hsl(30 3.97% 49.41%);
-	--radius: 0.8rem;
-	--chart-1: hsl(220 70% 50%);
-	--chart-2: hsl(160 60% 45%);
-	--chart-3: hsl(30 80% 55%);
-	--chart-4: hsl(280 65% 60%);
-	--chart-5: hsl(340 75% 55%);
-	--table-header: hsl(225, 6%, 97%);
+	--background: hsl(220 14% 97.5%);
+	--foreground: hsl(220 20% 11%);
+	--card: hsl(0 0% 100%);
+	--card-foreground: hsl(220 20% 11%);
+	--popover: hsl(0 0% 100%);
+	--popover-foreground: hsl(220 20% 11%);
+	--primary: hsl(220 18% 12%);
+	--primary-foreground: hsl(220 10% 98%);
+	--secondary: hsl(220 10% 94%);
+	--secondary-foreground: hsl(220 18% 14%);
+	--muted: hsl(220 12% 93.5%);
+	--muted-foreground: hsl(220 9% 38%);
+	--accent: hsl(220 12% 93.5%);
+	--accent-foreground: hsl(220 18% 14%);
+	--destructive: hsl(0 66% 45%);
+	--destructive-foreground: hsl(0 0% 98%);
+	--destructive-text: hsl(0 60% 38%);
+	--border: hsl(220 12% 86%);
+	--border-strong: hsl(220 8% 56%);
+	--input: hsl(220 8% 52%);
+	--ring: hsl(38 92% 38%);
+	--signal: hsl(38 92% 45%);
+	--signal-foreground: hsl(30 60% 12%);
+	--signal-muted: hsl(38 92% 94%);
+	--success: hsl(152 55% 32%);
+	--success-foreground: hsl(0 0% 100%);
+	--success-muted: hsl(152 50% 92%);
+	--success-text: hsl(152 55% 28%);
+	--warning: hsl(38 92% 45%);
+	--warning-foreground: hsl(30 60% 12%);
+	--warning-muted: hsl(38 90% 92%);
+	--warning-text: hsl(32 80% 30%);
+	--info: hsl(210 75% 42%);
+	--info-foreground: hsl(0 0% 100%);
+	--info-muted: hsl(210 70% 93%);
+	--info-text: hsl(210 75% 35%);
+	--radius: 0.625rem;
+	--chart-1: hsl(210 80% 52%);
+	--chart-2: hsl(152 55% 42%);
+	--chart-3: hsl(38 92% 50%);
+	--chart-4: hsl(270 55% 58%);
+	--chart-5: hsl(340 70% 55%);
+	--table-header: hsl(220 12% 96%);
 	--chart-saturation: 65%;
 	--chart-lightness: 50%;
-	--container: 1500px;
+	--container: 1600px;
 }
 
 .dark {
 	color-scheme: dark;
-	--background: hsl(220 5.5% 9%);
-	--foreground: hsl(220 2% 97%);
-	--card: hsl(220 5.5% 10.5%);
-	--card-foreground: hsl(220 2% 97%);
-	--popover: hsl(220 5.5% 9%);
-	--popover-foreground: hsl(220 2% 97%);
-	--primary: hsl(220 2% 96%);
-	--primary-foreground: hsl(220 4% 10%);
-	--secondary: hsl(220 4% 16%);
-	--secondary-foreground: hsl(220 0% 98%);
-	--muted: hsl(220 6% 16%);
-	--muted-foreground: hsl(220 4% 67%);
-	--accent: hsl(220 5% 15.5%);
-	--accent-foreground: hsl(220 2% 98%);
-	--destructive: hsl(0 62% 46%);
-	--border: hsl(220 3% 17%);
-	--input: hsl(220 4% 22%);
-	--ring: hsl(220 4% 80%);
-	--table-header: hsl(220, 6%, 13%);
-	--radius: 0.8rem;
+	--background: hsl(220 14% 7.5%);
+	--foreground: hsl(220 10% 96%);
+	--card: hsl(220 12% 10%);
+	--card-foreground: hsl(220 10% 96%);
+	--popover: hsl(220 12% 9%);
+	--popover-foreground: hsl(220 10% 96%);
+	--primary: hsl(220 8% 96%);
+	--primary-foreground: hsl(220 14% 9%);
+	--secondary: hsl(220 8% 16%);
+	--secondary-foreground: hsl(220 10% 96%);
+	--muted: hsl(220 10% 15%);
+	--muted-foreground: hsl(220 8% 68%);
+	--accent: hsl(220 8% 16%);
+	--accent-foreground: hsl(220 10% 96%);
+	--destructive: hsl(0 62% 50%);
+	--destructive-foreground: hsl(0 0% 98%);
+	--destructive-text: hsl(0 75% 68%);
+	--border: hsl(220 8% 20%);
+	--border-strong: hsl(220 7% 42%);
+	--input: hsl(220 7% 42%);
+	--ring: hsl(38 95% 58%);
+	--signal: hsl(38 95% 58%);
+	--signal-foreground: hsl(30 60% 10%);
+	--signal-muted: hsl(38 45% 16%);
+	--success: hsl(152 50% 42%);
+	--success-foreground: hsl(220 14% 9%);
+	--success-muted: hsl(152 40% 16%);
+	--success-text: hsl(152 60% 70%);
+	--warning: hsl(38 90% 55%);
+	--warning-foreground: hsl(30 60% 10%);
+	--warning-muted: hsl(38 45% 16%);
+	--warning-text: hsl(38 90% 68%);
+	--info: hsl(210 80% 58%);
+	--info-foreground: hsl(220 14% 9%);
+	--info-muted: hsl(210 45% 16%);
+	--info-text: hsl(210 80% 70%);
+	--chart-1: hsl(210 82% 60%);
+	--chart-2: hsl(152 55% 52%);
+	--chart-3: hsl(38 92% 55%);
+	--chart-4: hsl(270 60% 66%);
+	--chart-5: hsl(340 72% 62%);
+	--table-header: hsl(220 10% 13%);
 	--chart-saturation: 60%;
 	--chart-lightness: 55%;
 }
 
 @theme inline {
 	--font-sans: TwemojiCountryFlags, Inter, InterVariable, sans-serif;
+	--font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
 
 	--breakpoint-xs: 26.6rem;
 	--breakpoint-450: 28rem;
@@ -76,6 +116,7 @@
 	--radius-lg: var(--radius);
 	--radius-xl: calc(var(--radius) + 4px);
 
+	/* Legacy green scale: kept for compatibility, do not add new usages. */
 	--color-green-50: hsl(140 60% 95%);
 	--color-green-100: hsl(140 50% 90%);
 	--color-green-200: hsl(140 49% 80%);
@@ -106,9 +147,26 @@
 	--color-accent-foreground: var(--accent-foreground);
 	--color-destructive: var(--destructive);
 	--color-destructive-foreground: var(--destructive-foreground);
+	--color-destructive-text: var(--destructive-text);
 	--color-border: var(--border);
+	--color-border-strong: var(--border-strong);
 	--color-input: var(--input);
 	--color-ring: var(--ring);
+	--color-signal: var(--signal);
+	--color-signal-foreground: var(--signal-foreground);
+	--color-signal-muted: var(--signal-muted);
+	--color-success: var(--success);
+	--color-success-foreground: var(--success-foreground);
+	--color-success-muted: var(--success-muted);
+	--color-success-text: var(--success-text);
+	--color-warning: var(--warning);
+	--color-warning-foreground: var(--warning-foreground);
+	--color-warning-muted: var(--warning-muted);
+	--color-warning-text: var(--warning-text);
+	--color-info: var(--info);
+	--color-info-foreground: var(--info-foreground);
+	--color-info-muted: var(--info-muted);
+	--color-info-text: var(--info-text);
 	--color-chart-1: var(--chart-1);
 	--color-chart-2: var(--chart-2);
 	--color-chart-3: var(--chart-3);
@@ -171,6 +229,12 @@
 		font-variant-ligatures: no-contextual;
 	}
 
+	h1,
+	h2,
+	h3 {
+		letter-spacing: -0.02em;
+	}
+
 	button {
 		cursor: pointer;
 	}
@@ -180,15 +244,55 @@
 		content: "";
 		@apply absolute -top-2 left-0 w-full h-4 bg-table-header z-50
 	}
+
+	/* Honor reduced motion, but keep the spinner usable so loading still reads as busy. */
+	@media (prefers-reduced-motion: reduce) {
+		*,
+		::before,
+		::after {
+			animation-duration: 0.01ms !important;
+			animation-iteration-count: 1 !important;
+			transition-duration: 0.01ms !important;
+			scroll-behavior: auto !important;
+		}
+
+		.animate-spin {
+			animation-duration: 1s !important;
+			animation-iteration-count: infinite !important;
+		}
+	}
 }
 
 @utility container {
 	max-width: var(--container);
-	@apply mx-auto px-4;
+	margin-inline: auto;
+	padding-inline: 1rem;
+
+	@media (min-width: 40rem) {
+		padding-inline: 1.5rem;
+	}
 }
 
 @utility link {
 	@apply text-primary font-medium underline-offset-4 hover:underline;
+}
+
+@utility label-micro {
+	font-size: 11px;
+	line-height: 1.4;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--muted-foreground);
+}
+
+@utility data-value {
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.01em;
+}
+
+@utility surface {
+	@apply rounded-lg border border-border bg-card text-card-foreground shadow-none;
 }
 
 @utility ns-dialog {
@@ -206,7 +310,7 @@
 }
 
 @utility text-card-title {
-	@apply text-[1.4rem] sm:text-2xl;
+	@apply text-lg;
 }
 
 .recharts-tooltip-wrapper {

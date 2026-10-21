@@ -206,7 +206,7 @@ func (a *Agent) sumAndTrackPerNicDeltas(cacheTimeMs uint16, msElapsed uint64, ne
 
 // computeBytesPerSecond calculates per-second totals from elapsed time and totals
 func (a *Agent) computeBytesPerSecond(msElapsed, totalBytesSent, totalBytesRecv uint64, nis system.NetIoStats) (bytesSentPerSecond, bytesRecvPerSecond uint64) {
-	if msElapsed > 0 {
+	if msElapsed > 0 && totalBytesSent >= nis.BytesSent && totalBytesRecv >= nis.BytesRecv {
 		bytesSentPerSecond = (totalBytesSent - nis.BytesSent) * 1000 / msElapsed
 		bytesRecvPerSecond = (totalBytesRecv - nis.BytesRecv) * 1000 / msElapsed
 	}

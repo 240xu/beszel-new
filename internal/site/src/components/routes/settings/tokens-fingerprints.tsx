@@ -21,6 +21,7 @@ import {
 	InstallDropdown,
 } from "@/components/install-dropdowns"
 import { $router } from "@/components/router"
+import { TokenValue } from "@/components/token-value"
 import { Button } from "@/components/ui/button"
 import {
 	DropdownMenu,
@@ -117,10 +118,10 @@ const SettingsFingerprintsPage = memo(() => {
 
 const SectionIntro = memo(() => {
 	return (
-		<div>
-			<h3 className="text-xl font-medium mb-2">
+		<section className="grid gap-2">
+			<h2 className="text-lg font-semibold tracking-tight">
 				<Trans>Tokens & Fingerprints</Trans>
-			</h3>
+			</h2>
 			<p className="text-sm text-muted-foreground leading-relaxed">
 				<Trans>Tokens and fingerprints are used to authenticate WebSocket connections to the hub.</Trans>
 			</p>
@@ -130,7 +131,7 @@ const SectionIntro = memo(() => {
 					first connection.
 				</Trans>
 			</p>
-		</div>
+		</section>
 	)
 })
 
@@ -161,8 +162,8 @@ const SectionUniversalToken = memo(() => {
 	}, [])
 
 	return (
-		<div>
-			<h3 className="text-lg font-medium mb-2">
+		<section className="grid gap-2">
+			<h3 className="text-sm font-semibold">
 				<Trans>Universal token</Trans>
 			</h3>
 			<p className="text-sm text-muted-foreground leading-relaxed">
@@ -173,6 +174,7 @@ const SectionUniversalToken = memo(() => {
 					<div className="flex flex-col gap-3">
 						<div className="flex items-center gap-4 min-w-0">
 							<Switch
+								aria-label={t`Universal token`}
 								checked={checked}
 								onCheckedChange={(checked) => {
 									// Keep current permanence preference when enabling/disabling
@@ -180,14 +182,7 @@ const SectionUniversalToken = memo(() => {
 								}}
 							/>
 							<div className="min-w-0 flex-1 overflow-auto">
-								<span
-									className={cn(
-										"text-sm text-primary opacity-60 transition-opacity",
-										checked ? "opacity-100" : "select-none"
-									)}
-								>
-									{token}
-								</span>
+								<TokenValue token={token} label={t`Universal token`} disabled={!checked} />
 							</div>
 							<ActionsButtonUniversalToken token={token} checked={checked} />
 						</div>
@@ -205,8 +200,9 @@ const SectionUniversalToken = memo(() => {
 									size="icon"
 									onClick={() => copyToClipboard(publicKey)}
 									title={t`Copy public key`}
+									aria-label={t`Copy public key`}
 								>
-									<CopyIcon className="w-4" />
+									<CopyIcon className="size-4" />
 								</Button>
 							</div>
 						)}
@@ -245,7 +241,7 @@ const SectionUniversalToken = memo(() => {
 					</div>
 				)}
 			</div>
-		</div>
+		</section>
 	)
 })
 
@@ -304,7 +300,7 @@ const ActionsButtonUniversalToken = memo(({ token, checked }: { token: string; c
 						<span className="sr-only">
 							<Trans>Open menu</Trans>
 						</span>
-						<MoreHorizontalIcon className="w-5" />
+						<MoreHorizontalIcon className="size-5" />
 					</Button>
 				</DropdownMenuTrigger>
 				<InstallDropdown items={dropdownItems} />
@@ -365,8 +361,10 @@ const SectionTable = memo(({ fingerprints = [] }: { fingerprints: FingerprintRec
 							<TableCell className="font-medium ps-5 py-2 max-w-60 truncate">
 								{fingerprint.expand.system.name}
 							</TableCell>
-							<TableCell className="font-mono text-[0.95em] py-2">{fingerprint.token}</TableCell>
-							<TableCell className="font-mono text-[0.95em] py-2">{fingerprint.fingerprint}</TableCell>
+							<TableCell className="py-2">
+								<TokenValue token={fingerprint.token} label={t`Agent token`} />
+							</TableCell>
+							<TableCell className="font-mono text-sm py-2">{fingerprint.fingerprint}</TableCell>
 							{!isReadOnly && (
 								<TableCell className="py-2 px-4 xl:px-2">
 									<ActionsButtonTable fingerprint={fingerprint} />
@@ -406,7 +404,7 @@ const ActionsButtonTable = memo(({ fingerprint }: { fingerprint: FingerprintReco
 					<span className="sr-only">
 						<Trans>Open menu</Trans>
 					</span>
-					<MoreHorizontalIcon className="w-5" />
+					<MoreHorizontalIcon className="size-5" />
 				</Button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end">

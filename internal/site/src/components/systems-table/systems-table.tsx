@@ -1,3 +1,4 @@
+import { plural } from "@lingui/core/macro"
 import { useLingui as useLinguiContext } from "@lingui/react"
 import { Trans, useLingui } from "@lingui/react/macro"
 import { useStore } from "@nanostores/react"
@@ -25,10 +26,13 @@ import {
 	FilterIcon,
 	LayoutGridIcon,
 	LayoutListIcon,
+	PlusIcon,
+	RefreshCwIcon,
 	Settings2Icon,
 	XIcon,
 } from "lucide-react"
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { AddSystemDialog } from "@/components/add-system"
 import { Button } from "@/components/ui/button"
 import {
 	DropdownMenu,
@@ -44,26 +48,52 @@ import {
 import { Input } from "@/components/ui/input"
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { SystemStatus } from "@/lib/enums"
-import { queueUserSettings } from "@/lib/api"
+import { isReadOnlyUser, queueUserSettings } from "@/lib/api"
 import { $downSystems, $pausedSystems, $systems, $upSystems, $userSettings } from "@/lib/stores"
+import { $systemsStatus, refresh as refreshSystems } from "@/lib/systemsManager"
 import { cn, runOnce } from "@/lib/utils"
 import type { SystemRecord } from "@/types"
 import AlertButton from "../alerts/alert-button"
 import { $router, Link } from "../router"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card"
-import { SystemsTableColumns, ActionsButton, IndicatorDot } from "./systems-table-columns"
+import { Card, CardContent, CardHeader } from "../ui/card"
+import { SystemStatusBadge } from "../system-status"
+import { SystemsTableColumns, ActionsButton } from "./systems-table-columns"
 
 type ViewMode = "table" | "grid"
 type StatusFilter = "all" | SystemRecord["status"]
 
 const preloadSystemDetail = runOnce(() => import("@/components/routes/system.tsx"))
 
+/** Core overview columns; the operational extras stay one click away in "Visible Fields". */
+const DEFAULT_COLUMNS: VisibilityState = {
+	gpu: false,
+	loadAverage: false,
+	net: false,
+	temp: false,
+	battery: false,
+	wifi: false,
+	services: false,
+	updates: false,
+	agent: false,
+}
+
+const MOBILE_QUERY = "(max-width: 1023px)"
+
+function isMobile(): boolean {
+	return typeof window !== "undefined" && window.matchMedia(MOBILE_QUERY).matches
+}
+
 export default function SystemsTable() {
 	const data = useStore($systems)
+	const status = useStore($systemsStatus)
 	const downSystems = $downSystems.get()
 	const upSystems = $upSystems.get()
 	const pausedSystems = $pausedSystems.get()
-	const { i18n, t } = useLingui()
+	const { t } = useLingui()
+	const [addOpen, setAddOpen] = useState(false)
+	const explicitViewMode = useRef(
+		$userSettings.get().viewMode !== undefined || localStorage.getItem("besz-viewMode") !== null
+	)
 	const [filter, setFilter] = useState<string>("")
 	const [statusFilter, setStatusFilter] = useState<StatusFilter>(
 		() =>
@@ -77,9 +107,10 @@ export default function SystemsTable() {
 			JSON.parse(sessionStorage.getItem("besz-sortMode") || "null") ?? [{ id: "system", desc: false }]
 	)
 	const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
-		() => $userSettings.get().cols ?? JSON.parse(localStorage.getItem("besz-cols") || "{}")
-	)
+	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => ({
+		...DEFAULT_COLUMNS,
+		...($userSettings.get().cols ?? JSON.parse(localStorage.getItem("besz-cols") || "{}")),
+	}))
 
 	// Apply settings from server once they load (handles incognito / new devices)
 	const applied = useRef(new Set<string>())
@@ -87,7 +118,7 @@ export default function SystemsTable() {
 		return subscribeKeys($userSettings, ["cols", "statusFilter", "viewMode", "sortMode"], (vals) => {
 			if (!applied.current.has("cols") && vals.cols !== undefined) {
 				applied.current.add("cols")
-				setColumnVisibility(vals.cols)
+				setColumnVisibility({ ...DEFAULT_COLUMNS, ...vals.cols })
 			}
 			if (!applied.current.has("statusFilter") && vals.statusFilter !== undefined) {
 				applied.current.add("statusFilter")
@@ -95,6 +126,7 @@ export default function SystemsTable() {
 			}
 			if (!applied.current.has("viewMode") && vals.viewMode !== undefined) {
 				applied.current.add("viewMode")
+				explicitViewMode.current = true
 				setViewMode(vals.viewMode)
 			}
 			if (!applied.current.has("sortMode") && vals.sortMode !== undefined) {
@@ -127,6 +159,7 @@ export default function SystemsTable() {
 
 	const handleViewModeChange = useCallback((view: string) => {
 		const next = view as ViewMode
+		explicitViewMode.current = true
 		setViewMode(next)
 		localStorage.setItem("besz-viewMode", JSON.stringify(next))
 		$userSettings.setKey("viewMode", next)
@@ -142,8 +175,6 @@ export default function SystemsTable() {
 			return next
 		})
 	}, [])
-
-	const locale = i18n.locale
 
 	// Filter data based on status filter
 	const filteredData = useMemo(() => {
@@ -164,8 +195,24 @@ export default function SystemsTable() {
 			$userSettings.get().viewMode ??
 			(JSON.parse(localStorage.getItem("besz-viewMode") || "null") as ViewMode | null) ??
 			// show grid view on mobile if there are less than 200 systems (looks better but table is more efficient)
-			(window.innerWidth < 1024 && filteredData.length < 200 ? "grid" : "table")
+			(data.length < 200 && isMobile() ? "grid" : "table")
 	)
+
+	// Follow the mobile breakpoint until the user explicitly picks a view mode.
+	useEffect(() => {
+		if (explicitViewMode.current) {
+			return
+		}
+		const media = window.matchMedia(MOBILE_QUERY)
+		const onChange = () => {
+			if (explicitViewMode.current) {
+				return
+			}
+			setViewMode(media.matches && data.length < 200 ? "grid" : "table")
+		}
+		media.addEventListener("change", onChange)
+		return () => media.removeEventListener("change", onChange)
+	}, [data.length])
 
 	useEffect(() => {
 		if (filter !== undefined) {
@@ -199,6 +246,11 @@ export default function SystemsTable() {
 	})
 
 	const rows = table.getRowModel().rows
+	const retrySystems = useCallback(() => {
+		$systemsStatus.set("loading")
+		void refreshSystems()
+	}, [])
+
 	const columns = table.getAllColumns()
 	const visibleColumns = table.getVisibleLeafColumns()
 
@@ -206,207 +258,229 @@ export default function SystemsTable() {
 		return [Object.values(upSystems).length, Object.values(downSystems).length, Object.values(pausedSystems).length]
 	}, [upSystems, downSystems, pausedSystems])
 
-	const CardHead = useMemo(() => {
-		return (
-			<CardHeader className="p-0 mb-3 sm:mb-4">
-				<div className="grid md:flex gap-x-5 gap-y-3 w-full items-end">
-					<div className="px-2 sm:px-1">
-						<CardTitle className="mb-2">
-							<Trans>All Systems</Trans>
-						</CardTitle>
-						<CardDescription className="flex">
-							<Trans>Click on a system to view more information.</Trans>
-						</CardDescription>
+	const pageHeader = (
+		<header className="flex flex-col gap-3 px-1 sm:px-0">
+			<div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+				<div className="min-w-0">
+					<h1 className="text-2xl font-semibold tracking-[-0.02em] sm:text-[1.75rem]">
+						<Trans>All Systems</Trans>
+					</h1>
+					<div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+						<span className="tabular-nums">
+							{plural(data.length, { one: "# system", other: "# systems" })}
+						</span>
+						<span aria-hidden="true">·</span>
+						<span className="tabular-nums text-foreground">{upSystemsLength}</span> <Trans>Up</Trans>
+						<span aria-hidden="true">·</span>
+						<span className="tabular-nums text-foreground">{downSystemsLength}</span> <Trans>Down</Trans>
+						{pausedSystemsLength > 0 && (
+							<>
+								<span aria-hidden="true">·</span>
+								<span className="tabular-nums text-foreground">{pausedSystemsLength}</span> <Trans>Paused</Trans>
+							</>
+						)}
 					</div>
+				</div>
 
-					<div className="flex gap-2 ms-auto w-full md:w-80">
-						<div className="relative flex-1">
-							<Input
-								placeholder={t`Filter...`}
-								onChange={(e) => setFilter(e.target.value)}
-								value={filter}
-								className="ps-4 pe-10 w-full"
-							/>
-							{filter && (
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon"
-									aria-label={t`Clear`}
-									className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
-									onClick={() => setFilter("")}
-								>
-									<XIcon className="h-4 w-4" />
-								</Button>
-							)}
-						</div>
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<Button variant="outline">
-									<Settings2Icon className="me-1.5 size-4 opacity-80" />
-									<Trans>View</Trans>
-								</Button>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent align="end" className="h-72 md:h-auto min-w-48 md:min-w-auto overflow-y-auto">
-								<div className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-s md:divide-y-0">
-									<div className="border-r">
-										<DropdownMenuLabel className="pt-2 px-3.5 flex items-center gap-2">
+				<div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:flex-nowrap">
+					<div className="relative min-w-0 flex-1 md:w-64 md:flex-none">
+						<Input
+							placeholder={t`Filter...`}
+							aria-label={t`Search`}
+							onChange={(e) => setFilter(e.target.value)}
+							value={filter}
+							className="ps-4 pe-10 w-full h-11 sm:h-9"
+						/>
+						{filter && (
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon"
+								aria-label={t`Clear`}
+								className="absolute end-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
+								onClick={() => setFilter("")}
+							>
+								<XIcon className="h-4 w-4" />
+							</Button>
+						)}
+					</div>
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<Button variant="outline" className="h-11 sm:h-9">
+								<Settings2Icon className="me-1.5 size-4 opacity-80" />
+								<Trans>View</Trans>
+							</Button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="end" className="h-72 md:h-auto min-w-48 md:min-w-auto overflow-y-auto">
+							<div className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-s md:divide-y-0">
+								<div className="border-e">
+									<DropdownMenuLabel className="pt-2 px-3.5 flex items-center gap-2">
+										<LayoutGridIcon className="size-4" />
+										<Trans>Layout</Trans>
+									</DropdownMenuLabel>
+									<DropdownMenuSeparator />
+									<DropdownMenuRadioGroup className="px-1 pb-1" value={viewMode} onValueChange={handleViewModeChange}>
+										<DropdownMenuRadioItem value="table" onSelect={(e) => e.preventDefault()} className="gap-2">
+											<LayoutListIcon className="size-4" />
+											<Trans>Table</Trans>
+										</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="grid" onSelect={(e) => e.preventDefault()} className="gap-2">
 											<LayoutGridIcon className="size-4" />
-											<Trans>Layout</Trans>
-										</DropdownMenuLabel>
-										<DropdownMenuSeparator />
-										<DropdownMenuRadioGroup className="px-1 pb-1" value={viewMode} onValueChange={handleViewModeChange}>
-											<DropdownMenuRadioItem value="table" onSelect={(e) => e.preventDefault()} className="gap-2">
-												<LayoutListIcon className="size-4" />
-												<Trans>Table</Trans>
-											</DropdownMenuRadioItem>
-											<DropdownMenuRadioItem value="grid" onSelect={(e) => e.preventDefault()} className="gap-2">
-												<LayoutGridIcon className="size-4" />
-												<Trans>Grid</Trans>
-											</DropdownMenuRadioItem>
-										</DropdownMenuRadioGroup>
-									</div>
+											<Trans>Grid</Trans>
+										</DropdownMenuRadioItem>
+									</DropdownMenuRadioGroup>
+								</div>
 
-									<div className="border-r">
-										<DropdownMenuLabel className="pt-2 px-3.5 flex items-center gap-2">
-											<FilterIcon className="size-4" />
-											<Trans>Status</Trans>
-										</DropdownMenuLabel>
-										<DropdownMenuSeparator />
-										<DropdownMenuRadioGroup
-											className="px-1 pb-1"
-											value={statusFilter}
-											onValueChange={handleStatusFilterChange}
-										>
-											<DropdownMenuRadioItem value="all" onSelect={(e) => e.preventDefault()}>
-												<Trans>All Systems</Trans>
-											</DropdownMenuRadioItem>
-											<DropdownMenuRadioItem value="up" onSelect={(e) => e.preventDefault()}>
-												<Trans>Up ({upSystemsLength})</Trans>
-											</DropdownMenuRadioItem>
-											<DropdownMenuRadioItem value="down" onSelect={(e) => e.preventDefault()}>
-												<Trans>Down ({downSystemsLength})</Trans>
-											</DropdownMenuRadioItem>
-											<DropdownMenuRadioItem value="paused" onSelect={(e) => e.preventDefault()}>
-												<Trans>Paused ({pausedSystemsLength})</Trans>
-											</DropdownMenuRadioItem>
-										</DropdownMenuRadioGroup>
-									</div>
+								<div className="border-e">
+									<DropdownMenuLabel className="pt-2 px-3.5 flex items-center gap-2">
+										<FilterIcon className="size-4" />
+										<Trans>Status</Trans>
+									</DropdownMenuLabel>
+									<DropdownMenuSeparator />
+									<DropdownMenuRadioGroup
+										className="px-1 pb-1"
+										value={statusFilter}
+										onValueChange={handleStatusFilterChange}
+									>
+										<DropdownMenuRadioItem value="all" onSelect={(e) => e.preventDefault()}>
+											<Trans>All Systems</Trans>
+										</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="up" onSelect={(e) => e.preventDefault()}>
+											<Trans>Up ({upSystemsLength})</Trans>
+										</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="down" onSelect={(e) => e.preventDefault()}>
+											<Trans>Down ({downSystemsLength})</Trans>
+										</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="paused" onSelect={(e) => e.preventDefault()}>
+											<Trans>Paused ({pausedSystemsLength})</Trans>
+										</DropdownMenuRadioItem>
+									</DropdownMenuRadioGroup>
+								</div>
 
-									<div className="border-r">
-										<DropdownMenuLabel className="pt-2 px-3.5 flex items-center gap-2">
-											<ArrowUpDownIcon className="size-4" />
-											<Trans>Sort By</Trans>
-										</DropdownMenuLabel>
-										<DropdownMenuSeparator />
-										<div className="px-1 pb-1">
-											{columns.map((column) => {
-												if (!column.getCanSort()) return null
-												let Icon = <span className="w-6"></span>
-												// if current sort column, show sort direction
-												if (sorting[0]?.id === column.id) {
-													if (sorting[0]?.desc) {
-														Icon = <ArrowUpIcon className="me-2 size-4" />
-													} else {
-														Icon = <ArrowDownIcon className="me-2 size-4" />
-													}
+								<div className="border-e">
+									<DropdownMenuLabel className="pt-2 px-3.5 flex items-center gap-2">
+										<ArrowUpDownIcon className="size-4" />
+										<Trans>Sort By</Trans>
+									</DropdownMenuLabel>
+									<DropdownMenuSeparator />
+									<div className="px-1 pb-1">
+										{columns.map((column) => {
+											if (!column.getCanSort()) return null
+											let Icon = <span className="w-6"></span>
+											// if current sort column, show sort direction
+											if (sorting[0]?.id === column.id) {
+												if (sorting[0]?.desc) {
+													Icon = <ArrowUpIcon className="me-2 size-4" />
+												} else {
+													Icon = <ArrowDownIcon className="me-2 size-4" />
 												}
-												return (
-													<DropdownMenuItem
-														onSelect={(e) => {
-															e.preventDefault()
-															handleSortingChange([
-																{ id: column.id, desc: sorting[0]?.id === column.id && !sorting[0]?.desc },
-															])
-														}}
-														key={column.id}
-													>
-														{Icon}
-														{/* @ts-ignore */}
-														{column.columnDef.name()}
-													</DropdownMenuItem>
-												)
-											})}
-										</div>
-									</div>
-
-									<div>
-										<DropdownMenuLabel className="pt-2 px-3.5 flex items-center gap-2">
-											<EyeIcon className="size-4" />
-											<Trans>Visible Fields</Trans>
-										</DropdownMenuLabel>
-										<DropdownMenuSeparator />
-										<div className="px-1.5 pb-1">
-											{columns
-												.filter((column) => column.getCanHide())
-												.map((column) => {
-													return (
-														<DropdownMenuCheckboxItem
-															key={column.id}
-															onSelect={(e) => e.preventDefault()}
-															checked={column.getIsVisible()}
-															onCheckedChange={(value) => column.toggleVisibility(!!value)}
-														>
-															{/* @ts-ignore */}
-															{column.columnDef.name()}
-														</DropdownMenuCheckboxItem>
-													)
-												})}
-										</div>
+											}
+											return (
+												<DropdownMenuItem
+													onSelect={(e) => {
+														e.preventDefault()
+														handleSortingChange([
+															{ id: column.id, desc: sorting[0]?.id === column.id && !sorting[0]?.desc },
+														])
+													}}
+													key={column.id}
+												>
+													{Icon}
+													{/* @ts-ignore */}
+													{column.columnDef.name()}
+												</DropdownMenuItem>
+											)
+										})}
 									</div>
 								</div>
-							</DropdownMenuContent>
-						</DropdownMenu>
-					</div>
+
+								<div>
+									<DropdownMenuLabel className="pt-2 px-3.5 flex items-center gap-2">
+										<EyeIcon className="size-4" />
+										<Trans>Visible Fields</Trans>
+									</DropdownMenuLabel>
+									<DropdownMenuSeparator />
+									<div className="px-1.5 pb-1">
+										{columns
+											.filter((column) => column.getCanHide())
+											.map((column) => {
+												return (
+													<DropdownMenuCheckboxItem
+														key={column.id}
+														onSelect={(e) => e.preventDefault()}
+														checked={column.getIsVisible()}
+														onCheckedChange={(value) => column.toggleVisibility(!!value)}
+													>
+														{/* @ts-ignore */}
+														{column.columnDef.name()}
+													</DropdownMenuCheckboxItem>
+												)
+											})}
+									</div>
+								</div>
+							</div>
+						</DropdownMenuContent>
+					</DropdownMenu>
+					{!isReadOnlyUser() && (
+						<Button className="h-11 sm:h-9" onClick={() => setAddOpen(true)}>
+							<PlusIcon className="me-1.5 size-4" />
+							<Trans>Add System</Trans>
+						</Button>
+					)}
 				</div>
-			</CardHeader>
-		)
-	}, [
-		visibleColumns.length,
-		sorting,
-		viewMode,
-		locale,
-		statusFilter,
-		upSystemsLength,
-		downSystemsLength,
-		pausedSystemsLength,
-		filter,
-	])
+			</div>
+		</header>
+	)
 
 	return (
-		<Card className="w-full px-3 py-5 sm:py-6 sm:px-6">
-			{CardHead}
-			{viewMode === "table" ? (
+		<div className="grid min-h-0 gap-4">
+			{pageHeader}
+			{status === "error" && data.length > 0 && <SystemsError onRetry={retrySystems} />}
+			{status === "loading" && !data.length ? (
+				<SystemsTableSkeleton viewMode={viewMode} />
+			) : status === "error" && !data.length ? (
+				<SystemsError onRetry={retrySystems} />
+			) : !data.length ? (
+				<SystemsEmpty readOnly={isReadOnlyUser()} onAdd={() => setAddOpen(true)} />
+			) : viewMode === "table" ? (
 				// table layout
-				<div className="rounded-md">
+				<Card className="min-h-0 overflow-hidden p-0 shadow-none">
 					<AllSystemsTable table={table} rows={rows} colLength={visibleColumns.length} />
-				</div>
+				</Card>
 			) : (
 				// grid layout
-				<div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
 					{rows?.length ? (
 						rows.map((row) => {
 							return <SystemCard key={row.original.id} row={row} table={table} colLength={visibleColumns.length} />
 						})
 					) : (
-						<div className="col-span-full text-center py-8">
+						<Card className="col-span-full py-10 text-center text-sm text-muted-foreground shadow-none">
 							<Trans>No systems found.</Trans>
-						</div>
+						</Card>
 					)}
 				</div>
 			)}
-		</Card>
+			<AddSystemDialog open={addOpen} setOpen={setAddOpen} />
+		</div>
 	)
 }
 
-const AllSystemsTable = memo(
-	({ table, rows, colLength }: { table: TableType<SystemRecord>; rows: Row<SystemRecord>[]; colLength: number }) => {
+function AllSystemsTable({
+	table,
+	rows,
+	colLength,
+}: {
+	table: TableType<SystemRecord>
+	rows: Row<SystemRecord>[]
+	colLength: number
+}) {
 		// The virtualizer will need a reference to the scrollable container element
 		const scrollRef = useRef<HTMLDivElement>(null)
 
 		const virtualizer = useVirtualizer<HTMLDivElement, HTMLTableRowElement>({
 			count: rows.length,
-			estimateSize: () => (rows.length > 10 ? 56 : 60),
+			estimateSize: () => 54,
 			getScrollElement: () => scrollRef.current,
 			overscan: 5,
 		})
@@ -418,14 +492,14 @@ const AllSystemsTable = memo(
 		return (
 			<div
 				className={cn(
-					"h-min max-h-[calc(100dvh-17rem)] max-w-full relative overflow-auto border rounded-md",
+					"relative grid max-h-[70svh] min-h-0 max-w-full overflow-auto",
 					// don't set min height if there are less than 2 rows, do set if we need to display the empty state
 					(!rows.length || rows.length > 2) && "min-h-50"
 				)}
 				ref={scrollRef}
 			>
 				{/* add header height to table size */}
-				<div style={{ height: `${virtualizer.getTotalSize() + 50}px`, paddingTop, paddingBottom }}>
+				<div style={{ height: `${virtualizer.getTotalSize() + 48}px`, paddingTop, paddingBottom }}>
 					<table className="text-sm w-full h-full">
 						<SystemsTableHead table={table} />
 						<TableBody onMouseEnter={preloadSystemDetail}>
@@ -455,17 +529,16 @@ const AllSystemsTable = memo(
 			</div>
 		)
 	}
-)
 
 function SystemsTableHead({ table }: { table: TableType<SystemRecord> }) {
 	useLinguiContext()
 	return (
-		<TableHeader className="sticky top-0 z-50 w-full border-b-2">
+		<TableHeader className="sticky top-0 z-30 w-full border-b-2">
 			{table.getHeaderGroups().map((headerGroup) => (
 				<tr key={headerGroup.id}>
 					{headerGroup.headers.map((header) => {
 						return (
-							<TableHead className="px-1.5" key={header.id}>
+							<TableHead className="sticky top-0 z-30 bg-table-header px-1.5" key={header.id}>
 								{flexRender(header.column.columnDef.header, header.getContext())}
 							</TableHead>
 						)
@@ -515,30 +588,35 @@ const SystemTableRow = memo(
 	}
 )
 
-const SystemCard = memo(
-	({ row, table, colLength }: { row: Row<SystemRecord>; table: TableType<SystemRecord>; colLength: number }) => {
+function SystemCard({
+	row,
+	table,
+	colLength,
+}: {
+	row: Row<SystemRecord>
+	table: TableType<SystemRecord>
+	colLength: number
+}) {
 		const system = row.original
 		const { t } = useLingui()
+		const visibility = table.getState().columnVisibility
 
 		return useMemo(() => {
 			return (
 				<Card
 					onMouseEnter={preloadSystemDetail}
-					key={system.id}
 					className={cn(
-						"cursor-pointer hover:shadow-md transition-all bg-transparent w-full dark:border-border duration-200 relative",
+						"relative w-full cursor-pointer overflow-hidden bg-card p-0 shadow-none transition-colors duration-150 hover:border-input",
 						{
 							"opacity-50": system.status === SystemStatus.Paused,
 						}
 					)}
 				>
-					<CardHeader className="py-1 ps-4 pe-2 bg-muted/30 border-b border-border/60">
-						<div className="flex items-center gap-1 w-full overflow-hidden">
-							<h3 className="text-primary/90 min-w-0 flex-1 gap-2.5 font-semibold">
-								<div className="flex items-center gap-2.5 min-w-0 flex-1">
-									<IndicatorDot system={system} />
-									<span className="text-[.95em]/normal tracking-normal text-primary/90 truncate">{system.name}</span>
-								</div>
+					<CardHeader className="border-b border-border/60 bg-muted/30 px-4 py-3">
+						<div className="flex w-full items-center gap-2 overflow-hidden">
+							<h3 className="flex min-w-0 flex-1 items-center gap-2 text-sm font-semibold text-foreground">
+								<span className="truncate">{system.name}</span>
+								<SystemStatusBadge status={system.status} className="shrink-0" />
 							</h3>
 							{table.getColumn("actions")?.getIsVisible() && (
 								<div className="flex gap-1 shrink-0 relative z-10">
@@ -548,30 +626,27 @@ const SystemCard = memo(
 							)}
 						</div>
 					</CardHeader>
-					<CardContent className="text-sm px-5 pt-3.5 pb-4">
-						<div className="grid gap-2.5" style={{ gridTemplateColumns: "24px minmax(80px, max-content) minmax(0, 1fr)" }}>
+					<CardContent className="px-4 pb-4 pt-3 text-sm">
+						<div
+							className="grid gap-x-2 gap-y-2.5"
+							style={{ gridTemplateColumns: "16px minmax(4rem, max-content) minmax(0, 1fr)" }}
+						>
 							{table.getAllColumns().map((column) => {
-								if (!column.getIsVisible() || column.id === "system" || column.id === "actions") return null
+								if (!column.getIsVisible() || column.id === "system" || column.id === "status" || column.id === "actions") return null
 								const cell = row.getAllCells().find((cell) => cell.column.id === column.id)
 								if (!cell) return null
 								// @ts-expect-error
 								const { Icon, name } = column.columnDef as ColumnDef<SystemRecord, unknown>
 								return (
-									<>
-										<div key={`${column.id}-icon`} className="flex items-center">
-											{column.id === "lastSeen" ? (
-												<EyeIcon className="size-4 text-muted-foreground" />
-											) : (
-												Icon && <Icon className="size-4 text-muted-foreground" />
-											)}
+									<Fragment key={column.id}>
+										<div className="flex items-center">
+											{Icon && <Icon className="size-4 text-muted-foreground" />}
 										</div>
-										<div key={`${column.id}-label`} className="flex items-center text-muted-foreground pr-3">
-											{name()}:
-										</div>
-										<div key={`${column.id}-value`} className="flex items-center min-w-0">
+										<div className="flex min-w-0 items-center pe-2 text-muted-foreground">{name()}</div>
+										<div className="flex min-w-0 items-center overflow-hidden">
 											{flexRender(cell.column.columnDef.cell, cell.getContext())}
 										</div>
-									</>
+									</Fragment>
 								)
 							})}
 						</div>
@@ -584,6 +659,89 @@ const SystemCard = memo(
 					</Link>
 				</Card>
 			)
-		}, [system, colLength, t])
+		}, [system, colLength, t, visibility])
 	}
-)
+
+function SystemsError({ onRetry }: { onRetry: () => void }) {
+	return (
+		<Card className="flex flex-col items-start gap-3 p-6 shadow-none sm:flex-row sm:items-center sm:justify-between" role="alert">
+			<div>
+				<p className="font-medium">
+					<Trans>Failed to load systems.</Trans>
+				</p>
+				<p className="mt-1 text-sm text-muted-foreground">
+					<Trans>The hub could not be reached. Check the connection and try again.</Trans>
+				</p>
+			</div>
+			<Button variant="outline" className="h-11 sm:h-9" onClick={onRetry}>
+				<RefreshCwIcon className="me-1.5 size-4" />
+				<Trans>Retry</Trans>
+			</Button>
+		</Card>
+	)
+}
+
+function SystemsEmpty({ readOnly, onAdd }: { readOnly: boolean; onAdd: () => void }) {
+	return (
+		<Card className="px-6 py-12 text-center shadow-none">
+			<p className="font-medium">
+				<Trans>Add your first system</Trans>
+			</p>
+			<p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+				<Trans>Install the agent on a machine to start monitoring it here.</Trans>
+			</p>
+			{!readOnly && (
+				<Button className="mt-4 h-11 sm:h-9" onClick={onAdd}>
+					<PlusIcon className="me-1.5 size-4" />
+					<Trans>Add System</Trans>
+				</Button>
+			)}
+		</Card>
+	)
+}
+
+function SystemsTableSkeleton({ viewMode }: { viewMode: ViewMode }) {
+	const rows = Array.from({ length: 6 }, (_, index) => index)
+	return (
+		<div role="status" aria-live="polite">
+			<span className="sr-only">
+				<Trans>Loading...</Trans>
+			</span>
+			{viewMode === "table" ? (
+				<Card className="overflow-hidden p-0 shadow-none">
+					<div className="h-12 border-b bg-table-header" />
+					<div className="divide-y">
+						{rows.map((row) => (
+							<div key={row} className="flex h-[54px] items-center gap-4 px-4">
+								<div className="h-3.5 w-28 rounded bg-muted animate-pulse motion-reduce:animate-none" />
+								<div className="h-3.5 w-16 rounded bg-muted animate-pulse motion-reduce:animate-none" />
+								<div className="h-3.5 w-20 rounded bg-muted animate-pulse motion-reduce:animate-none" />
+								<div className="ms-auto h-3.5 w-24 rounded bg-muted animate-pulse motion-reduce:animate-none" />
+							</div>
+						))}
+					</div>
+				</Card>
+			) : (
+				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+					{rows.slice(0, 4).map((row) => (
+						<Card key={row} className="p-4 shadow-none">
+							<div className="flex items-center gap-2">
+								<div className="h-4 w-32 rounded bg-muted animate-pulse motion-reduce:animate-none" />
+								<div className="ms-auto h-5 w-14 rounded-full bg-muted animate-pulse motion-reduce:animate-none" />
+							</div>
+							<div className="mt-4 space-y-3">
+								{[0, 1, 2, 3].map((line) => (
+									<div key={line} className="flex items-center gap-3">
+										<div className="size-4 rounded bg-muted animate-pulse motion-reduce:animate-none" />
+										<div className="h-3 w-16 rounded bg-muted animate-pulse motion-reduce:animate-none" />
+										<div className="h-3 flex-1 rounded bg-muted animate-pulse motion-reduce:animate-none" />
+									</div>
+								))}
+							</div>
+						</Card>
+					))}
+				</div>
+			)}
+		</div>
+	)
+}

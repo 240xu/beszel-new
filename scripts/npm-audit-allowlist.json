@@ -1,0 +1,9 @@
+{
+	"https://github.com/advisories/GHSA-5qjj-4xww-7phc": "valibot: KNOWN AND SHIPPED. The advisory (GHSA-5qjj-4xww-7phc, `record()` issue paths can make `flatten()` throw for inherited Object property names) is real and the package is in the browser bundle. The fix is the version bump to valibot ^1.4.2 that upstream already made (upstream commit 195afc10); it is not applied in this change because the three components that use valibot (login/auth-form.tsx, network-monitors-table/monitor-dialog.tsx, routes/settings/notifications.tsx) have no tests, so a minor bump of a validation library cannot be shown to be behaviour-preserving here. Raise this entry's severity when the bump lands.",
+	"https://github.com/advisories/GHSA-c83g-rgw3-j3cx": "browserslist: BUILD-TIME ONLY. It is installed because @lingui/macro sits in `dependencies` while the build compiles the macro with @lingui/swc-plugin; a dist/ grep finds 0 occurrences in the shipped bundle. See the round-2 static-analysis finding SA-03, whose fix (moving @lingui/macro to devDependencies) does not change the classification under npm 10 because the peer chain is installed as a production tree.",
+	"https://github.com/advisories/GHSA-73wf-gq98-2v4g": "browserslist: build-time only, same reason as GHSA-c83g-rgw3-j3cx.",
+	"https://github.com/advisories/GHSA-h67p-54hq-rp68": "js-yaml: BUILD-TIME ONLY. It is pulled in by @lingui/babel-plugin-lingui-macro through cosmiconfig, which nothing in the build imports; a dist/ grep finds 0 occurrences in the shipped bundle.",
+	"https://github.com/advisories/GHSA-52cp-r559-cp3m": "js-yaml: build-time only, same reason as GHSA-h67p-54hq-rp68.",
+	"https://github.com/advisories/GHSA-5p4m-2wfm-xmqj": "js-yaml: build-time only, same reason as GHSA-h67p-54hq-rp68.",
+	"https://github.com/advisories/GHSA-2883-xcg3-v3hh": "js-yaml: build-time only, same reason as GHSA-h67p-54hq-rp68."
+}

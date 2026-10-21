@@ -5,15 +5,15 @@ import { type ChangeEventHandler, useEffect, useState } from "react"
 import * as v from "valibot"
 import { prependBasePath } from "@/components/router"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
+import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
 import { InputTags } from "@/components/ui/input-tags"
-import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "@/components/ui/use-toast"
 import { isAdmin, pb } from "@/lib/api"
 import type { UserSettings } from "@/types"
 import { saveSettings } from "./layout"
+import { SettingsSaveBar } from "./save-bar"
 import { QuietHours } from "./quiet-hours"
 import type { ClientResponseError } from "pocketbase"
 
@@ -72,10 +72,10 @@ const SettingsNotificationsPage = ({ userSettings }: { userSettings: UserSetting
 
 	return (
 		<div>
-			<div>
-				<h3 className="text-xl font-medium mb-2">
+			<section className="grid gap-2">
+				<h2 className="text-lg font-semibold tracking-tight">
 					<Trans>Notifications</Trans>
-				</h3>
+				</h2>
 				<p className="text-sm text-muted-foreground leading-relaxed">
 					<Trans>Configure how you receive alert notifications.</Trans>
 				</p>
@@ -85,12 +85,12 @@ const SettingsNotificationsPage = ({ userSettings }: { userSettings: UserSetting
 						the systems table.
 					</Trans>
 				</p>
-			</div>
-			<Separator className="my-4" />
-			<div className="space-y-5">
-				<div className="grid gap-2">
-					<div className="mb-2">
-						<h3 className="mb-1 text-lg font-medium">
+			</section>
+			<Separator />
+			<div className="grid gap-6">
+				<section className="grid gap-3">
+					<div className="grid gap-1">
+						<h3 className="text-sm font-semibold">
 							<Trans>Email notifications</Trans>
 						</h3>
 						{isAdmin() && (
@@ -105,26 +105,25 @@ const SettingsNotificationsPage = ({ userSettings }: { userSettings: UserSetting
 							</p>
 						)}
 					</div>
-					<Label className="block" htmlFor="email">
-						<Trans>To email(s)</Trans>
-					</Label>
-					<InputTags
-						value={emails}
-						onChange={setEmails}
-						placeholder={t`Enter email address...`}
-						className="w-full"
-						type="email"
+					<FormField
 						id="email"
-					/>
-					<p className="text-[0.8rem] text-muted-foreground">
-						<Trans>Save address using enter key or comma. Leave blank to disable email notifications.</Trans>
-					</p>
-				</div>
+						label={<Trans>To email(s)</Trans>}
+						hint={<Trans>Save address using enter key or comma. Leave blank to disable email notifications.</Trans>}
+					>
+						<InputTags
+							value={emails}
+							onChange={setEmails}
+							placeholder={t`Enter email address...`}
+							className="w-full"
+							type="email"
+						/>
+					</FormField>
+				</section>
 				<Separator />
 				<div className="space-y-3">
 					<div className="grid grid-cols-1 sm:flex items-center justify-between gap-4">
-						<div>
-							<h3 className="mb-1 text-lg font-medium">
+						<div className="grid gap-1">
+							<h3 className="text-sm font-semibold">
 								<Trans>Webhook / Push notifications</Trans>
 							</h3>
 							<p className="text-sm text-muted-foreground leading-relaxed">
@@ -162,15 +161,17 @@ const SettingsNotificationsPage = ({ userSettings }: { userSettings: UserSetting
 					<QuietHours />
 				</div>
 				<Separator />
-				<Button
-					type="button"
-					className="flex items-center gap-1.5 disabled:opacity-100"
-					onClick={updateSettings}
-					disabled={isLoading}
-				>
-					{isLoading ? <LoaderCircleIcon className="h-4 w-4 animate-spin" /> : <SaveIcon className="h-4 w-4" />}
-					<Trans>Save Settings</Trans>
-				</Button>
+				<SettingsSaveBar>
+					<Button
+						type="button"
+						className="flex items-center gap-1.5 disabled:opacity-100"
+						onClick={updateSettings}
+						disabled={isLoading}
+					>
+						{isLoading ? <LoaderCircleIcon className="h-4 w-4 animate-spin" /> : <SaveIcon className="h-4 w-4" />}
+						<Trans>Save Settings</Trans>
+					</Button>
+				</SettingsSaveBar>
 			</div>
 		</div>
 	)
@@ -207,16 +208,18 @@ const ShoutrrrUrlCard = ({ url, onUrlChange, onRemove }: ShoutrrrUrlCardProps) =
 	}
 
 	return (
-		<Card className="bg-table-header p-2 md:p-3">
+		<div className="bg-muted/30 rounded-md p-2 md:p-3">
 			<div className="flex items-center gap-1">
-				<Input
-					type="url"
-					className="light:bg-card"
-					required
-					placeholder="generic://webhook.site/xxxxxx"
-					value={url}
-					onChange={onUrlChange}
-				/>
+				<FormField label={<Trans>Webhook URL</Trans>} srOnlyLabel className="flex-1">
+					<Input
+						type="url"
+						className="light:bg-card"
+						required
+						placeholder="generic://webhook.site/xxxxxx"
+						value={url}
+						onChange={onUrlChange}
+					/>
+				</FormField>
 				<Button type="button" variant="outline" disabled={isLoading || url === ""} onClick={sendTestNotification}>
 					{isLoading ? (
 						<LoaderCircleIcon className="h-4 w-4 animate-spin" />
@@ -228,11 +231,11 @@ const ShoutrrrUrlCard = ({ url, onUrlChange, onRemove }: ShoutrrrUrlCardProps) =
 						</span>
 					)}
 				</Button>
-				<Button type="button" variant="outline" size="icon" className="shrink-0" aria-label="Delete" onClick={onRemove}>
+				<Button type="button" variant="outline" size="icon" className="shrink-0" aria-label={t`Delete`} onClick={onRemove}>
 					<Trash2Icon className="h-4 w-4" />
 				</Button>
 			</div>
-		</Card>
+		</div>
 	)
 }
 

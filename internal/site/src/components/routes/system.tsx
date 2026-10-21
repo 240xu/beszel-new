@@ -1,4 +1,4 @@
-import { memo, useState } from "react"
+import { lazy, memo, Suspense, useEffect, useRef, useState } from "react"
 import { Trans } from "@lingui/react/macro"
 import { compareSemVer, parseSemVer, supportsNetworkMonitors } from "@/lib/utils"
 import { SystemStatus } from "@/lib/enums"
@@ -13,7 +13,6 @@ import { ZfsCharts } from "./system/charts/storage-pool-charts"
 import { BandwidthChart, ContainerNetworkChart } from "./system/charts/network-charts"
 import { TemperatureChart, FanChart, BatteryChart } from "./system/charts/sensor-charts"
 import { PlusChart } from "./system/plus-sheet"
-import { PlusFanCurveTab, PlusFanTab } from "./system/plus-fan-tab"
 import { plusAvailable } from "@/lib/plus-metrics"
 import { WiFiChart } from "./system/charts/wifi-chart"
 import { GpuPowerChart, GpuCharts } from "./system/charts/gpu-charts"
@@ -28,11 +27,17 @@ import {
 import { LoadAverageChart } from "./system/charts/load-average-chart"
 import { ContainerIcon, CpuIcon, HardDriveIcon, NetworkIcon, PackageIcon, TerminalSquareIcon } from "lucide-react"
 import { GpuIcon } from "../ui/icons"
-import SystemdTable from "../systemd-table/systemd-table"
-import ContainersTable from "../containers-table/containers-table"
+
+const PlusFanTab = lazy(() => import("./system/plus-fan-tab").then((m) => ({ default: m.PlusFanTab })))
+const PlusFanCurveTab = lazy(() => import("./system/plus-fan-tab").then((m) => ({ default: m.PlusFanCurveTab })))
+const SystemdTable = lazy(() => import("../systemd-table/systemd-table"))
+const ContainersTable = lazy(() => import("../containers-table/containers-table"))
 
 const SEMVER_0_14_0 = parseSemVer("0.14.0")
 const SEMVER_0_15_0 = parseSemVer("0.15.0")
+
+const tabTriggerClass =
+	"inline-flex h-11 min-h-11 w-auto items-center justify-center gap-1.5 whitespace-nowrap rounded-none border-b-2 border-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
 
 export default memo(function SystemDetail({ id }: { id: string }) {
 	const systemData = useSystemData(id)
@@ -66,6 +71,21 @@ export default memo(function SystemDetail({ id }: { id: string }) {
 	// extra margin to add to bottom of page, specifically for temperature chart,
 	// where the tooltip can go past the bottom of the page if lots of sensors
 	const [pageBottomExtraMargin, setPageBottomExtraMargin] = useState(0)
+	const tabsListRef = useRef<HTMLDivElement>(null)
+
+	// Keep the active tab visible when the tab strip scrolls horizontally.
+	useEffect(() => {
+		const list = tabsListRef.current
+		const active = list?.querySelector<HTMLElement>('[data-state="active"]')
+		if (!list || !active || list.scrollWidth <= list.clientWidth + 1) {
+			return
+		}
+		const listRect = list.getBoundingClientRect()
+		const activeRect = active.getBoundingClientRect()
+		const left = list.scrollLeft + activeRect.left - listRect.left - (listRect.width - activeRect.width) / 2
+		const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"
+		list.scrollTo({ left, behavior })
+	}, [activeTab])
 
 	if (!system.id) {
 		return null
@@ -96,7 +116,7 @@ export default memo(function SystemDetail({ id }: { id: string }) {
 		return (
 			<>
 				{/* main charts */}
-				<div className="grid xl:grid-cols-2 gap-4">
+				<div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:gap-5">
 					<CpuChart {...coreProps} />
 
 					{hasContainers && (
@@ -144,10 +164,12 @@ export default memo(function SystemDetail({ id }: { id: string }) {
 					<FanChart {...coreProps} />
 					<PlusChart chartData={chartData} grid={grid} />
 					{plusAvailable(systemStats) && (
-						<>
-							<PlusFanTab grid={grid} dataEmpty={dataEmpty} />
-							<PlusFanCurveTab grid={grid} dataEmpty={dataEmpty} />
-						</>
+						<div className="grid gap-4 xl:col-span-2 xl:gap-5">
+							<Suspense fallback={null}>
+								<PlusFanTab grid={grid} dataEmpty={dataEmpty} />
+								<PlusFanCurveTab grid={grid} dataEmpty={dataEmpty} />
+							</Suspense>
+						</div>
 					)}
 
 					<BatteryChart system={system} {...coreProps} />
@@ -188,39 +210,42 @@ export default memo(function SystemDetail({ id }: { id: string }) {
 	function tabbedLayout() {
 		return (
 			<Tabs value={activeTab} onValueChange={setActiveTab} className="contents">
-				<TabsList className="h-11 p-1.5 w-full shadow-xs overflow-auto justify-start">
-					<TabsTrigger value="core" className="w-full flex items-center gap-1.5">
+				<TabsList
+					ref={tabsListRef}
+					className="flex h-auto w-full flex-wrap justify-start gap-x-1 overflow-x-auto rounded-none border-b border-border bg-transparent p-0 shadow-none"
+				>
+					<TabsTrigger value="core" className={tabTriggerClass}>
 						<CpuIcon className="size-3.5" />
 						<Trans context="Core system metrics">Core</Trans>
 					</TabsTrigger>
-					<TabsTrigger value="network" className="w-full flex items-center gap-1.5">
+					<TabsTrigger value="network" className={tabTriggerClass}>
 						<NetworkIcon className="size-3.5" />
 						<Trans>Network</Trans>
 					</TabsTrigger>
-					<TabsTrigger value="disk" className="w-full flex items-center gap-1.5">
+					<TabsTrigger value="disk" className={tabTriggerClass}>
 						<HardDriveIcon className="size-3.5" />
 						<Trans>Disk</Trans>
 					</TabsTrigger>
 					{hasGpu && (
-						<TabsTrigger value="gpu" className="w-full flex items-center gap-2">
+						<TabsTrigger value="gpu" className={tabTriggerClass}>
 							<GpuIcon className="size-3.5" />
 							<Trans>GPU</Trans>
 						</TabsTrigger>
 					)}
 					{hasContainers && (
-						<TabsTrigger value="containers" className="w-full flex items-center gap-2">
+						<TabsTrigger value="containers" className={tabTriggerClass}>
 							<ContainerIcon className="size-3.5" />
 							<Trans>Containers</Trans>
 						</TabsTrigger>
 					)}
 					{hasSystemd && (
-						<TabsTrigger value="services" className="w-full flex items-center gap-2">
+						<TabsTrigger value="services" className={tabTriggerClass}>
 							<TerminalSquareIcon className="size-3.5" />
 							<Trans>Services</Trans>
 						</TabsTrigger>
 					)}
 					{packageUpdates && (
-						<TabsTrigger value="updates" className="w-full flex items-center gap-2">
+						<TabsTrigger value="updates" className={tabTriggerClass}>
 							<PackageIcon className="size-3.5" />
 							<Trans>Updates</Trans>
 						</TabsTrigger>
@@ -228,7 +253,7 @@ export default memo(function SystemDetail({ id }: { id: string }) {
 				</TabsList>
 
 				<TabsContent value="core" forceMount className={activeTab === "core" ? "contents" : "hidden"}>
-					<div className="grid xl:grid-cols-2 gap-4">
+					<div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:gap-5">
 						<CpuChart {...coreProps} />
 						<LoadAverageChart chartData={chartData} grid={grid} dataEmpty={dataEmpty} />
 						<MemoryChart {...coreProps} />
@@ -237,10 +262,12 @@ export default memo(function SystemDetail({ id }: { id: string }) {
 						<FanChart {...coreProps} />
 						<PlusChart chartData={chartData} grid={grid} />
 						{plusAvailable(systemStats) && (
-							<>
-								<PlusFanTab grid={grid} dataEmpty={dataEmpty} />
-								<PlusFanCurveTab grid={grid} dataEmpty={dataEmpty} />
-							</>
+							<div className="grid gap-4 xl:col-span-2 xl:gap-5">
+								<Suspense fallback={null}>
+									<PlusFanTab grid={grid} dataEmpty={dataEmpty} />
+									<PlusFanCurveTab grid={grid} dataEmpty={dataEmpty} />
+								</Suspense>
+							</div>
 						)}
 						<BatteryChart system={system} {...coreProps} />
 						{pageBottomExtraMargin > 0 && <div style={{ marginBottom: pageBottomExtraMargin }}></div>}
@@ -314,7 +341,11 @@ export default memo(function SystemDetail({ id }: { id: string }) {
 										networkConfig={containerChartConfigs.network}
 									/>
 								</div>
-								{hasContainersTable && <ContainersTable systemId={system.id} />}
+								{hasContainersTable && (
+									<Suspense fallback={null}>
+										<ContainersTable systemId={system.id} />
+									</Suspense>
+								)}
 							</>
 						)}
 					</TabsContent>
@@ -322,7 +353,11 @@ export default memo(function SystemDetail({ id }: { id: string }) {
 
 				{hasSystemd && (
 					<TabsContent value="services" forceMount className={activeTab === "services" ? "contents" : "hidden"}>
-						{mountedTabs.has("services") && <SystemdTable systemId={system.id} />}
+						{mountedTabs.has("services") && (
+							<Suspense fallback={null}>
+								<SystemdTable systemId={system.id} />
+							</Suspense>
+						)}
 					</TabsContent>
 				)}
 
@@ -336,7 +371,7 @@ export default memo(function SystemDetail({ id }: { id: string }) {
 	}
 
 	return (
-		<div className="grid gap-4 mb-14 overflow-x-clip">
+		<div className="grid min-h-0 gap-4 mb-14 overflow-x-clip">
 			{/* system info */}
 			<InfoBar
 				system={system}

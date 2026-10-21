@@ -1,17 +1,10 @@
 import { plural } from "@lingui/core/macro"
 import { Trans, useLingui } from "@lingui/react/macro"
-import {
-	AppleIcon,
-	ChevronRightSquareIcon,
-	ClockArrowUp,
-	CpuIcon,
-	GlobeIcon,
-	MemoryStickIcon,
-	MonitorIcon,
-	Settings2Icon,
-} from "lucide-react"
-import { useMemo } from "react"
+import { ChevronRightSquareIcon, Settings2Icon } from "lucide-react"
+import type { ReactNode } from "react"
 import ChartTimeSelect from "@/components/charts/chart-time-select"
+import { RelativeTimeCell } from "@/components/systems-table/relative-time-cell"
+import { SystemStatusBadge } from "@/components/system-status"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import {
@@ -23,12 +16,48 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { FreeBsdIcon, TuxIcon, WebSocketIcon, WindowsIcon } from "@/components/ui/icons"
-import { Separator } from "@/components/ui/separator"
+import { WebSocketIcon } from "@/components/ui/icons"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { ConnectionType, connectionTypeLabels, Os, SystemStatus } from "@/lib/enums"
-import { cn, formatBytes, getHostDisplayValue, secondsToUptimeString, toFixedFloat } from "@/lib/utils"
+import { ConnectionType, connectionTypeLabels, Os } from "@/lib/enums"
+import { formatBytes, getHostDisplayValue, secondsToUptimeString, toFixedFloat } from "@/lib/utils"
 import type { ChartData, SystemDetailsRecord, SystemRecord } from "@/types"
+
+const OS_NAMES: Record<Os, string> = {
+	[Os.Linux]: "Linux",
+	[Os.Darwin]: "macOS",
+	[Os.Windows]: "Windows",
+	[Os.FreeBSD]: "FreeBSD",
+}
+
+function MetricCell({
+	label,
+	value,
+	unit,
+	helper,
+	meter,
+}: {
+	label: string
+	value: ReactNode
+	unit?: string
+	helper?: ReactNode
+	meter?: number
+}) {
+	return (
+		<div className="min-w-0 rounded-md bg-muted/30 px-3 py-3">
+			<div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{label}</div>
+			<div className="mt-1 flex items-baseline gap-1 tabular-nums">
+				<span className="text-2xl font-semibold tracking-[-0.02em] sm:text-3xl">{value}</span>
+				{unit && <span className="text-sm text-muted-foreground">{unit}</span>}
+			</div>
+			{typeof meter === "number" && (
+				<div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
+					<div className="h-full rounded-full bg-foreground/70" style={{ width: `${Math.min(100, Math.max(0, meter))}%` }} />
+				</div>
+			)}
+			<div className="mt-1.5 truncate text-xs text-muted-foreground">{helper}</div>
+		</div>
+	)
+}
 
 export default function InfoBar({
 	system,
@@ -49,167 +78,86 @@ export default function InfoBar({
 }) {
 	const { t } = useLingui()
 
-	// values for system info bar - use details with fallback to system.info
-	const systemInfo = useMemo(() => {
-		if (!system.info) {
-			return []
-		}
+	const cpu = system.info?.cpu ?? 0
+	const memory = system.info?.mp ?? 0
+	const disk = system.info?.dp ?? 0
+	const uptime = system.info?.u ?? 0
+	const cores = details?.cores ?? system.info?.c ?? 0
+	const threads = details?.threads ?? system.info?.t ?? 0
+	const cpuModel = details?.cpu ?? system.info?.m
+	const os = details?.os ?? system.info?.os
+	const osName = details?.os_name || (os !== undefined ? OS_NAMES[os] : undefined)
+	const arch = details?.arch
+	const kernel = details?.kernel ?? system.info?.k
+	const totalMemory = details?.memory
 
-		// Use details if available, otherwise fall back to system.info
-		const hostname = details?.hostname ?? system.info.h
-		const kernel = details?.kernel ?? system.info.k
-		const cores = details?.cores ?? system.info.c
-		const threads = details?.threads ?? system.info.t ?? 0
-		const cpuModel = details?.cpu ?? system.info.m
-		const os = details?.os ?? system.info.os ?? Os.Linux
-		const osName = details?.os_name
-		const arch = details?.arch
-		const memory = details?.memory
+	const lastStats = chartData.systemStats.at(-1)?.stats
+	const sentBytes = lastStats?.b?.[0]
+	const receivedBytes = lastStats?.b?.[1]
+	const netTotal = sentBytes !== undefined && receivedBytes !== undefined ? sentBytes + receivedBytes : undefined
+	const netValue = netTotal !== undefined ? formatBytes(netTotal, true) : undefined
+	const sentValue = sentBytes !== undefined ? formatBytes(sentBytes, true) : undefined
+	const receivedValue = receivedBytes !== undefined ? formatBytes(receivedBytes, true) : undefined
 
-		const osInfo = {
-			[Os.Linux]: {
-				Icon: TuxIcon,
-				// show kernel in tooltip if os name is available, otherwise show the kernel
-				value: osName || kernel,
-				label: osName ? kernel : undefined,
-			},
-			[Os.Darwin]: {
-				Icon: AppleIcon,
-				value: osName || `macOS ${kernel}`,
-			},
-			[Os.Windows]: {
-				Icon: WindowsIcon,
-				value: osName || kernel,
-				label: osName ? kernel : undefined,
-			},
-			[Os.FreeBSD]: {
-				Icon: FreeBsdIcon,
-				value: osName || kernel,
-				label: osName ? kernel : undefined,
-			},
-		}
-
-		const info = [
-			{ value: getHostDisplayValue(system), Icon: GlobeIcon },
-			{
-				value: hostname,
-				Icon: MonitorIcon,
-				label: "Hostname",
-				// hide if hostname is same as host or name
-				hide: hostname === system.host || hostname === system.name,
-			},
-			{ value: secondsToUptimeString(system.info.u), Icon: ClockArrowUp, label: t`Uptime`, hide: !system.info.u },
-			osInfo[os],
-			{
-				value: cpuModel,
-				Icon: CpuIcon,
-				hide: !cpuModel,
-				label: `${plural(cores, { one: "# core", other: "# cores" })} / ${plural(threads, { one: "# thread", other: "# threads" })}${arch ? ` / ${arch}` : ""}`,
-			},
-		] as {
-			value: string | number | undefined
-			label?: string
-			Icon: React.ElementType
-			hide?: boolean
-		}[]
-
-		if (memory) {
-			const memValue = formatBytes(memory, false, undefined, false)
-			info.push({
-				value: `${toFixedFloat(memValue.value, memValue.value >= 10 ? 1 : 2)} ${memValue.unit}`,
-				Icon: MemoryStickIcon,
-				hide: !memory,
-				label: t`Memory`,
-			})
-		}
-
-		return info
-	}, [system, details, t])
-
-	let translatedStatus: string = system.status
-	if (system.status === SystemStatus.Up) {
-		translatedStatus = t({ message: "Up", comment: "Context: System is up" })
-	} else if (system.status === SystemStatus.Down) {
-		translatedStatus = t({ message: "Down", comment: "Context: System is down" })
-	}
+	const memoryTotal = totalMemory ? formatBytes(totalMemory) : undefined
+	const connectionType = system.info?.ct as ConnectionType | undefined
 
 	return (
-		<Card>
-			<div className="grid xl:flex xl:gap-4 px-4 sm:px-6 pt-3 sm:pt-4 pb-5">
+		<Card className="p-4 shadow-none sm:p-5">
+			<div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
 				<div className="min-w-0">
-					<h1 className="text-2xl sm:text-[1.6rem] font-semibold mb-1.5">{system.name}</h1>
-					<div className="flex xl:flex-wrap items-center py-4 xl:p-0 -mt-3 xl:mt-1 gap-3 text-sm text-nowrap opacity-90 max-xl:overflow-x-auto scrollbar-hide -mx-4 px-4 xl:mx-0">
+					<h1 className="truncate text-2xl font-semibold tracking-[-0.02em] sm:text-[1.75rem]">{system.name}</h1>
+					<div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted-foreground">
 						<Tooltip>
 							<TooltipTrigger asChild>
-								<div className="capitalize flex gap-2 items-center">
-									<span className={cn("relative flex h-3 w-3")}>
-										{system.status === SystemStatus.Up && (
-											<span
-												className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"
-												style={{ animationDuration: "1.5s" }}
-											></span>
-										)}
-										<span
-											className={cn("relative inline-flex rounded-full h-3 w-3", {
-												"bg-green-500": system.status === SystemStatus.Up,
-												"bg-red-500": system.status === SystemStatus.Down,
-												"bg-primary/40": system.status === SystemStatus.Paused,
-												"bg-yellow-500": system.status === SystemStatus.Pending,
-											})}
-										></span>
-									</span>
-									{translatedStatus}
-								</div>
+								<span className="inline-flex">
+									<SystemStatusBadge status={system.status} />
+								</span>
 							</TooltipTrigger>
-							{!!system.info.ct && (
+							{connectionType ? (
 								<TooltipContent>
-									<div className="flex gap-1 items-center">
-										{system.info.ct === ConnectionType.WebSocket ? (
+									<div className="flex items-center gap-1">
+										{connectionType === ConnectionType.WebSocket ? (
 											<WebSocketIcon className="size-4" />
 										) : (
 											<ChevronRightSquareIcon className="size-4" strokeWidth={2} />
 										)}
-										{connectionTypeLabels[system.info.ct as ConnectionType]}
+										{connectionTypeLabels[connectionType]}
 									</div>
 								</TooltipContent>
-							)}
+							) : null}
 						</Tooltip>
 
-						{systemInfo.map(({ value, label, Icon, hide }) => {
-							if (hide || !value) {
-								return null
-							}
-							const content = (
-								<div className="flex gap-1.5 items-center">
-									<Icon className="h-4 w-4" /> {value}
-								</div>
-							)
-							return (
-								<div key={value} className="contents">
-									<Separator orientation="vertical" className="h-4 bg-primary/30" />
-									{label ? (
-										<Tooltip delayDuration={100}>
-											<TooltipTrigger asChild>{content}</TooltipTrigger>
-											<TooltipContent>{label}</TooltipContent>
-										</Tooltip>
-									) : (
-										content
-									)}
-								</div>
-							)
-						})}
+						<span className="font-mono text-xs text-muted-foreground/90">{getHostDisplayValue(system)}</span>
+
+						{(osName || arch) && (
+							<span className="inline-flex min-w-0 items-center gap-1.5" title={kernel}>
+								<span className="truncate">{osName}</span>
+								{arch && <span className="text-muted-foreground/70">{arch}</span>}
+							</span>
+						)}
+
+						{uptime > 0 && (
+							<span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+								<Trans>Uptime</Trans>
+								<span className="tabular-nums text-foreground/80">{secondsToUptimeString(uptime)}</span>
+							</span>
+						)}
+
+						{system.updated && (
+							<span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+								<Trans>Updated</Trans>
+								<RelativeTimeCell value={system.updated} className="text-foreground/80" />
+							</span>
+						)}
 					</div>
 				</div>
-				<div className="xl:ms-auto flex items-center gap-2 max-sm:-mb-1">
-					<ChartTimeSelect className="w-full xl:w-40" agentVersion={chartData.agentVersion} />
+
+				<div className="flex w-full shrink-0 flex-wrap items-center gap-2 xl:w-auto xl:justify-end">
+					<ChartTimeSelect className="min-w-0 flex-1 sm:w-40 sm:flex-none" agentVersion={chartData.agentVersion} />
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
-							<Button
-								aria-label={t`Settings`}
-								variant="outline"
-								size="icon"
-								className="hidden xl:flex p-0 text-primary"
-							>
+							<Button aria-label={t`Settings`} variant="outline" size="icon" className="p-0 text-primary">
 								<Settings2Icon className="size-4 opacity-90" />
 							</Button>
 						</DropdownMenuTrigger>
@@ -250,6 +198,47 @@ export default function InfoBar({
 						</DropdownMenuContent>
 					</DropdownMenu>
 				</div>
+			</div>
+
+			<div className="mt-4 grid grid-cols-2 gap-2 border-t border-border pt-4 sm:gap-3 lg:grid-cols-4">
+				<MetricCell
+					label={t`CPU`}
+					value={toFixedFloat(cpu, cpu >= 10 ? 1 : 2)}
+					unit="%"
+					meter={cpu}
+					helper={
+						cpuModel ||
+						`${plural(cores, { one: "# core", other: "# cores" })} / ${plural(threads, { one: "# thread", other: "# threads" })}`
+					}
+				/>
+				<MetricCell
+					label={t`Memory`}
+					value={toFixedFloat(memory, memory >= 10 ? 1 : 2)}
+					unit="%"
+					meter={memory}
+					helper={memoryTotal ? `${t`Total`}: ${toFixedFloat(memoryTotal.value, memoryTotal.value >= 10 ? 1 : 2)} ${memoryTotal.unit}` : undefined}
+				/>
+				<MetricCell
+					label={t`Disk`}
+					value={toFixedFloat(disk, disk >= 10 ? 1 : 2)}
+					unit="%"
+					meter={disk}
+					helper={system.info?.rdn || t`Root`}
+				/>
+				<MetricCell
+					label={t`Network`}
+					value={netValue ? toFixedFloat(netValue.value, netValue.value >= 10 ? 1 : 2) : "—"}
+					unit={netValue?.unit}
+					helper={
+						sentValue && receivedValue ? (
+							<span className="inline-flex gap-1">
+								<Trans>Sent</Trans> {toFixedFloat(sentValue.value, 1)} {sentValue.unit}
+								<span aria-hidden="true">·</span>
+								<Trans>Received</Trans> {toFixedFloat(receivedValue.value, 1)} {receivedValue.unit}
+							</span>
+						) : undefined
+					}
+				/>
 			</div>
 		</Card>
 	)

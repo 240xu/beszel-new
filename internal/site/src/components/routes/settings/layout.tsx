@@ -12,7 +12,7 @@ import {
 } from "lucide-react"
 import { lazy, useEffect } from "react"
 import { $router } from "@/components/router.tsx"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx"
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card.tsx"
 import { toast } from "@/components/ui/use-toast.ts"
 import { saveUserSettings } from "@/lib/api"
 import { $userSettings } from "@/lib/stores.ts"
@@ -107,18 +107,18 @@ export default function SettingsLayout() {
 	}, [])
 
 	return (
-		<Card className="pt-5 px-4 pb-8 min-h-96 mb-14 sm:pt-6 sm:px-7">
+		<Card className="p-5 sm:p-6 min-h-96 mb-14">
 			<CardHeader className="p-0">
-				<CardTitle className="mb-1">
+				<h1 className="text-card-title font-semibold leading-none tracking-tight mb-1">
 					<Trans>Settings</Trans>
-				</CardTitle>
+				</h1>
 				<CardDescription>
 					<Trans>Manage display and notification preferences.</Trans>
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="p-0">
-				<Separator className="hidden md:block my-5" />
-				<div className="flex flex-col gap-3.5 md:flex-row md:gap-5 lg:gap-12">
+				<Separator className="hidden md:block my-4" />
+				<div className="flex flex-col gap-4 md:flex-row md:gap-6 lg:gap-10">
 					<aside className="md:max-w-52 min-w-40">
 						<SidebarNav items={sidebarNavItems} />
 					</aside>

@@ -1,7 +1,23 @@
-import { describe, expect, test } from "bun:test"
+import { afterAll, describe, expect, mock, test } from "bun:test"
 import type { FanCurve, FanState } from "@/types"
 import { buildCurvePayload, getFanState, isPendingRestart, saveCurve, setFanLevel, setFanMode } from "@/lib/plus-api"
 import { FAN_REJECT_CODES, FanApiError, readFanRefusal } from "@/lib/plus-refusals"
+
+const TOKEN = { value: "" }
+mock.module("@/lib/api", () => ({
+	pb: {
+		authStore: {
+			get token() {
+				return TOKEN.value
+			},
+		},
+	},
+}))
+
+afterAll(() => {
+	TOKEN.value = ""
+	delete (globalThis as { window?: unknown }).window
+})
 
 const CURVE: FanCurve = {
 	idle: 52,
@@ -28,7 +44,7 @@ const CURVE: FanCurve = {
 	iv: 10,
 }
 
-type FetchCall = { url: string; method: string; body: unknown }
+type FetchCall = { url: string; method: string; body: unknown; headers: Record<string, string> }
 
 function stubFetch(responses: { status: number; body: string }[]): { calls: FetchCall[] } {
 	const calls: FetchCall[] = []
@@ -40,6 +56,7 @@ function stubFetch(responses: { status: number; body: string }[]): { calls: Fetc
 			url: String(input),
 			method: init?.method ?? "GET",
 			body: init?.body === undefined ? undefined : JSON.parse(String(init.body)),
+			headers: Object.fromEntries(new Headers(init?.headers).entries()),
 		})
 		return Promise.resolve(new Response(r.body, { status: r.status }))
 	}) as typeof fetch
@@ -48,6 +65,21 @@ function stubFetch(responses: { status: number; body: string }[]): { calls: Fetc
 
 function ok(obj: unknown): { status: number; body: string } {
 	return { status: 200, body: JSON.stringify(obj) }
+}
+
+function browser() {
+	Object.defineProperty(globalThis, "window", { configurable: true, writable: true, value: {} })
+}
+
+const STATE: FanState = {
+	pfand_active: false,
+	level_read: true,
+	level: 70,
+	level_label: "70%",
+	pkg_temp_read: true,
+	pkg_temp_c: 50,
+	regress_pending: false,
+	curve: CURVE,
 }
 
 describe("refusal reading", () => {
@@ -225,5 +257,33 @@ describe("fan state", () => {
 		expect(got.level).toBe(70)
 		expect(got.regress_pending).toBe(false)
 		expect(got.regress_at).toBeUndefined()
+	})
+})
+
+describe("authorization", () => {
+	test("a signed-in session sends the stored token, which the fan routes require", async () => {
+		TOKEN.value = "session-token"
+		browser()
+		const { calls } = stubFetch([ok(STATE)])
+		await getFanState()
+		expect(calls[0].headers.authorization).toBe("session-token")
+		expect(calls[0].headers["content-type"]).toBe("application/json")
+	})
+
+	test("no token sends no authorization header and keeps the JSON content type", async () => {
+		TOKEN.value = ""
+		browser()
+		const { calls } = stubFetch([ok(STATE)])
+		await getFanState()
+		expect(calls[0].headers.authorization).toBeUndefined()
+		expect(calls[0].headers["content-type"]).toBe("application/json")
+	})
+
+	test("a write carries the token too, so a write route cannot answer 401 behind a read", async () => {
+		TOKEN.value = "session-token"
+		browser()
+		const { calls } = stubFetch([ok({ applied: true, needs_pfand_restart: false, status: "applied", level: 25 })])
+		await setFanLevel(25, true)
+		expect(calls[0].headers.authorization).toBe("session-token")
 	})
 })

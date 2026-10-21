@@ -110,14 +110,35 @@ func (h *Hub) registerPlusFanRoutes(se *core.ServeEvent) error {
 // file exists to name this machine's zone, and a literal index in code is the
 // one thing that turns a moved sensor into a silently wrong refusal.
 func productionDeps(audit func(fanapi.Event)) fanapi.Deps {
-	readTemp := readPackageTempC
+	// A sysfs read can block (e.g. a wedged thermal zone during resume). The
+	// guard holds its mutex while it reads, so an unbounded read would freeze the
+	// floor and /state together. Treat a timeout as an unreadable sensor: the
+	// floor then holds the emergency duty rather than going quiet.
+	readTemp := func() (int, error) {
+		type result struct {
+			temp int
+			err  error
+		}
+		ch := make(chan result, 1)
+		go func() {
+			t, err := readPackageTempC()
+			ch <- result{t, err}
+		}()
+		select {
+		case r := <-ch:
+			return r.temp, r.err
+		case <-time.After(500 * time.Millisecond):
+			return 0, fmt.Errorf("package temperature read timed out")
+		}
+	}
 	return fanapi.Deps{
-		Now:       time.Now,
-		ReadTempC: readTemp,
-		ReadCurve: func() (*plus.Curve, error) { return plus.ReadCurveFile(plus.ProdCurveConf) },
-		SetLevel:  plus.SetFanLevel,
-		GetLevel:  plus.GetFanLevel,
-		PfandUp:   plus.PfandActive,
+		Now:            time.Now,
+		ReadTempC:      readTemp,
+		ReadCurve:      func() (*plus.Curve, error) { return plus.ReadCurveFile(plus.ProdCurveConf) },
+		SetLevel:       plus.SetFanLevel,
+		GetLevel:       plus.GetFanLevel,
+		PfandUp:        plus.PfandActive,
+		ResolveDutySet: plus.ResolveDutySet,
 		ReadCurveBytes: func() ([]byte, error) {
 			return os.ReadFile(plus.ProdCurveConf)
 		},
@@ -300,13 +321,19 @@ func (fc *fanRoutes) mode(e *core.RequestEvent) error {
 	// no floor: a floor outliving its own daemon would be a second writer on one fan.
 	if req.Mode == "manual" {
 		fc.guard.ArmThermalFloor()
-	} else {
+	} else if fc.deps.PfandUp() {
+		// Only hand the fan back once the daemon is actually running. systemctl
+		// start can return 0 for a unit that exits immediately; disarming on the
+		// exit code alone would leave no thermal writer at all.
 		fc.guard.DisarmThermalFloor()
+	} else {
+		fc.guard.ArmThermalFloor()
 	}
 
 	return e.JSON(http.StatusOK, map[string]any{
-		"mode":         req.Mode,
-		"pfand_active": fc.deps.PfandUp(),
+		"mode":                req.Mode,
+		"pfand_active":        fc.deps.PfandUp(),
+		"thermal_floor_armed": fc.guard.ThermalFloorArmed(),
 	})
 }
 

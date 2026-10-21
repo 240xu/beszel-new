@@ -1,14 +1,15 @@
 import { t } from "@lingui/core/macro"
 import { Trans } from "@lingui/react/macro"
 import { getPagePath } from "@nanostores/router"
-import { KeyIcon, LoaderCircle, LockIcon, LogInIcon, MailIcon } from "lucide-react"
+import { KeyIcon, LoaderCircle, LogInIcon } from "lucide-react"
 import type { AuthMethodsList, AuthProviderInfo, OAuth2AuthConfig } from "pocketbase"
 import { useCallback, useEffect, useState } from "react"
 import * as v from "valibot"
 import { buttonVariants } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Separator } from "@/components/ui/separator"
 import { pb } from "@/lib/api"
 import { $authenticated } from "@/lib/stores"
 import { cn } from "@/lib/utils"
@@ -81,7 +82,6 @@ export function UserAuthForm({
 				const Schema = isFirstRun ? RegisterSchema : LoginSchema
 				const result = v.safeParse(Schema, data)
 				if (!result.success) {
-					console.log(result)
 					const errors = {}
 					for (const issue of result.issues) {
 						// @ts-expect-error
@@ -95,8 +95,7 @@ export function UserAuthForm({
 				if (isFirstRun) {
 					// check that passwords match
 					if (password !== passwordConfirm) {
-						const msg = "Passwords do not match"
-						setErrors({ passwordConfirm: msg })
+						setErrors({ passwordConfirm: t`Passwords must match` })
 						return
 					}
 					await pb.send("/api/beszel/create-user", {
@@ -229,108 +228,85 @@ export function UserAuthForm({
 		<div className={cn("grid gap-6", className)} {...props}>
 			{passwordEnabled && (
 				<>
-					<form onSubmit={handleSubmit} onChange={() => setErrors({})}>
-						<div className="grid gap-2.5">
-							<div className="grid gap-1 relative">
-								<MailIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-								<Label className="sr-only" htmlFor="email">
-									<Trans>Email</Trans>
-								</Label>
+					<form onSubmit={handleSubmit} onChange={() => setErrors({})} className="grid gap-4">
+						<FormField id="email" label={<Trans>Email</Trans>} error={errors?.email} required>
+							<Input
+								name="email"
+								required
+								placeholder="name@example.com"
+								type="text"
+								autoCapitalize="none"
+								autoComplete="email"
+								autoCorrect="off"
+								disabled={isLoading || isOauthLoading}
+							/>
+						</FormField>
+						<FormField id="password" label={<Trans>Password</Trans>} error={errors?.password} required>
+							<Input
+								name="password"
+								required
+								type="password"
+								autoComplete={isFirstRun ? "new-password" : "current-password"}
+								disabled={isLoading || isOauthLoading}
+							/>
+						</FormField>
+						{isFirstRun && (
+							<FormField
+								id="passwordConfirm"
+								label={<Trans>Confirm password</Trans>}
+								error={errors?.passwordConfirm}
+								required
+							>
 								<Input
-									id="email"
-									name="email"
-									required
-									placeholder="name@example.com"
-									type="text"
-									autoCapitalize="none"
-									autoComplete="email"
-									autoCorrect="off"
-									disabled={isLoading || isOauthLoading}
-									className={cn("ps-9", errors?.email && "border-red-500")}
-								/>
-								{errors?.email && <p className="px-1 text-xs text-red-600">{errors.email}</p>}
-							</div>
-							<div className="grid gap-1 relative">
-								<LockIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-								<Label className="sr-only" htmlFor="pass">
-									<Trans>Password</Trans>
-								</Label>
-								<Input
-									id="pass"
-									name="password"
-									placeholder={t`Password`}
+									name="passwordConfirm"
 									required
 									type="password"
-									autoComplete="current-password"
+									autoComplete="new-password"
 									disabled={isLoading || isOauthLoading}
-									className={cn("ps-9", errors?.password && "border-red-500")}
 								/>
-								{errors?.password && <p className="px-1 text-xs text-red-600">{errors.password}</p>}
-							</div>
-							{isFirstRun && (
-								<div className="grid gap-1 relative">
-									<LockIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-									<Label className="sr-only" htmlFor="pass2">
-										<Trans>Confirm password</Trans>
-									</Label>
-									<Input
-										id="pass2"
-										name="passwordConfirm"
-										placeholder={t`Confirm password`}
-										required
-										type="password"
-										autoComplete="current-password"
-										disabled={isLoading || isOauthLoading}
-										className={cn("ps-9", errors?.password && "border-red-500")}
-									/>
-									{errors?.passwordConfirm && <p className="px-1 text-xs text-red-600">{errors.passwordConfirm}</p>}
-								</div>
-							)}
-							<div className="sr-only" aria-hidden="true">
-								{/* honeypot */}
-								<label htmlFor="website">Website</label>
-								<input
-									id="website"
-									type="text"
-									name="website"
-									tabIndex={-1}
-									readOnly
-									autoComplete="off"
-									data-1p-ignore
-									data-lpignore="true"
-									data-bwignore
-									data-form-type="other"
-									data-protonpass-ignore
-								/>
-							</div>
-							<button className={cn(buttonVariants())} disabled={isLoading}>
-								{isLoading ? (
-									<LoaderCircle className="me-2 h-4 w-4 animate-spin" />
-								) : (
-									<LogInIcon className="me-2 h-4 w-4" />
-								)}
-								{isFirstRun ? t`Create account` : t`Sign in`}
-							</button>
+							</FormField>
+						)}
+						<div className="sr-only" aria-hidden="true">
+							{/* honeypot */}
+							<label htmlFor="website">Website</label>
+							<input
+								id="website"
+								type="text"
+								name="website"
+								tabIndex={-1}
+								readOnly
+								autoComplete="off"
+								data-1p-ignore
+								data-lpignore="true"
+								data-bwignore
+								data-form-type="other"
+								data-protonpass-ignore
+							/>
 						</div>
+						<button className={cn(buttonVariants())} disabled={isLoading}>
+							{isLoading ? (
+								<LoaderCircle className="me-2 h-4 w-4 animate-spin" />
+							) : (
+								<LogInIcon className="me-2 h-4 w-4" />
+							)}
+							{isFirstRun ? t`Create account` : t`Sign in`}
+						</button>
 					</form>
 					{(isFirstRun || oauthEnabled || (otpEnabled && !mfaEnabled)) && (
 						// only show 'continue with' during onboarding or if we have auth providers
-						<div className="relative">
-							<div className="absolute inset-0 flex items-center">
-								<span className="w-full border-t" />
-							</div>
-							<div className="relative flex justify-center text-xs uppercase">
-								<span className="bg-background px-2 text-muted-foreground">
-									<Trans>Or continue with</Trans>
-								</span>
-							</div>
+						<div className="flex items-center gap-3">
+							<Separator className="flex-1" />
+							<span className="text-xs uppercase text-muted-foreground">
+								<Trans>Or continue with</Trans>
+							</span>
+							<Separator className="flex-1" />
 						</div>
 					)}
 				</>
 			)}
 			{/* hide OTP button if MFA is enabled (it will be used as MFA) */}
 			{otpEnabled && !mfaEnabled && (
-				<div className="grid gap-2 -mt-1">
+				<div className="grid gap-2">
 					<Link href="/request-otp" type="button" className={cn(buttonVariants({ variant: "outline" }), "flex gap-2")}>
 						<KeyIcon className="size-4" />
 						<Trans>One-time password</Trans>
@@ -338,7 +314,7 @@ export function UserAuthForm({
 				</div>
 			)}
 			{oauthEnabled && (
-				<div className="grid gap-2 -mt-1">
+				<div className="grid gap-2">
 					{authMethods.oauth2.providers.map((provider) => (
 						<button
 							key={provider.name}
@@ -382,7 +358,7 @@ export function UserAuthForm({
 								<Trans>OAuth 2 / OIDC support</Trans>
 							</DialogTitle>
 						</DialogHeader>
-						<div className="text-primary/70 text-[0.95em] contents">
+						<div className="text-sm text-muted-foreground contents">
 							<p>
 								<Trans>Beszel supports OpenID Connect and many OAuth2 authentication providers.</Trans>
 							</p>

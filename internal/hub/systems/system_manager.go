@@ -162,7 +162,7 @@ func (sm *SystemManager) onTokenRotated(e *core.RecordEvent) error {
 		return e.Next()
 	}
 	// No need to close connection if not connected via websocket
-	if system.WsConn == nil {
+	if system.getWsConn() == nil {
 		return e.Next()
 	}
 	system.setDown(nil)
@@ -229,7 +229,7 @@ func (sm *SystemManager) onRecordAfterUpdateSuccess(e *core.RecordEvent) error {
 		// system address or other connection setting is changed.
 		_ = deactivateAlerts(e.App, e.Record.Id, true)
 		// Resume monitoring, preferring existing WebSocket connection
-		if ok && system.WsConn != nil {
+		if ok && system.getWsConn() != nil {
 			go system.update()
 			return e.Next()
 		}
@@ -353,7 +353,7 @@ func (sm *SystemManager) AddWebSocketSystem(systemId string, agentVersion semver
 	sm.resetFailedSmartFetchState(systemId)
 
 	system := sm.NewSystem(systemId)
-	system.WsConn = wsConn
+	system.setWsConn(wsConn)
 	system.setAgentVersion(agentVersion)
 	system.monitorsNeedSync.Store(true)
 

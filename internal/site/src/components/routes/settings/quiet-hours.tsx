@@ -30,8 +30,8 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -92,7 +92,7 @@ export function QuietHours() {
 			toast({
 				variant: "destructive",
 				title: t`Error`,
-				description: (e as Error).message || "Failed to delete quiet hours.",
+				description: (e as Error).message || t`Failed to delete quiet hours.`,
 			})
 		}
 	}
@@ -161,9 +161,9 @@ export function QuietHours() {
 
 	return (
 		<>
-			<div className="grid grid-cols-1 sm:flex items-center justify-between gap-4 mb-3">
-				<div>
-					<h3 className="mb-1 text-lg font-medium">{quietHoursTranslation}</h3>
+			<div className="grid grid-cols-1 sm:flex items-center justify-between gap-4">
+				<div className="grid gap-1">
+					<h3 className="text-sm font-semibold">{quietHoursTranslation}</h3>
 					<p className="text-sm text-muted-foreground leading-relaxed">
 						<Trans>
 							Schedule quiet hours where notifications will not be sent, such as during maintenance periods.
@@ -211,7 +211,7 @@ export function QuietHours() {
 										<Trans>State</Trans>
 									</span>
 								</TableHead>
-								<TableHead className="px-4 text-right sr-only">
+								<TableHead className="px-4 text-end sr-only">
 									<Trans>Actions</Trans>
 								</TableHead>
 							</TableRow>
@@ -238,7 +238,7 @@ export function QuietHours() {
 											return <Badge variant={config.variant}>{config.label}</Badge>
 										})()}
 									</TableCell>
-									<TableCell className="px-4 py-3 text-right">
+									<TableCell className="px-4 py-3 text-end">
 										<DropdownMenu>
 											<DropdownMenuTrigger asChild>
 												<Button variant="ghost" size="icon" className="size-8">
@@ -414,21 +414,20 @@ function QuietHoursDialog({
 
 					<TabsContent value="system" className="mt-4 space-y-4">
 						<div className="grid gap-2">
-							<Label htmlFor="system">
-								<Trans>System</Trans>
-							</Label>
-							<Select value={selectedSystem} onValueChange={setSelectedSystem}>
-								<SelectTrigger id="system">
-									<SelectValue placeholder={t`Select ${{ foo: t`System`.toLocaleLowerCase() }}`} />
-								</SelectTrigger>
-								<SelectContent>
-									{systems.map((system) => (
-										<SelectItem key={system.id} value={system.id}>
-											{system.name}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
+							<FormField id="system" label={<Trans>System</Trans>}>
+								<Select value={selectedSystem} onValueChange={setSelectedSystem}>
+									<SelectTrigger id="system">
+										<SelectValue placeholder={t`Select ${{ foo: t`System`.toLocaleLowerCase() }}`} />
+									</SelectTrigger>
+									<SelectContent>
+										{systems.map((system) => (
+											<SelectItem key={system.id} value={system.id}>
+												{system.name}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</FormField>
 							{/* Hidden input for native form validation */}
 							<input
 								className="sr-only"
@@ -443,10 +442,7 @@ function QuietHoursDialog({
 					</TabsContent>
 				</Tabs>
 
-				<div className="grid gap-2">
-					<Label htmlFor="type">
-						<Trans>Type</Trans>
-					</Label>
+				<FormField id="type" label={<Trans>Type</Trans>}>
 					<Select value={windowType} onValueChange={(value: "one-time" | "daily") => setWindowType(value)}>
 						<SelectTrigger id="type">
 							<SelectValue />
@@ -460,16 +456,12 @@ function QuietHoursDialog({
 							</SelectItem>
 						</SelectContent>
 					</Select>
-				</div>
+				</FormField>
 
 				{windowType === "one-time" ? (
 					<>
-						<div className="grid gap-2">
-							<Label htmlFor="start-datetime">
-								<Trans>Start Time</Trans>
-							</Label>
+						<FormField id="start-datetime" label={<Trans>Start Time</Trans>} required>
 							<Input
-								id="start-datetime"
 								type="datetime-local"
 								value={startDateTime}
 								onChange={(e) => setStartDateTime(e.target.value)}
@@ -477,13 +469,9 @@ function QuietHoursDialog({
 								required
 								className="tabular-nums tracking-tighter"
 							/>
-						</div>
-						<div className="grid gap-2">
-							<Label htmlFor="end-datetime">
-								<Trans>End Time</Trans>
-							</Label>
+						</FormField>
+						<FormField id="end-datetime" label={<Trans>End Time</Trans>} required>
 							<Input
-								id="end-datetime"
 								type="datetime-local"
 								value={endDateTime}
 								onChange={(e) => setEndDateTime(e.target.value)}
@@ -491,36 +479,28 @@ function QuietHoursDialog({
 								required
 								className="tabular-nums tracking-tighter"
 							/>
-						</div>
+						</FormField>
 					</>
 				) : (
-					<div className="grid gap-2 grid-cols-2">
-						<div>
-							<Label htmlFor="start-time">
-								<Trans>Start Time</Trans>
-							</Label>
+					<div className="grid grid-cols-2 gap-4">
+						<FormField id="start-time" label={<Trans>Start Time</Trans>} required>
 							<Input
 								className="tabular-nums tracking-tighter"
-								id="start-time"
 								type="time"
 								value={startTime}
 								onChange={(e) => setStartTime(e.target.value)}
 								required
 							/>
-						</div>
-						<div>
-							<Label htmlFor="end-time">
-								<Trans>End Time</Trans>
-							</Label>
+						</FormField>
+						<FormField id="end-time" label={<Trans>End Time</Trans>} required>
 							<Input
 								className="tabular-nums tracking-tighter"
-								id="end-time"
 								type="time"
 								value={endTime}
 								onChange={(e) => setEndTime(e.target.value)}
 								required
 							/>
-						</div>
+						</FormField>
 					</div>
 				)}
 

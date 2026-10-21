@@ -1,13 +1,13 @@
 import { t } from "@lingui/core/macro"
 import { Trans } from "@lingui/react/macro"
-import { LoaderCircle, MailIcon, SendHorizonalIcon } from "lucide-react"
+import { LoaderCircle, SendHorizonalIcon } from "lucide-react"
 import { useCallback, useState } from "react"
 import { pb } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "../ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog"
+import { FormField } from "../ui/form-field"
 import { Input } from "../ui/input"
-import { Label } from "../ui/label"
 import { toast } from "../ui/use-toast"
 
 const showLoginFaliedToast = () => {
@@ -46,16 +46,11 @@ export default function ForgotPassword() {
 	return (
 		<>
 			<form onSubmit={handleSubmit}>
-				<div className="grid gap-3">
-					<div className="grid gap-1 relative">
-						<MailIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-						<Label className="sr-only" htmlFor="email">
-							<Trans>Email</Trans>
-						</Label>
+				<div className="grid gap-4">
+					<FormField id="email" label={<Trans>Email</Trans>} required>
 						<Input
 							value={email}
 							onChange={(e) => setEmail(e.target.value)}
-							id="email"
 							name="email"
 							required
 							placeholder="name@example.com"
@@ -64,9 +59,8 @@ export default function ForgotPassword() {
 							autoComplete="email"
 							autoCorrect="off"
 							disabled={isLoading}
-							className="ps-9"
 						/>
-					</div>
+					</FormField>
 					<button className={cn(buttonVariants())} disabled={isLoading}>
 						{isLoading ? (
 							<LoaderCircle className="me-2 h-4 w-4 animate-spin" />
@@ -89,12 +83,12 @@ export default function ForgotPassword() {
 							<Trans>Command line instructions</Trans>
 						</DialogTitle>
 					</DialogHeader>
-					<p className="text-primary/70 text-[0.95em] leading-relaxed">
+					<p className="text-sm text-muted-foreground leading-relaxed">
 						<Trans>
 							If you've lost the password to your admin account, you may reset it using the following command.
 						</Trans>
 					</p>
-					<p className="text-primary/70 text-[0.95em] leading-relaxed">
+					<p className="text-sm text-muted-foreground leading-relaxed">
 						<Trans>Then log into the backend and reset your user account password in the users table.</Trans>
 					</p>
 					<code className="bg-muted rounded-sm py-0.5 px-2.5 me-auto text-sm">

@@ -1,6 +1,8 @@
+import { t } from "@lingui/core/macro"
 import { Trans } from "@lingui/react/macro"
-import { LoaderCircle, MailIcon, SendHorizonalIcon } from "lucide-react"
+import { LoaderCircle, SendHorizonalIcon } from "lucide-react"
 import { useCallback, useState } from "react"
+import { FormField } from "@/components/ui/form-field"
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/otp"
 import { pb } from "@/lib/api"
 import { $authenticated } from "@/lib/stores"
@@ -8,7 +10,6 @@ import { cn } from "@/lib/utils"
 import { $router } from "../router"
 import { buttonVariants } from "../ui/button"
 import { Input } from "../ui/input"
-import { Label } from "../ui/label"
 import { showLoginFaliedToast } from "./auth-form"
 
 export function OtpInputForm({ otpId, mfaId }: { otpId: string; mfaId: string }) {
@@ -28,7 +29,7 @@ export function OtpInputForm({ otpId, mfaId }: { otpId: string; mfaId: string })
 
 	return (
 		<div className="grid gap-3 items-center justify-center">
-			<InputOTP maxLength={6} value={value} onChange={setValue} autoFocus>
+			<InputOTP maxLength={6} value={value} onChange={setValue} autoFocus aria-label={t`One-time password`}>
 				<InputOTPGroup>
 					{Array.from({ length: 6 }).map((_, i) => (
 						<InputOTPSlot key={i} index={i} />
@@ -71,16 +72,11 @@ export function OtpRequestForm() {
 
 	return (
 		<form onSubmit={handleSubmit}>
-			<div className="grid gap-3">
-				<div className="grid gap-1 relative">
-					<MailIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-					<Label className="sr-only" htmlFor="email">
-						<Trans>Email</Trans>
-					</Label>
+			<div className="grid gap-4">
+				<FormField id="email" label={<Trans>Email</Trans>} required>
 					<Input
 						value={email}
 						onChange={(e) => setEmail(e.target.value)}
-						id="email"
 						name="email"
 						required
 						placeholder="name@example.com"
@@ -89,9 +85,8 @@ export function OtpRequestForm() {
 						autoComplete="email"
 						autoCorrect="off"
 						disabled={isLoading}
-						className="ps-9"
 					/>
-				</div>
+				</FormField>
 				<button className={cn(buttonVariants())} disabled={isLoading}>
 					{isLoading ? (
 						<LoaderCircle className="me-2 h-4 w-4 animate-spin" />

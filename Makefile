@@ -41,7 +41,7 @@ endif
 # Set executable extension based on target OS
 EXE_EXT := $(if $(filter windows,$(OS)),.exe,)
 
-.PHONY: tidy test test-build test-go test-site ci-gate-drift build-agent build-hub build-hub-dev build clean lint dev-server dev-agent dev-hub dev generate-locales fetch-smartctl-conditional
+.PHONY: tidy test test-build test-go test-site ci-gate-drift build-agent build-hub build-hub-dev build clean lint dev-server dev-agent dev-hub dev generate-locales fetch-smartctl-conditional site-bundle lint-go test-site-dom
 .DEFAULT_GOAL := build
 
 clean:
@@ -74,9 +74,38 @@ test-go:
 
 # The gate owns every "can this run" decision rather than this file, because it can be
 # tested there: its self-tests run first so that its refusal path is never taken on faith.
+#
+# The script itself grew: besides the bun suite it now compiles the catalogs, checks
+# them against the source by message set, type checks the tree, lints it against a
+# recorded baseline and audits the dependencies. None of those is a valve; each one fails
+# the build. The production bundle is deliberately not in here -- it takes minutes, and
+# `make site-bundle` is its own target so it can run as its own job.
 test-site:
 	@internal/site/scripts/test-gate.test.sh
 	@internal/site/scripts/test-gate.sh
+	@internal/site/scripts/test-gate-dom.sh
+
+# The DOM component suite on its own, for a frontend-only change. It is a third runner:
+# bun cannot apply the Lingui macro transform, so the components that use the macro can
+# only be rendered by vitest, which uses the same Vite pipeline `vite build` uses.
+test-site-dom:
+	@internal/site/scripts/test-gate-dom.sh
+
+# The production bundle, built the way `go:embed` will ship it: the catalogs are
+# compiled first because the bundle imports src/locales/<locale>/<locale>.ts, and the
+# extraction step is left out on purpose. `lingui extract --overwrite` rewrites every
+# .po file with the entries in the order the source scan reached them, which on this
+# tree is a 260-line reorder of a green tree; a build that dirties the checkout is a
+# build nobody trusts.
+site-bundle:
+	cd internal/site && npx --no-install lingui compile && npx --no-install vite build
+
+# staticcheck and golangci-lint, both against a recorded baseline: a finding that is
+# new fails the build, a finding that is already recorded does not. The tools are not
+# installed here -- a gate that installs its own linter is not a gate -- so they must
+# be on PATH. See scripts/lint-go.sh for the version pins and why they are pins.
+lint-go:
+	@scripts/lint-go.sh
 
 # Guards the one thing a test workflow can quietly stop doing. .github/workflows/tests.yml runs
 # exactly one make target; this asserts that target is still the real conjunction of both suites

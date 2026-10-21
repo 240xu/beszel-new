@@ -47,14 +47,14 @@ import { alertsHistoryColumns } from "../../alerts-history-columns"
 
 const SectionIntro = memo(() => {
 	return (
-		<div>
-			<h3 className="text-xl font-medium mb-2">
+		<section className="grid gap-2">
+			<h2 className="text-lg font-semibold tracking-tight">
 				<Trans>Alert History</Trans>
-			</h3>
+			</h2>
 			<p className="text-sm text-muted-foreground leading-relaxed">
 				<Trans>View your 200 most recent alerts.</Trans>
 			</p>
-		</div>
+		</section>
 	)
 })
 
@@ -120,14 +120,14 @@ export default function AlertsHistoryDataTable() {
 						className="ms-2"
 						checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
 						onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-						aria-label="Select all"
+						aria-label={t`Select all`}
 					/>
 				),
 				cell: ({ row }) => (
 					<Checkbox
 						checked={row.getIsSelected()}
 						onCheckedChange={(value) => row.toggleSelected(!!value)}
-						aria-label="Select row"
+						aria-label={t`Select row`}
 					/>
 				),
 				enableSorting: false,
@@ -272,6 +272,7 @@ export default function AlertsHistoryDataTable() {
 					)}
 					<Input
 						placeholder={t`Filter...`}
+						aria-label={t`Filter...`}
 						value={globalFilter}
 						onChange={(e) => setGlobalFilter(e.target.value)}
 						className="px-4 w-full max-w-full @3xl:w-64"
@@ -354,7 +355,9 @@ export default function AlertsHistoryDataTable() {
 							onClick={() => table.setPageIndex(0)}
 							disabled={!table.getCanPreviousPage()}
 						>
-							<span className="sr-only">Go to first page</span>
+							<span className="sr-only">
+								<Trans>Go to first page</Trans>
+							</span>
 							<ChevronsLeftIcon className="size-5" />
 						</Button>
 						<Button
@@ -364,7 +367,9 @@ export default function AlertsHistoryDataTable() {
 							onClick={() => table.previousPage()}
 							disabled={!table.getCanPreviousPage()}
 						>
-							<span className="sr-only">Go to previous page</span>
+							<span className="sr-only">
+								<Trans>Go to previous page</Trans>
+							</span>
 							<ChevronLeftIcon className="size-5" />
 						</Button>
 						<Button
@@ -374,7 +379,9 @@ export default function AlertsHistoryDataTable() {
 							onClick={() => table.nextPage()}
 							disabled={!table.getCanNextPage()}
 						>
-							<span className="sr-only">Go to next page</span>
+							<span className="sr-only">
+								<Trans>Go to next page</Trans>
+							</span>
 							<ChevronRightIcon className="size-5" />
 						</Button>
 						<Button
@@ -384,7 +391,9 @@ export default function AlertsHistoryDataTable() {
 							onClick={() => table.setPageIndex(table.getPageCount() - 1)}
 							disabled={!table.getCanNextPage()}
 						>
-							<span className="sr-only">Go to last page</span>
+							<span className="sr-only">
+								<Trans>Go to last page</Trans>
+							</span>
 							<ChevronsRightIcon className="size-5" />
 						</Button>
 					</div>

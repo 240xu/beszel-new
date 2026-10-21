@@ -340,7 +340,7 @@ export default function NetworkMonitorsTableNew({
 										variant="ghost"
 										size="icon"
 										aria-label={t`Clear`}
-										className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
+										className="absolute end-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
 										onClick={() => setGlobalFilter("")}
 									>
 										<XIcon className="h-4 w-4" />
@@ -357,7 +357,7 @@ export default function NetworkMonitorsTableNew({
 							</DropdownMenuTrigger>
 							<DropdownMenuContent className="h-72 md:h-auto min-w-48 md:min-w-auto overflow-y-auto">
 								<div className="grid grid-cols-2 divide-y md:divide-s md:divide-y-0">
-									<div className="border-r">
+									<div className="border-e">
 										<DropdownMenuLabel className="pt-2 px-3.5 flex items-center gap-2">
 											<ArrowUpDownIcon className="size-4" />
 											<Trans>Sort By</Trans>
@@ -521,7 +521,7 @@ const NetworkMonitorsTable = memo(function NetworkMonitorTable({
 	return (
 		<div
 			className={cn(
-				"h-min max-h-[calc(100dvh-17rem)] max-w-full relative overflow-auto border rounded-md",
+				"relative grid max-h-[70svh] min-h-0 max-w-full overflow-auto border rounded-md",
 				(!rows.length || rows.length > 2) && "min-h-50"
 			)}
 			ref={scrollRef}
@@ -662,7 +662,7 @@ function NetworkMonitorSheet({
 	)
 }
 
-const certExpiryTextColors = { ok: "", warning: "text-yellow-600 dark:text-yellow-500", critical: "text-red-500" }
+const certExpiryTextColors = { ok: "", warning: "text-warning-text", critical: "text-destructive-text" }
 
 function CertExpiry({ cert }: { cert: MonitorCertInfo }) {
 	const daysLeft = getCertDaysLeft(cert)

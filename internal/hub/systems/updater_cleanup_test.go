@@ -71,7 +71,8 @@ func TestRemoveAllSystemsWaitsForUpdater(t *testing.T) {
 			t.Cleanup(func() { _ = conn.NetConn().Close() })
 			go conn.ReadLoop()
 			select {
-			case sys.WsConn = <-connections:
+			case conn := <-connections:
+				sys.setWsConn(conn)
 			case <-time.After(3 * time.Second):
 				t.Fatal("websocket was not established")
 			}

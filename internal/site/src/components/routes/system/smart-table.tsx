@@ -573,7 +573,7 @@ export default function DisksTable({ systemId }: { systemId?: string }) {
 									variant="ghost"
 									size="icon"
 									aria-label={t`Clear`}
-									className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
+									className="absolute end-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
 									onClick={() => setGlobalFilter("")}
 								>
 									<XIcon className="h-4 w-4" />
@@ -624,7 +624,7 @@ const SmartDevicesTable = memo(function SmartDevicesTable({
 	return (
 		<div
 			className={cn(
-				"h-min max-h-[calc(100dvh-17rem)] max-w-full relative overflow-auto rounded-md border",
+				"relative grid max-h-[70svh] min-h-0 max-w-full overflow-auto rounded-md border",
 				(!rows.length || rows.length > 2) && "min-h-50"
 			)}
 			ref={scrollRef}
@@ -840,7 +840,7 @@ function DiskSheet({
 												const isFailedAttribute = row.original.wf && row.original.wf.trim() !== ""
 
 												return (
-													<TableRow key={row.id} className={isFailedAttribute ? "text-red-600 dark:text-red-400" : ""}>
+													<TableRow key={row.id} className={isFailedAttribute ? "text-destructive-text" : ""}>
 														{row.getVisibleCells().map((cell) => (
 															<TableCell key={cell.id}>
 																{flexRender(cell.column.columnDef.cell, cell.getContext())}

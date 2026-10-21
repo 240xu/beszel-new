@@ -125,7 +125,7 @@ export const SystemDialog = ({ setOpen, system }: { setOpen: (open: boolean) => 
 		>
 			<Tabs defaultValue={tab} onValueChange={setTab}>
 				<DialogHeader>
-					<DialogTitle className="mb-1 pb-1 max-w-100 truncate pr-8">
+					<DialogTitle className="mb-1 pb-1 max-w-100 truncate pe-8">
 						{system ? (
 							<Trans>Edit System</Trans>
 						) : (

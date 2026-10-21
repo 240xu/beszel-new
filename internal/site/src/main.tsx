@@ -1,6 +1,7 @@
 import "./index.css"
 import { i18n } from "@lingui/core"
 import { I18nProvider } from "@lingui/react"
+import { Trans } from "@lingui/react/macro"
 import { useStore } from "@nanostores/react"
 import { DirectionProvider } from "@radix-ui/react-direction"
 // import { Suspense, lazy, useEffect, StrictMode } from "react"
@@ -8,7 +9,6 @@ import { lazy, memo, Suspense, useEffect } from "react"
 import ReactDOM from "react-dom/client"
 import Navbar from "@/components/navbar.tsx"
 import { $router } from "@/components/router.tsx"
-import Settings from "@/components/routes/settings/layout.tsx"
 import { ThemeProvider } from "@/components/theme-provider.tsx"
 import { Toaster } from "@/components/ui/toaster.tsx"
 import { alertManager } from "@/lib/alerts"
@@ -34,6 +34,7 @@ const Monitors = lazy(() => import("@/components/routes/monitors.tsx"))
 const SystemDetail = lazy(() => import("@/components/routes/system.tsx"))
 const CopyToClipboardDialog = lazy(() => import("@/components/copy-to-clipboard.tsx"))
 const ActiveAlerts = lazy(() => import("@/components/active-alerts.tsx").then((m) => ({ default: m.ActiveAlerts })))
+const Settings = lazy(() => import("@/components/routes/settings/layout.tsx"))
 
 const App = memo(() => {
 	const page = useStore($router)
@@ -100,16 +101,24 @@ const Layout = () => {
 
 	return (
 		<DirectionProvider dir={direction}>
+			<a
+				href="#main"
+				className="sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4 focus:z-100 focus:rounded-md focus:border focus:border-border focus:bg-card focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+			>
+				<Trans>Skip to content</Trans>
+			</a>
 			{!authenticated ? (
-				<Suspense>
-					<LoginPage />
-				</Suspense>
+				<main id="main" tabIndex={-1} className="outline-hidden">
+					<Suspense>
+						<LoginPage />
+					</Suspense>
+				</main>
 			) : (
 				<div style={{ "--container": `${layoutWidth ?? defaultLayoutWidth}px` } as React.CSSProperties}>
 					<div className="container">
 						<Navbar />
 					</div>
-					<div className="container relative">
+					<main id="main" tabIndex={-1} className="container relative outline-hidden">
 						<Suspense>
 							<ActiveAlerts className="mb-4" />
 						</Suspense>
@@ -119,7 +128,7 @@ const Layout = () => {
 								<CopyToClipboardDialog content={copyContent} />
 							</Suspense>
 						)}
-					</div>
+					</main>
 				</div>
 			)}
 		</DirectionProvider>

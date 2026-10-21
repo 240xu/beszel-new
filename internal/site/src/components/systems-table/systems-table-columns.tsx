@@ -6,13 +6,16 @@ import { getPagePath } from "@nanostores/router"
 import type { CellContext, ColumnDef, HeaderContext } from "@tanstack/react-table"
 import type { ClassValue } from "clsx"
 import {
+	ActivityIcon,
 	ArrowUpDownIcon,
 	ChevronRightSquareIcon,
 	ClockArrowUp,
+	ClockIcon,
 	CopyIcon,
 	CpuIcon,
 	HardDriveIcon,
 	MemoryStickIcon,
+	MonitorIcon,
 	MoreHorizontalIcon,
 	PackageIcon,
 	PauseCircleIcon,
@@ -26,7 +29,7 @@ import {
 import { memo, useMemo, useRef, useState } from "react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip"
 import { isReadOnlyUser, pb } from "@/lib/api"
-import { BatteryState, ConnectionType, connectionTypeLabels, MeterState, SystemStatus } from "@/lib/enums"
+import { BatteryState, ConnectionType, connectionTypeLabels, MeterState, Os, SystemStatus } from "@/lib/enums"
 import { $longestSystemName, $userSettings } from "@/lib/stores"
 import {
 	cn,
@@ -43,6 +46,8 @@ import type { SystemRecord, WiFi } from "@/types"
 import { SystemDialog } from "../add-system"
 import AlertButton from "../alerts/alert-button"
 import { $router, Link } from "../router"
+import { SystemStatusBadge } from "../system-status"
+import { RelativeTimeCell } from "./relative-time-cell"
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -76,11 +81,22 @@ import {
 } from "../ui/icons"
 
 const STATUS_COLORS = {
-	[SystemStatus.Up]: "bg-green-500",
-	[SystemStatus.Down]: "bg-red-500",
+	[SystemStatus.Up]: "bg-success",
+	[SystemStatus.Down]: "bg-destructive",
 	[SystemStatus.Paused]: "bg-primary/40",
-	[SystemStatus.Pending]: "bg-yellow-500",
+	[SystemStatus.Pending]: "bg-warning",
 } as const
+
+const OS_NAMES: Record<Os, string> = {
+	[Os.Linux]: "Linux",
+	[Os.Darwin]: "macOS",
+	[Os.Windows]: "Windows",
+	[Os.FreeBSD]: "FreeBSD",
+}
+
+function osDisplayName(os?: Os): string | undefined {
+	return os === undefined ? undefined : OS_NAMES[os]
+}
 
 /** Rank of the updates dot color for sorting: 2 security (red), 1 regular (yellow), 0 up to date (green), -1 no data */
 function getUpdatesRank(pu: SystemRecord["info"]["pu"]): number {
@@ -101,6 +117,15 @@ function getMeterStateByThresholds(value: number, warn = 65, crit = 90): MeterSt
  */
 export function SystemsTableColumns(viewMode: "table" | "grid"): ColumnDef<SystemRecord>[] {
 	return [
+		{
+			accessorFn: ({ status }) => status,
+			id: "status",
+			name: () => t`Status`,
+			size: 90,
+			Icon: ActivityIcon,
+			header: sortableHeader,
+			cell: (info) => <SystemStatusBadge status={info.row.original.status} />,
+		},
 		{
 			// size: 200,
 			size: 100,
@@ -152,7 +177,6 @@ export function SystemsTableColumns(viewMode: "table" | "grid"): ColumnDef<Syste
 				return (
 					<>
 						<span className="flex gap-2 items-center font-medium text-sm text-nowrap md:ps-1">
-							<IndicatorDot system={info.row.original} />
 							<Link
 								href={linkUrl}
 								tabIndex={-1}
@@ -178,6 +202,27 @@ export function SystemsTableColumns(viewMode: "table" | "grid"): ColumnDef<Syste
 				)
 			},
 			header: sortableHeader,
+		},
+		{
+			accessorFn: ({ info }) => osDisplayName(info.os) ?? info.k ?? "",
+			id: "os",
+			name: () => t`OS`,
+			size: 130,
+			Icon: MonitorIcon,
+			header: sortableHeader,
+			cell: (info) => {
+				const { info: sysInfo } = info.row.original
+				const osName = osDisplayName(sysInfo.os)
+				if (!osName && !sysInfo.k) {
+					return null
+				}
+				return (
+					<div className="min-w-0 leading-tight">
+						<div className="truncate text-sm">{osName ?? "—"}</div>
+						{sysInfo.k && <div className="truncate text-xs text-muted-foreground">{sysInfo.k}</div>}
+					</div>
+				)
+			},
 		},
 		{
 			accessorFn: ({ info }) => info.cpu || undefined,
@@ -320,7 +365,7 @@ export function SystemsTableColumns(viewMode: "table" | "grid"): ColumnDef<Syste
 
 				if (state !== BatteryState.Charging) {
 					if (pct < 25) {
-						iconColor = pct < 11 ? "text-red-500" : "text-yellow-500"
+						iconColor = pct < 11 ? "text-destructive-text" : "text-warning-text"
 						Icon = BatteryLowIcon
 					} else if (pct < 75) {
 						Icon = BatteryMediumIcon
@@ -511,6 +556,16 @@ export function SystemsTableColumns(viewMode: "table" | "grid"): ColumnDef<Syste
 			},
 		},
 		{
+			accessorFn: ({ updated }) => updated,
+			id: "updated",
+			name: () => t`Updated`,
+			size: 110,
+			Icon: ClockIcon,
+			header: sortableHeader,
+			sortUndefined: "last",
+			cell: (info) => <RelativeTimeCell value={info.getValue() as string} className="text-muted-foreground" />,
+		},
+		{
 			accessorFn: ({ info }) => info.v,
 			id: "agent",
 			name: () => t`Agent`,
@@ -524,9 +579,9 @@ export function SystemsTableColumns(viewMode: "table" | "grid"): ColumnDef<Syste
 					return null
 				}
 				const system = info.row.original
-				let color = "text-red-500"
+				let color = "text-destructive-text"
 				if (system.status === SystemStatus.Up) {
-					color = version === globalThis.BESZEL.HUB_VERSION ? "text-green-500" : "text-yellow-500"
+					color = version === globalThis.BESZEL.HUB_VERSION ? "text-success-text" : "text-warning-text"
 				} else if (system.status === SystemStatus.Paused) {
 					color = "text-primary/40"
 				}
@@ -599,8 +654,8 @@ function TableCellWithMeter(info: CellContext<SystemRecord, unknown>) {
 	)
 	return (
 		<div className="flex gap-2 items-center tabular-nums tracking-tight w-full min-w-0">
-			<span className="min-w-8 shrink-0">{decimalString(val, val >= 10 ? 1 : 2)}%</span>
-			<span className="flex-1 min-w-8 grid bg-muted h-[1em] rounded-sm overflow-hidden">
+			<span className="min-w-9 shrink-0 text-end">{decimalString(val, val >= 10 ? 1 : 2)}%</span>
+			<span className="flex-1 min-w-8 grid bg-muted h-1 rounded-full overflow-hidden">
 				<span className={meterClass} style={{ width: `${val}%` }}></span>
 			</span>
 		</div>
@@ -648,8 +703,8 @@ function DiskCellWithMultiple(info: CellContext<SystemRecord, unknown>) {
 					className="flex flex-col gap-0.5 w-full relative z-10"
 				>
 					<div className="flex gap-2 items-center tabular-nums tracking-tight">
-						<span className="min-w-8 shrink-0">{decimalString(rootDiskPct, rootDiskPct >= 10 ? 1 : 2)}%</span>
-						<span className="flex-1 min-w-8 flex items-center gap-0.5 px-1 justify-end bg-muted h-[1em] rounded-sm overflow-hidden relative">
+						<span className="min-w-9 shrink-0 text-end">{decimalString(rootDiskPct, rootDiskPct >= 10 ? 1 : 2)}%</span>
+						<span className="flex-1 min-w-8 flex items-center gap-0.5 px-1 justify-end bg-muted h-1 rounded-full overflow-hidden relative">
 							{/* Root disk */}
 							<span
 								className={cn("absolute inset-0", getMeterClass(rootDiskPct))}
@@ -719,12 +774,7 @@ function WiFiSignal({ wifi, className }: { wifi: WiFi; className?: ClassValue })
 
 export function IndicatorDot({ system, className }: { system: SystemRecord; className?: ClassValue }) {
 	className ||= STATUS_COLORS[system.status as keyof typeof STATUS_COLORS] || ""
-	return (
-		<span
-			className={cn("shrink-0 size-2 rounded-full", className)}
-			// style={{ marginBottom: "-1px" }}
-		/>
-	)
+	return <span aria-hidden="true" className={cn("shrink-0 size-2 rounded-full", className)} />
 }
 
 export const ActionsButton = memo(({ system }: { system: SystemRecord }) => {

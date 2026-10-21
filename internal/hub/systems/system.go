@@ -49,7 +49,7 @@ type System struct {
 	data           *system.CombinedData           // system data from agent
 	ctx            context.Context                // Context for stopping the updater
 	cancel         context.CancelFunc             // Stops and removes system from updater
-	WsConn         *ws.WsConn                     // Handler for agent WebSocket connection
+	wsConn         atomic.Pointer[ws.WsConn]      // Handler for agent WebSocket connection (atomic: read by event goroutines, cleared by the updater)
 	agentVersion   atomic.Pointer[semver.Version] // Use getAgentVersion/setAgentVersion
 	updateTicker   *time.Ticker                   // Ticker for updating the system
 	detailsFetched atomic.Bool                    // True if static system details have been fetched and saved
@@ -112,10 +112,10 @@ func (sys *System) StartUpdater() {
 	// clustering if all agents are started at the same time.
 	// SSH connections during hub startup are already staggered.
 	var jitter <-chan time.Time
-	if sys.WsConn != nil {
+	if conn := sys.getWsConn(); conn != nil {
 		jitter = getJitter()
 		// use the websocket connection's down channel to set the system down
-		downChan = sys.WsConn.DownChan
+		downChan = conn.DownChan
 	} else {
 		// if the system does not have a websocket connection, wait before updating
 		// to allow the agent to connect via websocket (makes sure fingerprint is set).
@@ -146,7 +146,7 @@ func (sys *System) StartUpdater() {
 				_ = sys.setDown(err)
 			}
 		case <-downChan:
-			sys.WsConn = nil
+			sys.setWsConn(nil)
 			downChan = nil
 			_ = sys.setDown(nil)
 		case <-jitter:
@@ -174,6 +174,26 @@ func (sys *System) update() error {
 
 	data, err := sys.fetchDataFromAgent(options)
 	if err != nil {
+		// Keep the WebSocket alive even though this fetch failed.
+		//
+		// Only a message from the agent resets the read deadline, and an agent
+		// still collecting sends nothing. Without this ping the deadline expires
+		// between polls, the hub closes the connection, the agent reconnects,
+		// collects slowly again, and the cycle repeats. Pinging here is the same
+		// move handlePaused already makes for a paused system, and Ping() pushes
+		// the deadline out as it sends, so it works without an answer, which
+		// matters because a collecting agent cannot answer.
+		//
+		// This is why the deadline has to exceed interval + wsDataRequestTimeout:
+		// the ping only happens once the fetch gives up. See ws.deadline.
+		//
+		// The system is still reported down: that comes from the error we
+		// return. Only the connection survives, so recovery costs no reconnect.
+		// A failed ping needs no handling either, since a connection that
+		// cannot be pinged runs into its deadline anyway.
+		if conn := sys.getWsConn(); conn != nil && conn.IsConnected() && conn.TimeSinceLastMessage() < maxAgentSilence {
+			_ = conn.Ping()
+		}
 		return err
 	}
 
@@ -235,12 +255,13 @@ func (sys *System) update() error {
 }
 
 func (sys *System) handlePaused() {
-	if sys.WsConn == nil {
+	conn := sys.getWsConn()
+	if conn == nil {
 		// if the system is paused and there's no websocket connection, remove the system
 		_ = sys.manager.RemoveSystem(sys.Id)
 	} else {
 		// Send a ping to the agent to keep the connection alive if the system is paused
-		if err := sys.WsConn.Ping(); err != nil {
+		if err := conn.Ping(); err != nil {
 			sys.manager.hub.Logger().Warn("Failed to ping agent", "system", sys.Id, "err", err)
 			_ = sys.manager.RemoveSystem(sys.Id)
 		}
@@ -613,6 +634,9 @@ func createContainerRecords(app core.App, data []*container.Stats, systemId stri
 // If the record is not found, it removes the system from the manager.
 func (sys *System) getRecord(app core.App) (*core.Record, error) {
 	record, err := app.FindRecordById("systems", sys.Id)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
 	if err != nil || record == nil {
 		_ = sys.manager.RemoveSystem(sys.Id)
 		if err == nil {
@@ -680,8 +704,8 @@ func (sys *System) getContext(ctx context.Context) (context.Context, context.Can
 // This is the unified request method that uses the transport abstraction.
 func (sys *System) request(ctx context.Context, action common.WebSocketAction, req any, dest any) error {
 	// Try WebSocket first
-	if sys.WsConn != nil && sys.WsConn.IsConnected() {
-		wsTransport := transport.NewWebSocketTransport(sys.WsConn)
+	if conn := sys.getWsConn(); conn != nil && conn.IsConnected() {
+		wsTransport := transport.NewWebSocketTransport(conn)
 		if err := wsTransport.Request(ctx, action, req, dest); err == nil {
 			return nil
 		} else if !shouldFallbackToSSH(err) {
@@ -772,7 +796,7 @@ func (sys *System) setAgentVersion(v semver.Version) {
 // Each fetch decodes into a new struct: CBOR leaves fields the agent omits
 // untouched, and real-time and regular updates may fetch concurrently.
 func (sys *System) fetchDataFromAgent(options common.DataRequestOptions) (*system.CombinedData, error) {
-	if sys.WsConn != nil && sys.WsConn.IsConnected() {
+	if conn := sys.getWsConn(); conn != nil && conn.IsConnected() {
 		wsData, err := sys.fetchDataViaWebSocket(options)
 		if err == nil {
 			sys.syncPendingNetworkMonitors()
@@ -800,13 +824,20 @@ func (sys *System) fetchDataFromAgent(options common.DataRequestOptions) (*syste
 // so this must be well above the request manager's 5s default.
 var wsDataRequestTimeout = 30 * time.Second
 
+// maxAgentSilence is how long a WebSocket agent may go without sending anything
+// before failed polls stop keeping its connection alive. An agent whose
+// collection runs past its own 120s deadline drops the connection itself, so a
+// live agent always answers within interval + 120s.
+var maxAgentSilence = 3 * time.Minute
+
 func (sys *System) fetchDataViaWebSocket(options common.DataRequestOptions) (*system.CombinedData, error) {
-	if sys.WsConn == nil || !sys.WsConn.IsConnected() {
+	conn := sys.getWsConn()
+	if conn == nil || !conn.IsConnected() {
 		return nil, errors.New("no websocket connection")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), wsDataRequestTimeout)
 	defer cancel()
-	wsTransport := transport.NewWebSocketTransport(sys.WsConn)
+	wsTransport := transport.NewWebSocketTransport(conn)
 	data := &system.CombinedData{}
 	if err := wsTransport.Request(ctx, common.GetData, options, data); err != nil {
 		return nil, err
@@ -1053,9 +1084,24 @@ func (sys *System) closeSSHConnection() {
 // to allow updating via SSH. It will be removed if the WS connection is re-established.
 // The system will be set as down a few seconds later if the connection is not re-established.
 func (sys *System) closeWebSocketConnection() {
-	if sys.WsConn != nil {
-		sys.WsConn.Close(nil)
+	if conn := sys.getWsConn(); conn != nil {
+		conn.Close(nil)
 	}
+}
+
+// getWsConn returns the agent WebSocket connection, or nil when there is none.
+//
+// The pointer is read atomically: the per-system updater goroutine clears it
+// when the agent's down channel fires, while PocketBase record-event
+// goroutines read it (onTokenRotated, onRecordAfterUpdateSuccess,
+// closeWebSocketConnection). A plain field is a data race between those.
+func (sys *System) getWsConn() *ws.WsConn {
+	return sys.wsConn.Load()
+}
+
+// setWsConn stores the agent WebSocket connection.
+func (sys *System) setWsConn(conn *ws.WsConn) {
+	sys.wsConn.Store(conn)
 }
 
 // getJitter returns a channel that will be triggered after a random delay

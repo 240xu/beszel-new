@@ -152,7 +152,7 @@ function getColumns(securityKnown: boolean): ColumnDef<PackageUpdateRow>[] {
 			),
 			cell: ({ row }) =>
 				row.original.security ? (
-					<span className="ms-1.5 flex items-center gap-1.5 text-red-600 dark:text-red-400">
+					<span className="ms-1.5 flex items-center gap-1.5 text-destructive-text">
 						<ShieldAlertIcon className="size-4" />
 						<Trans>Security</Trans>
 					</span>
@@ -293,7 +293,7 @@ export default function PackageUpdatesTable({ systemId, counts }: { systemId: st
 									variant="ghost"
 									size="icon"
 									aria-label={t`Clear`}
-									className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
+									className="absolute end-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
 									onClick={() => setGlobalFilter("")}
 								>
 									<XIcon className="h-4 w-4" />

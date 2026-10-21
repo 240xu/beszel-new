@@ -55,6 +55,9 @@ func getCpuMetrics(cacheTimeMs uint16) (CpuMetrics, error) {
 
 	t1 := lastCpuTimes[cacheTimeMs]
 	t2 := times[0]
+	// A counter reset or wrap must establish a new baseline even if this
+	// sample cannot produce a valid delta.
+	lastCpuTimes[cacheTimeMs] = t2
 
 	t1All, _ := getAllBusy(t1)
 	t2All, _ := getAllBusy(t2)
@@ -73,7 +76,6 @@ func getCpuMetrics(cacheTimeMs uint16) (CpuMetrics, error) {
 		Idle:   clampPercent((t2.Idle - t1.Idle) / totalDelta * 100),
 	}
 
-	lastCpuTimes[cacheTimeMs] = times[0]
 	return metrics, nil
 }
 

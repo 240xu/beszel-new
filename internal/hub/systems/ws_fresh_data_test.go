@@ -70,7 +70,8 @@ func TestFetchDataViaWebSocketDoesNotRetainOmittedFields(t *testing.T) {
 	var sys *System
 	select {
 	case wsConn := <-connections:
-		sys = &System{WsConn: wsConn}
+		sys = &System{}
+		sys.setWsConn(wsConn)
 	case <-time.After(3 * time.Second):
 		t.Fatal("websocket connection was not established")
 	}

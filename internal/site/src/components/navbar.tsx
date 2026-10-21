@@ -1,4 +1,4 @@
-import { Trans } from "@lingui/react/macro"
+import { Trans, useLingui } from "@lingui/react/macro"
 import { getPagePath } from "@nanostores/router"
 import {
 	ContainerIcon,
@@ -31,17 +31,18 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { isAdmin, isReadOnlyUser, logOut, pb } from "@/lib/api"
 import { cn, runOnce } from "@/lib/utils"
-import { AddSystemDialog } from "./add-system"
 import { Logo } from "./logo"
 import { ModeToggle } from "./mode-toggle"
 import { $router, basePath, Link, navigate, prependBasePath } from "./router"
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip"
 
 const CommandPalette = lazy(() => import("./command-palette"))
+const AddSystemDialog = lazy(() => import("./add-system").then((m) => ({ default: m.AddSystemDialog })))
 
 const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0
 
 export default function Navbar() {
+	const { t } = useLingui()
 	const [addSystemDialogOpen, setAddSystemDialogOpen] = useState(false)
 	const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
 
@@ -52,15 +53,17 @@ export default function Navbar() {
 			<Suspense>
 				<CommandPalette open={commandPaletteOpen} setOpen={setCommandPaletteOpen} />
 			</Suspense>
-			<AddSystemDialog open={addSystemDialogOpen} setOpen={setAddSystemDialogOpen} />
+			<Suspense>
+				<AddSystemDialog open={addSystemDialogOpen} setOpen={setAddSystemDialogOpen} />
+			</Suspense>
 
 			<Link
 				href={basePath}
-				aria-label="Home"
+				aria-label={t`Home`}
 				className="p-2 ps-0 me-3 group"
 				onMouseEnter={runOnce(() => import("@/components/routes/home"))}
 			>
-				<Logo className="h-[1.2rem] md:h-5 fill-foreground" />
+				<Logo className="h-5 fill-foreground" />
 			</Link>
 			<Button
 				variant="outline"
@@ -80,14 +83,14 @@ export default function Navbar() {
 			{/* mobile menu */}
 			<div className="ms-auto flex items-center text-xl md:hidden">
 				<ModeToggle />
-				<Button variant="ghost" size="icon" onClick={() => setCommandPaletteOpen(true)}>
-					<SearchIcon className="h-[1.2rem] w-[1.2rem]" />
+				<Button variant="ghost" size="icon" className="size-11" onClick={() => setCommandPaletteOpen(true)}>
+					<SearchIcon className="size-5" />
 				</Button>
 				<DropdownMenu>
 					<DropdownMenuTrigger
 						onMouseEnter={() => import("@/components/routes/settings/general")}
-						className="ms-3"
-						aria-label="Open Menu"
+						className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "ms-3 size-11")}
+						aria-label={t`Open menu`}
 					>
 						<MenuIcon />
 					</DropdownMenuTrigger>
@@ -163,9 +166,9 @@ export default function Navbar() {
 						<Link
 							href={getPagePath($router, "containers")}
 							className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
-							aria-label="Containers"
+							aria-label={t`Containers`}
 						>
-							<ContainerIcon className="h-[1.2rem] w-[1.2rem]" strokeWidth={1.5} />
+							<ContainerIcon className="size-5" strokeWidth={1.5} />
 						</Link>
 					</TooltipTrigger>
 					<TooltipContent>
@@ -179,7 +182,7 @@ export default function Navbar() {
 							className={cn("hidden md:grid", buttonVariants({ variant: "ghost", size: "icon" }))}
 							aria-label="S.M.A.R.T."
 						>
-							<HardDriveIcon className="h-[1.2rem] w-[1.2rem]" strokeWidth={1.5} />
+							<HardDriveIcon className="size-5" strokeWidth={1.5} />
 						</Link>
 					</TooltipTrigger>
 					<TooltipContent>S.M.A.R.T.</TooltipContent>
@@ -189,10 +192,10 @@ export default function Navbar() {
 						<Link
 							href={getPagePath($router, "monitors")}
 							className={cn("hidden md:grid", buttonVariants({ variant: "ghost", size: "icon" }))}
-							aria-label="Network Monitors"
+							aria-label={t`Network Monitors`}
 							onMouseEnter={() => import("@/components/routes/monitors")}
 						>
-							<NetworkIcon className="h-[1.2rem] w-[1.2rem]" strokeWidth={1.5} />
+							<NetworkIcon className="size-5" strokeWidth={1.5} />
 						</Link>
 					</TooltipTrigger>
 					<TooltipContent>
@@ -204,10 +207,10 @@ export default function Navbar() {
 					<TooltipTrigger asChild>
 						<Link
 							href={getPagePath($router, "settings", { name: "general" })}
-							aria-label="Settings"
+							aria-label={t`Settings`}
 							className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
 						>
-							<SettingsIcon className="h-[1.2rem] w-[1.2rem]" />
+							<SettingsIcon className="size-5" />
 						</Link>
 					</TooltipTrigger>
 					<TooltipContent>
@@ -216,8 +219,8 @@ export default function Navbar() {
 				</Tooltip>
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
-						<button aria-label="User Actions" className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}>
-							<UserIcon className="h-[1.2rem] w-[1.2rem]" />
+						<button aria-label={t`User actions`} className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}>
+							<UserIcon className="size-5" />
 						</button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align={isReadOnlyUser() ? "end" : "center"} className="min-w-44">
@@ -249,7 +252,7 @@ export default function Navbar() {
 }
 
 const Kbd = ({ children }: { children: React.ReactNode }) => (
-	<kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+	<kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-xs font-medium text-muted-foreground opacity-100">
 		{children}
 	</kbd>
 )

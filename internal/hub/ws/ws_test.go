@@ -170,9 +170,13 @@ func TestFingerprintRecord(t *testing.T) {
 	assert.Equal(t, "test-token", record.Token)
 }
 
-// TestDeadlineConstant tests that the deadline constant is reasonable
+// TestDeadlineConstant tests that the deadline is long enough to outlast a
+// failed poll: the updater polls every 60s and a fetch gives up after 30s, so
+// nothing can reset the deadline before 90s into a stalled cycle.
 func TestDeadlineConstant(t *testing.T) {
-	assert.Equal(t, 70*time.Second, deadline, "Deadline should be 70 seconds")
+	assert.Equal(t, 100*time.Second, deadline, "Deadline should be 100 seconds")
+	assert.Greater(t, int64(deadline), int64(90*time.Second),
+		"Deadline must exceed poll interval (60s) + fetch timeout (30s)")
 }
 
 // TestCommonActions tests that the common actions are properly defined

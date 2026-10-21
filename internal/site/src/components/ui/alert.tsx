@@ -4,13 +4,16 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 const alertVariants = cva(
-	"relative w-full rounded-lg border p-4 [&>svg~*]:ps-7 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4",
+	"relative w-full rounded-lg border p-4 [&>svg~*]:ps-7 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:start-4 [&>svg]:top-4",
 	{
 		variants: {
 			variant: {
-				default: "bg-background text-foreground [&>svg]:text-foreground",
+				default: "border-border bg-card text-foreground [&>svg]:text-foreground",
 				destructive:
-					"bg-destructive/5 border-destructive/50 text-destructive dark:bg-destructive/6 dark:text-red-400 dark:border-destructive/50 [&>svg]:text-destructive dark:[&>svg]:text-red-400",
+					"border-destructive/40 bg-destructive/5 text-destructive-text [&>svg]:text-destructive-text",
+				success: "border-success/40 bg-success-muted text-success-text [&>svg]:text-success-text",
+				warning: "border-warning/40 bg-warning-muted text-warning-text [&>svg]:text-warning-text",
+				info: "border-info/40 bg-info-muted text-info-text [&>svg]:text-info-text",
 			},
 		},
 		defaultVariants: {
@@ -29,7 +32,7 @@ Alert.displayName = "Alert"
 
 const AlertTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(
 	({ className, ...props }, ref) => (
-		<h5 ref={ref} className={cn("mb-1 -mt-0.5 font-medium leading-tight tracking-tight", className)} {...props} />
+		<h5 ref={ref} className={cn("mb-1 -mt-0.5 font-semibold leading-tight tracking-tight", className)} {...props} />
 	)
 )
 AlertTitle.displayName = "AlertTitle"

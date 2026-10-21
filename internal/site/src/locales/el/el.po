@@ -18,6 +18,36 @@ msgstr ""
 "X-Crowdin-File: /main/internal/site/src/locales/en/en.po\n"
 "X-Crowdin-File-ID: 32\n"
 
+
+#: src/components/token-value.tsx
+msgid "Agent token"
+msgstr ""
+
+
+#: src/components/token-value.tsx
+msgid "Copy token"
+msgstr ""
+
+
+#: src/components/token-value.tsx
+msgid "Hide token"
+msgstr ""
+
+
+#: src/components/token-value.tsx
+msgid "Reveal token"
+msgstr ""
+
+
+#: src/components/token-value.tsx
+msgid "Token hidden"
+msgstr ""
+
+#. placeholder {0}: data.length
+#: src/components/systems-table/systems-table.tsx
+msgid "{0, plural, one {# system} other {# systems}}"
+msgstr ""
+
 #. placeholder {0}: newVersion.v
 #: src/components/footer-repo-link.tsx
 msgctxt "New version available"
@@ -176,12 +206,18 @@ msgstr "Προσθήκη {foo}"
 #: src/components/add-system.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
+#: src/components/systems-table/systems-table.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Add System"
 msgstr "Προσθήκη Σύστημα"
 
 #: src/components/routes/settings/notifications.tsx
 msgid "Add URL"
 msgstr "Προσθήκη URL"
+
+#: src/components/systems-table/systems-table.tsx
+msgid "Add your first system"
+msgstr ""
 
 #: src/components/routes/settings/general.tsx
 msgid "Adjust display options for charts."
@@ -245,6 +281,7 @@ msgstr "Όλα τα συστήματα"
 msgid "Also written unchanged:"
 msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Applied Duty"
 msgstr ""
@@ -258,17 +295,21 @@ msgstr "Είστε βέβαιοι ότι θέλετε να διαγράψετε 
 msgid "Are you sure?"
 msgstr "Είστε βέβαιοι;"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Auto"
+msgstr ""
+
 #: src/components/copy-to-clipboard.tsx
 msgid "Automatic copy requires a secure context."
 msgstr "Η αυτόματη αντιγραφή απαιτεί ασφαλές περιβάλλον."
 
-#: src/components/routes/system/storage-pools-table.tsx
-msgctxt "Disk space available"
+#. Package version available to install
+#: src/components/routes/system/package-updates-table.tsx
 msgid "Available"
 msgstr "Διαθέσιμο"
 
-#. Package version available to install
-#: src/components/routes/system/package-updates-table.tsx
+#: src/components/routes/system/storage-pools-table.tsx
+msgctxt "Disk space available"
 msgid "Available"
 msgstr "Διαθέσιμο"
 
@@ -383,7 +424,6 @@ msgstr "Το Beszel υποστηρίζει OpenID Connect και πολλούς 
 msgid "Beszel uses <0>Shoutrrr</0> to integrate with popular notification services."
 msgstr "Το Beszel χρησιμοποιεί το <0>Shoutrrr</0> για ενσωμάτωση με δημοφιλείς υπηρεσίες ειδοποιήσεων."
 
-#: src/components/routes/system/plus-sheet.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "beszel-new"
 msgstr ""
@@ -559,8 +599,8 @@ msgid "Click on a pool to view vdev and dataset details."
 msgstr "Κάντε κλικ σε ένα pool για να δείτε λεπτομέρειες για τα vdev και τα σύνολα δεδομένων."
 
 #: src/components/systems-table/systems-table.tsx
-msgid "Click on a system to view more information."
-msgstr "Κάντε κλικ σε ένα σύστημα για να δείτε περισσότερες πληροφορίες."
+#~ msgid "Click on a system to view more information."
+#~ msgstr "Κάντε κλικ σε ένα σύστημα για να δείτε περισσότερες πληροφορίες."
 
 #: src/components/ui/input-copy.tsx
 msgid "Click to copy"
@@ -592,7 +632,6 @@ msgid "Confirm"
 msgstr ""
 
 #: src/components/login/auth-form.tsx
-#: src/components/login/auth-form.tsx
 msgid "Confirm password"
 msgstr "Επιβεβαίωση κωδικού πρόσβασης"
 
@@ -616,6 +655,7 @@ msgstr "Κοντέινερ"
 msgid "Container Health"
 msgstr "Υγεία κοντέινερ"
 
+#: src/components/navbar.tsx
 #: src/components/routes/system.tsx
 msgid "Containers"
 msgstr "Κοντέινερ"
@@ -674,6 +714,7 @@ msgid "Copy name"
 msgstr "Αντιγραφή ονόματος"
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
+#: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Copy public key"
 msgstr "Αντιγραφή δημόσιου κλειδιού"
 
@@ -699,6 +740,7 @@ msgid "Core"
 msgstr "Βασικά"
 
 #: src/components/containers-table/containers-table-columns.tsx
+#: src/components/routes/system/info-bar.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "CPU"
@@ -790,7 +832,6 @@ msgstr "Συνολική εγγραφή"
 
 #. Current package version
 #: src/components/routes/system/package-updates-table.tsx
-#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Current"
 msgstr "Τρέχον"
 
@@ -802,9 +843,11 @@ msgid "Current state"
 msgstr "Τρέχουσα κατάσταση"
 
 #: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Curve running"
 msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Curve stopped"
 msgstr ""
@@ -838,6 +881,7 @@ msgstr "Προεπιλεγμένη χρονική περίοδος"
 
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
+#: src/components/routes/settings/notifications.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/systems-table/systems-table-columns.tsx
@@ -870,6 +914,7 @@ msgid "Discharging"
 msgstr "Αποφορτίζεται"
 
 #: src/components/routes/system.tsx
+#: src/components/routes/system/info-bar.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Disk"
 msgstr "Δίσκος"
@@ -918,10 +963,10 @@ msgstr "I/O δικτύου Docker"
 msgid "Documentation"
 msgstr "Τεκμηρίωση"
 
-#. Context: System is down
 #: src/components/alerts-history-columns.tsx
-#: src/components/routes/system/info-bar.tsx
+#: src/components/system-status.tsx
 #: src/components/systems-table/systems-table-columns.tsx
+#: src/components/systems-table/systems-table.tsx
 #: src/lib/alerts.ts
 msgid "Down"
 msgstr "Εκτός λειτουργίας"
@@ -938,6 +983,8 @@ msgstr "Λήψη"
 msgid "Duration"
 msgstr "Διάρκεια"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Duty"
 msgstr ""
@@ -1040,6 +1087,10 @@ msgstr ""
 msgid "Error"
 msgstr "Σφάλμα"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Every value beyond the preview card. A reading the agent did not report is absent, not zero."
+msgstr ""
+
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Example:"
 msgstr "Παράδειγμα:"
@@ -1083,6 +1134,10 @@ msgstr "Εξαγωγή διαμόρφωσης"
 msgid "Export your current systems configuration."
 msgstr "Εξαγάγετε την τρέχουσα διαμόρφωση των συστημάτων σας."
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Extended metrics"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 msgid "Fahrenheit (°F)"
 msgstr "Φαρενάιτ (°F)"
@@ -1103,6 +1158,10 @@ msgstr "Η ταυτοποίηση απέτυχε"
 msgid "Failed to delete monitors."
 msgstr "Η διαγραφή των monitors απέτυχε."
 
+#: src/components/routes/settings/quiet-hours.tsx
+msgid "Failed to delete quiet hours."
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Failed to load logs."
@@ -1111,6 +1170,10 @@ msgstr "Αποτυχία φόρτωσης των αρχείων καταγραφ
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Failed to load package updates"
 msgstr "Αποτυχία φόρτωσης των ενημερώσεων πακέτων"
+
+#: src/components/systems-table/systems-table.tsx
+msgid "Failed to load systems."
+msgstr ""
 
 #: src/components/routes/settings/layout.tsx
 #: src/components/routes/settings/notifications.tsx
@@ -1161,6 +1224,7 @@ msgstr "Ανεμιστήρες"
 
 #: src/components/containers-table/containers-table.tsx
 #: src/components/network-monitors-table/network-monitors-table.tsx
+#: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/system/chart-card.tsx
 #: src/components/routes/system/package-updates-table.tsx
@@ -1214,6 +1278,10 @@ msgstr ""
 msgid "Full"
 msgstr "Πλήρες"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Full-speed backstop: the firmware carries this value, so it is fixed here."
+msgstr ""
+
 #: src/components/containers-table/containers-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Fullscreen"
@@ -1228,6 +1296,22 @@ msgstr "Γενικά"
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Global"
 msgstr "Καθολικό"
+
+#: src/components/routes/settings/alerts-history-data-table.tsx
+msgid "Go to first page"
+msgstr ""
+
+#: src/components/routes/settings/alerts-history-data-table.tsx
+msgid "Go to last page"
+msgstr ""
+
+#: src/components/routes/settings/alerts-history-data-table.tsx
+msgid "Go to next page"
+msgstr ""
+
+#: src/components/routes/settings/alerts-history-data-table.tsx
+msgid "Go to previous page"
+msgstr ""
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Governor"
@@ -1275,6 +1359,10 @@ msgstr "Το heartbeat στάλθηκε με επιτυχία"
 msgid "Hide timestamps"
 msgstr "Απόκρυψη χρονοσφραγίδων"
 
+#: src/components/navbar.tsx
+msgid "Home"
+msgstr ""
+
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgctxt "Button to copy install command"
@@ -1313,6 +1401,7 @@ msgid "I/O Utilization"
 msgstr "Χρήση I/O"
 
 #. Context: Battery state
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/lib/i18n.ts
 msgid "Idle"
 msgstr "Αδράνεια"
@@ -1333,6 +1422,7 @@ msgid "Image update available"
 msgstr "Διατίθεται ενημέρωση εικόνας"
 
 #: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "In force"
 msgstr ""
 
@@ -1343,6 +1433,10 @@ msgstr ""
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Inactive"
 msgstr "Ανενεργό"
+
+#: src/components/systems-table/systems-table.tsx
+msgid "Install the agent on a machine to start monitoring it here."
+msgstr ""
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Intel DPTF sensors. A zone the collector could not read is left out rather than shown as zero."
@@ -1414,8 +1508,13 @@ msgstr "Κατάσταση φόρτωσης"
 
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Loading..."
 msgstr "Φόρτωση..."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Locked"
+msgstr ""
 
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
@@ -1464,6 +1563,10 @@ msgstr "Σημαντική"
 #: src/components/routes/settings/layout.tsx
 msgid "Manage display and notification preferences."
 msgstr "Διαχειριστείτε τις προτιμήσεις εμφάνισης και ειδοποιήσεων."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Manual"
+msgstr ""
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
@@ -1520,6 +1623,8 @@ msgstr "Ελάχιστο 1ώρου"
 msgid "Minor"
 msgstr "Δευτερεύουσα"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Mode"
 msgstr ""
@@ -1558,6 +1663,7 @@ msgid "Net"
 msgstr "Δίκτυο"
 
 #: src/components/routes/system.tsx
+#: src/components/routes/system/info-bar.tsx
 msgid "Network"
 msgstr "Δίκτυο"
 
@@ -1571,6 +1677,7 @@ msgid "Network Monitor Loss"
 msgstr "Απώλεια παρακολούθησης δικτύου"
 
 #: src/components/command-palette.tsx
+#: src/components/navbar.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
@@ -1602,9 +1709,17 @@ msgstr "Μονάδα δικτύου"
 msgid "No"
 msgstr "Όχι"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "No curve on record."
+msgstr ""
+
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "No detail data for this pool."
 msgstr "Δεν υπάρχουν λεπτομερή δεδομένα για αυτό το pool."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "No fan state is on record."
+msgstr ""
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "No hand-set duty is on record. One set before an agent restarted would still be driving the fan, and this panel cannot see it."
@@ -1693,9 +1808,11 @@ msgid "One-time"
 msgstr "Μία φορά"
 
 #: src/components/login/auth-form.tsx
+#: src/components/login/otp-forms.tsx
 msgid "One-time password"
 msgstr "Κωδικός μίας χρήσης"
 
+#: src/components/navbar.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
@@ -1713,6 +1830,10 @@ msgstr "Προαιρετικό. Από προεπιλογή χρησιμοποι
 #: src/components/login/auth-form.tsx
 msgid "Or continue with"
 msgstr "Ή συνεχίστε με"
+
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "OS"
+msgstr ""
 
 #. Package version
 #: src/components/routes/system/cpu-sheet.tsx
@@ -1733,15 +1854,15 @@ msgstr "Αντικατάσταση υπαρχουσών ειδοποιήσεων
 msgid "P-State"
 msgstr ""
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgctxt "CPU package"
-msgid "Package"
-msgstr ""
-
 #. Software package
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Package"
 msgstr "Πακέτο"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgctxt "CPU package"
+msgid "Package"
+msgstr ""
 
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Package Updates"
@@ -1772,7 +1893,6 @@ msgid "Pages / Settings"
 msgstr "Σελίδες / Ρυθμίσεις"
 
 #: src/components/login/auth-form.tsx
-#: src/components/login/auth-form.tsx
 msgid "Password"
 msgstr "Κωδικός πρόσβασης"
 
@@ -1788,6 +1908,10 @@ msgstr "Ο κωδικός πρόσβασης πρέπει να είναι μικ
 msgid "Password reset request received"
 msgstr "Το αίτημα επαναφοράς κωδικού πρόσβασης ελήφθη"
 
+#: src/components/login/auth-form.tsx
+msgid "Passwords must match"
+msgstr ""
+
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Past"
 msgstr "Παρελθόν"
@@ -1802,7 +1926,9 @@ msgstr "Διόρθωση"
 msgid "Pause"
 msgstr "Παύση"
 
+#: src/components/system-status.tsx
 #: src/components/systems-table/systems-table-columns.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Paused"
 msgstr "Σε παύση"
 
@@ -1813,6 +1939,11 @@ msgstr "Σε παύση ({pausedSystemsLength})"
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Payload format"
 msgstr "Μορφή payload"
+
+#. Context: System status is pending its first connection
+#: src/components/system-status.tsx
+msgid "Pending"
+msgstr ""
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Per core, named by cpu number, plus the active tuning policy"
@@ -1995,7 +2126,12 @@ msgstr "Ανάγνωση"
 msgid "Read errors"
 msgstr "Σφάλματα ανάγνωσης"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Reading the fan state…"
+msgstr ""
+
 #: src/components/routes/system/charts/network-charts.tsx
+#: src/components/routes/system/info-bar.tsx
 msgid "Received"
 msgstr "Λήφθηκαν"
 
@@ -2062,10 +2198,24 @@ msgstr "Επανεκκινήσεις"
 msgid "Resume"
 msgstr "Συνέχιση"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/systems-table/systems-table.tsx
+msgid "Retry"
+msgstr ""
+
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Retry since previous sample"
 msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Return to the curve"
 msgstr ""
@@ -2074,6 +2224,10 @@ msgstr ""
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Revision"
 msgstr "Αναθεώρηση"
+
+#: src/components/routes/system/info-bar.tsx
+msgid "Root"
+msgstr ""
 
 #: src/components/routes/system/charts/disk-charts.tsx
 #: src/components/routes/system/charts/disk-charts.tsx
@@ -2137,6 +2291,7 @@ msgid "Schedule quiet hours where notifications will not be sent."
 msgstr "Προγραμματίστε ώρες σίγασης κατά τις οποίες δεν θα αποστέλλονται ειδοποιήσεις."
 
 #: src/components/navbar.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Search"
 msgstr "Αναζήτηση"
 
@@ -2155,6 +2310,10 @@ msgstr "Αναζήτηση στόχων"
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Seconds between pings (default: 60)"
 msgstr "Δευτερόλεπτα μεταξύ ping (προεπιλογή: 60)"
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Sections"
+msgstr ""
 
 #. Security update
 #: src/components/routes/system/package-updates-table.tsx
@@ -2180,6 +2339,7 @@ msgstr "Επιλέξτε ένα σύστημα"
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "Select all"
 msgstr "Επιλογή όλων"
 
@@ -2187,7 +2347,12 @@ msgstr "Επιλογή όλων"
 msgid "Select matches"
 msgstr "Επιλογή αντιστοιχιών"
 
+#: src/components/routes/settings/sidebar-nav.tsx
+msgid "Select page"
+msgstr ""
+
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "Select row"
 msgstr "Επιλογή γραμμής"
 
@@ -2212,6 +2377,7 @@ msgid "Send test heartbeat"
 msgstr "Αποστολή δοκιμαστικού heartbeat"
 
 #: src/components/routes/system/charts/network-charts.tsx
+#: src/components/routes/system/info-bar.tsx
 msgid "Sent"
 msgstr "Απεστάλησαν"
 
@@ -2240,11 +2406,17 @@ msgstr "Ορίστε τις ακόλουθες μεταβλητές περιβά
 #: src/components/command-palette.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
+#: src/components/navbar.tsx
 #: src/components/routes/settings/layout.tsx
 #: src/components/routes/settings/layout.tsx
+#: src/components/routes/settings/sidebar-nav.tsx
 #: src/components/routes/system/info-bar.tsx
 msgid "Settings"
 msgstr "Ρυθμίσεις"
+
+#: src/components/routes/settings/sidebar-nav.tsx
+msgid "Settings navigation"
+msgstr ""
 
 #: src/components/routes/settings/layout.tsx
 msgid "Settings saved"
@@ -2267,6 +2439,10 @@ msgstr ""
 msgid "Signal strength of connected Wi-Fi interfaces"
 msgstr "Ισχύς σήματος των συνδεδεμένων διεπαφών Wi-Fi"
 
+#: src/main.tsx
+msgid "Skip to content"
+msgstr ""
+
 #: src/components/routes/system/plus-sheet.tsx
 msgid "SMART log. A field the drive omits reads as unknown, not as zero."
 msgstr ""
@@ -2282,6 +2458,11 @@ msgstr "Ταξινόμηση κατά"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "stale"
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Stale"
 msgstr ""
 
 #: src/components/routes/settings/quiet-hours.tsx
@@ -2300,6 +2481,7 @@ msgstr "Κατάσταση"
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
+#: src/components/systems-table/systems-table-columns.tsx
 #: src/components/systems-table/systems-table.tsx
 #: src/lib/alerts.ts
 msgid "Status"
@@ -2370,14 +2552,21 @@ msgid "Tabs"
 msgstr "Καρτέλες"
 
 #: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Take manual control"
 msgstr ""
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Target"
 msgstr "Στόχος"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Target duty"
+msgstr ""
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
@@ -2395,6 +2584,8 @@ msgid "Temp"
 msgstr "Θερμ."
 
 #: src/components/routes/system/charts/sensor-charts.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-sheet.tsx
 #: src/components/routes/system/plus-sheet.tsx
 #: src/lib/alerts.ts
@@ -2458,6 +2649,10 @@ msgid "The curve failed validation and was rejected before anything was written.
 msgstr ""
 
 #: src/components/routes/system/plus-fan-tab.tsx
+msgid "The daemon picks the curve up on its next restart."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "the edited curve"
 msgstr ""
 
@@ -2467,6 +2662,18 @@ msgstr ""
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The fan is not holding the duty that was requested; the old one was put back."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The fan state could not be read."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The fan state could not be refreshed. Showing the last reading."
+msgstr ""
+
+#: src/components/systems-table/systems-table.tsx
+msgid "The hub could not be reached. Check the connection and try again."
 msgstr ""
 
 #: src/components/routes/settings/heartbeat.tsx
@@ -2482,9 +2689,14 @@ msgid "The package temperature could not be read, so no duty was written and the
 msgstr ""
 
 #: src/components/routes/system/plus-fan-tab.tsx
+msgid "The package temperature could not be read."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "The previous duty could not be restored: the fan is holding one you did not ask for."
 msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The request never reached the server."
 msgstr ""
@@ -2565,6 +2777,7 @@ msgstr "Τα διακριτικά επιτρέπουν στους πράκτορ
 msgid "Tokens and fingerprints are used to authenticate WebSocket connections to the hub."
 msgstr "Τα διακριτικά και τα αποτυπώματα χρησιμοποιούνται για την ταυτοποίηση συνδέσεων WebSocket προς τον κόμβο."
 
+#: src/components/routes/system/info-bar.tsx
 #: src/components/ui/chart.tsx
 #: src/components/ui/chart.tsx
 msgid "Total"
@@ -2673,6 +2886,12 @@ msgstr "Ενεργοποιείται όταν η χρήση οποιουδήπο
 msgid "Type"
 msgstr "Τύπος"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Unavailable"
+msgstr ""
+
 #: src/lib/alerts.ts
 msgid "Unhealthy"
 msgstr "Μη υγιές"
@@ -2687,6 +2906,7 @@ msgid "Unit preferences"
 msgstr "Προτιμήσεις μονάδων μέτρησης"
 
 #: src/components/command-palette.tsx
+#: src/components/routes/settings/tokens-fingerprints.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Universal token"
 msgstr "Καθολικό διακριτικό"
@@ -2707,9 +2927,13 @@ msgstr "Απεριόριστο"
 msgid "Unsafe Shutdowns"
 msgstr ""
 
-#. Context: System is up
-#: src/components/routes/system/info-bar.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Unsaved changes"
+msgstr ""
+
+#: src/components/system-status.tsx
 #: src/components/systems-table/systems-table-columns.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Up"
 msgstr "Σε λειτουργία"
 
@@ -2729,9 +2953,13 @@ msgstr "Ενημέρωση"
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/system/info-bar.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/routes/system/storage-pools-table.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
+#: src/components/systems-table/systems-table-columns.tsx
 msgid "Updated"
 msgstr "Ενημερώθηκε"
 
@@ -2775,6 +3003,10 @@ msgstr "Χρήση του pool αποθήκευσης {displayName}"
 msgid "Used"
 msgstr "Χρησιμοποιείται"
 
+#: src/components/navbar.tsx
+msgid "User actions"
+msgstr ""
+
 #: src/components/command-palette.tsx
 #: src/components/navbar.tsx
 msgid "Users"
@@ -2805,6 +3037,7 @@ msgstr "Προβολή λεπτομερειών"
 #: src/components/routes/system/cpu-sheet.tsx
 #: src/components/routes/system/disk-io-sheet.tsx
 #: src/components/routes/system/network-sheet.tsx
+#: src/components/routes/system/plus-sheet.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "View more"
 msgstr "Προβολή περισσότερων"
@@ -2841,6 +3074,10 @@ msgstr "Όρια προειδοποίησης"
 #: src/components/routes/settings/notifications.tsx
 msgid "Webhook / Push notifications"
 msgstr "Webhook / Ειδοποιήσεις Push"
+
+#: src/components/routes/settings/notifications.tsx
+msgid "Webhook URL"
+msgstr ""
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "When enabled, this token allows agents to self-register without prior system creation."
@@ -2880,13 +3117,15 @@ msgid "Write errors"
 msgstr "Σφάλματα εγγραφής"
 
 #: src/components/routes/system/plus-fan-tab.tsx
-msgid "Write this curve"
-msgstr ""
+#~ msgid "Write this curve"
+#~ msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Write this curve to the disk"
 msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Write this duty to the firmware"
 msgstr ""
@@ -2899,6 +3138,7 @@ msgstr ""
 msgid "YAML Config"
 msgstr "Διαμ. YAML"
 
+#: src/components/routes/settings/config-yaml.tsx
 #: src/components/routes/settings/config-yaml.tsx
 msgid "YAML Configuration"
 msgstr "Διαμόρφωση YAML"

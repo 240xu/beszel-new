@@ -241,7 +241,7 @@ const AllSystemdTable = memo(function AllSystemdTable({
 	return (
 		<div
 			className={cn(
-				"h-min max-h-[calc(100dvh-17rem)] max-w-full relative overflow-auto border rounded-md",
+				"relative grid max-h-[70svh] min-h-0 max-w-full overflow-auto border rounded-md",
 				// don't set min height if there are less than 2 rows, do set if we need to display the empty state
 				(!rows.length || rows.length > 2) && "min-h-50"
 			)}

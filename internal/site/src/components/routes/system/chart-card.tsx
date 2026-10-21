@@ -54,7 +54,7 @@ export function FilterBar({ store = $containerFilter }: { store?: typeof $contai
 					variant="ghost"
 					size="icon"
 					aria-label="Clear"
-					className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+					className="absolute end-1 top-1/2 -translate-y-1/2 h-7 w-7 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
 					onClick={handleClear}
 				>
 					<XIcon className="h-4 w-4" />
@@ -93,6 +93,9 @@ export function ChartCard({
 	cornerEl,
 	legend,
 	className,
+	autoHeight,
+	loading,
+	contentClassName,
 }: {
 	title: string
 	description: React.ReactNode
@@ -102,14 +105,17 @@ export function ChartCard({
 	cornerEl?: JSX.Element | null
 	legend?: boolean
 	className?: string
+	autoHeight?: boolean
+	loading?: boolean
+	contentClassName?: string
 }) {
 	const { isIntersecting, ref } = useIntersectionObserver()
 
 	return (
 		<Card
 			className={cn(
-				"px-3 py-5 sm:py-6 sm:px-6 odd:last-of-type:col-span-full min-h-full",
-				{ "col-span-full": !grid },
+				"px-3 py-5 sm:py-6 sm:px-6 odd:last-of-type:col-span-full",
+				{ "col-span-full": !grid, "min-h-full": !autoHeight },
 				className
 			)}
 			ref={ref}
@@ -119,13 +125,19 @@ export function ChartCard({
 				<CardDescription>{description}</CardDescription>
 				{cornerEl && <div className="grid sm:justify-end sm:absolute sm:top-0 sm:end-0 my-1 sm:my-0">{cornerEl}</div>}
 			</CardHeader>
-			<div className={cn("ps-0 -me-1 -ms-3.5 relative group", legend ? "h-54 md:h-56" : "h-48 md:h-52")}>
-				{
+			<div
+				className={cn(
+					"ps-0 -me-1 -ms-3.5 relative group",
+					autoHeight ? "min-h-0" : legend ? "h-54 md:h-56" : "h-48 md:h-52",
+					contentClassName
+				)}
+			>
+				{(loading || empty) && (
 					<Spinner
 						msg={empty ? t`Waiting for enough records to display` : undefined}
 						className="group-has-[.opacity-100]:invisible duration-100"
 					/>
-				}
+				)}
 				{isIntersecting && children}
 			</div>
 		</Card>

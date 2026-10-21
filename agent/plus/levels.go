@@ -23,6 +23,13 @@ type DutySet struct {
 	duties []int
 }
 
+// DutySetFrom builds a validated duty set from explicit duties. It is used by
+// tests and by callers that already hold a resolved list; production resolution
+// stays in ResolveDutySet.
+func DutySetFrom(duties []int) DutySet {
+	return dutySetFrom(duties)
+}
+
 // dutySetFrom sorts and deduplicates, so the two views of a set cannot drift.
 func dutySetFrom(duties []int) DutySet {
 	sorted := append([]int(nil), duties...)

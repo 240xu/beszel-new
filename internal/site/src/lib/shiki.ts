@@ -5,7 +5,7 @@ import githubDarkDimmed from '@shikijs/themes/github-dark-dimmed'
 
 // `shiki/core` entry does not include any themes or languages or the wasm binary.
 import { createHighlighterCore } from 'shiki/core'
-import { createOnigurumaEngine } from 'shiki/engine/oniguruma'
+import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
 
 export const highlighter = await createHighlighterCore({
    themes: [
@@ -20,8 +20,10 @@ export const highlighter = await createHighlighterCore({
       // shiki will try to interop the module with the default export
       // () => import('@shikijs/langs/css'),
    ],
-   // `shiki/wasm` contains the wasm binary inlined as base64 string.
-   engine: createOnigurumaEngine(import('shiki/wasm'))
+   // The JavaScript RegExp engine needs no binary blob. `shiki/wasm` would inline
+   // 466 kB of Oniguruma as base64 into a lazily-loaded chunk -- the single largest
+   // asset in the bundle -- for two grammars (log, json) that the JS engine handles.
+   engine: createJavaScriptRegexEngine({ forgiving: true })
 })
 
 // optionally, load themes and languages after creation

@@ -44,10 +44,18 @@ export function isPendingRestart(result: CurveSaveResult): boolean {
 	return result.status === FAN_SAVE_STATUS.pendingRestart
 }
 
+async function authorizationHeader(): Promise<Record<string, string>> {
+	if (typeof window === "undefined") return {}
+	const { pb } = await import("@/lib/api")
+	const token = pb.authStore.token
+	return token ? { Authorization: token } : {}
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+	const authorization = await authorizationHeader()
 	const res = await fetch(path, {
 		...init,
-		headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+		headers: { "Content-Type": "application/json", ...(init?.headers ?? {}), ...authorization },
 	})
 	const text = await res.text()
 	if (!res.ok) {

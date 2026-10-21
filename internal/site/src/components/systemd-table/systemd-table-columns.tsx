@@ -19,11 +19,11 @@ import { t } from "@lingui/core/macro"
 function getSubStateColor(subState: ServiceSubState) {
 	switch (subState) {
 		case ServiceSubState.Running:
-			return "bg-green-500"
+			return "bg-success"
 		case ServiceSubState.Failed:
-			return "bg-red-500"
+			return "bg-destructive"
 		case ServiceSubState.Dead:
-			return "bg-yellow-500"
+			return "bg-warning"
 		default:
 			return "bg-zinc-500"
 	}
@@ -187,13 +187,13 @@ function HeaderButton({ column, name, Icon }: { column: Column<SystemdRecord>; n
 export function getStatusColor(status: ServiceStatus) {
 	switch (status) {
 		case ServiceStatus.Active:
-			return "bg-green-500"
+			return "bg-success"
 		case ServiceStatus.Failed:
-			return "bg-red-500"
+			return "bg-destructive"
 		case ServiceStatus.Reloading:
 		case ServiceStatus.Activating:
 		case ServiceStatus.Deactivating:
-			return "bg-yellow-500"
+			return "bg-warning"
 		default:
 			return "bg-zinc-500"
 	}

@@ -103,9 +103,7 @@ const columns: ColumnDef<ZfsPoolRecord>[] = [
 		cell: ({ getValue }) => {
 			const type = getValue() as string
 			return (
-				<Badge variant="outline" className={cn("border-transparent", type === "ZFS" ? "bg-blue-200 text-blue-800" : "bg-yellow-200 text-yellow-800")}>
-					{type}
-				</Badge>
+				<Badge variant={type === "ZFS" ? "secondary" : "outline"}>{type}</Badge>
 			)
 		},
 	},
@@ -178,9 +176,9 @@ function VdevTable({ vdevs }: { vdevs: ZfsVdev[] }) {
 					<TableRow>
 						<TableHead>Vdev</TableHead>
 						<TableHead>{t`State`}</TableHead>
-						<TableHead className="text-right">{t`Read errors`}</TableHead>
-						<TableHead className="text-right">{t`Write errors`}</TableHead>
-						<TableHead className="text-right">{t`Checksum errors`}</TableHead>
+						<TableHead className="text-end">{t`Read errors`}</TableHead>
+						<TableHead className="text-end">{t`Write errors`}</TableHead>
+						<TableHead className="text-end">{t`Checksum errors`}</TableHead>
 					</TableRow>
 				</TableHeader>
 				<TableBody>
@@ -193,19 +191,19 @@ function VdevTable({ vdevs }: { vdevs: ZfsVdev[] }) {
 								</Badge>
 							</TableCell>
 							<TableCell
-								className={cn("text-right tabular-nums", (vdev.readErrs ?? 0) > 0 && "text-red-600 dark:text-red-400")}
+								className={cn("text-end tabular-nums", (vdev.readErrs ?? 0) > 0 && "text-destructive-text")}
 							>
 								{vdev.readErrs ?? 0}
 							</TableCell>
 							<TableCell
-								className={cn("text-right tabular-nums", (vdev.writeErrs ?? 0) > 0 && "text-red-600 dark:text-red-400")}
+								className={cn("text-end tabular-nums", (vdev.writeErrs ?? 0) > 0 && "text-destructive-text")}
 							>
 								{vdev.writeErrs ?? 0}
 							</TableCell>
 							<TableCell
 								className={cn(
-									"text-right tabular-nums",
-									(vdev.checksumErrs ?? 0) > 0 && "text-red-600 dark:text-red-400"
+									"text-end tabular-nums",
+									(vdev.checksumErrs ?? 0) > 0 && "text-destructive-text"
 								)}
 							>
 								{vdev.checksumErrs ?? 0}
@@ -230,14 +228,14 @@ const datasetColumns: ColumnDef<ZfsDataset>[] = [
 		accessorFn: (ds) => ds.used ?? 0,
 		invertSorting: true,
 		header: ({ column }) => <HeaderButton column={column} name={t`Used`} Icon={HardDriveDownloadIcon} />,
-		cell: ({ getValue }) => <span className="text-right tabular-nums">{formatCapacity(getValue() as number)}</span>,
+		cell: ({ getValue }) => <span className="text-end tabular-nums">{formatCapacity(getValue() as number)}</span>,
 	},
 	{
 		id: "avail",
 		accessorFn: (ds) => ds.avail ?? 0,
 		invertSorting: true,
 		header: ({ column }) => <HeaderButton column={column} name={t({message:`Available`, context: "Disk space available"})} Icon={HardDriveUploadIcon} />,
-		cell: ({ getValue }) => <span className="text-right tabular-nums">{formatCapacity(getValue() as number)}</span>,
+		cell: ({ getValue }) => <span className="text-end tabular-nums">{formatCapacity(getValue() as number)}</span>,
 	},
 	{
 		accessorKey: "mount",
@@ -283,7 +281,7 @@ function DatasetTable({ datasets }: { datasets: ZfsDataset[] }) {
 							variant="ghost"
 							size="icon"
 							aria-label={t`Clear`}
-							className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
+							className="absolute end-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
 							onClick={() => setFilter("")}
 						>
 							<XIcon className="h-4 w-4" />
@@ -635,7 +633,7 @@ export default function ZfsTable({ systemId }: { systemId?: string }) {
 									variant="ghost"
 									size="icon"
 									aria-label={t`Clear`}
-									className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
+									className="absolute end-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
 									onClick={() => setGlobalFilter("")}
 								>
 									<XIcon className="h-4 w-4" />
@@ -644,7 +642,7 @@ export default function ZfsTable({ systemId }: { systemId?: string }) {
 						</div>
 					</div>
 				</CardHeader>
-				<div className="h-min max-h-[calc(100dvh-17rem)] max-w-full relative overflow-auto rounded-md border">
+				<div className="relative grid max-h-[70svh] min-h-0 max-w-full overflow-auto rounded-md border">
 					<Table>
 						<TableHeader className="sticky top-0 z-50 w-full border-b-2">
 							{table.getHeaderGroups().map((headerGroup) => (

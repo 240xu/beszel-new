@@ -79,18 +79,18 @@ export default function HeartbeatSettings() {
 
 	return (
 		<div>
-			<div>
-				<h3 className="text-xl font-medium mb-2">
+			<section className="grid gap-2">
+				<h2 className="text-lg font-semibold tracking-tight">
 					<Trans>Heartbeat Monitoring</Trans>
-				</h3>
+				</h2>
 				<p className="text-sm text-muted-foreground leading-relaxed">
 					<Trans>
 						Send periodic outbound pings to an external monitoring service so you can monitor Beszel without exposing it
 						to the internet.
 					</Trans>
 				</p>
-			</div>
-			<Separator className="my-4" />
+			</section>
+			<Separator />
 
 			{status?.enabled ? (
 				<EnabledState status={status} isTesting={isTesting} sendTestHeartbeat={sendTestHeartbeat} />
@@ -126,11 +126,11 @@ function EnabledState({
 
 			<Separator />
 
-			<div>
-				<h4 className="text-base font-medium mb-1">
+			<section className="grid gap-2">
+				<h3 className="text-sm font-semibold">
 					<Trans>Test heartbeat</Trans>
-				</h4>
-				<p className="text-sm text-muted-foreground leading-relaxed mb-3">
+				</h3>
+				<p className="text-sm text-muted-foreground leading-relaxed">
 					<Trans>Send a single heartbeat ping to verify your endpoint is working.</Trans>
 				</p>
 				<Button
@@ -143,15 +143,15 @@ function EnabledState({
 					<TestIcon className={cn("size-4", isTesting && "animate-spin")} />
 					<Trans>Send test heartbeat</Trans>
 				</Button>
-			</div>
+			</section>
 
 			<Separator />
 
-			<div>
-				<h4 className="text-base font-medium mb-2">
+			<section className="grid gap-2">
+				<h3 className="text-sm font-semibold">
 					<Trans>Payload format</Trans>
-				</h4>
-				<p className="text-sm text-muted-foreground leading-relaxed mb-2">
+				</h3>
+				<p className="text-sm text-muted-foreground leading-relaxed">
 					<Trans>
 						When using POST, each heartbeat includes a JSON payload with system status summary, list of down systems,
 						and triggered alerts.
@@ -164,7 +164,7 @@ function EnabledState({
 						<code className="bg-muted rounded-sm px-1 text-primary">error</code> when any system is down.
 					</Trans>
 				</p>
-			</div>
+			</section>
 		</div>
 	)
 }

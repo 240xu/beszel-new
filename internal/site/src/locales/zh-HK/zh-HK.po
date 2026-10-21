@@ -18,6 +18,36 @@ msgstr ""
 "X-Crowdin-File: /main/internal/site/src/locales/en/en.po\n"
 "X-Crowdin-File-ID: 32\n"
 
+
+#: src/components/token-value.tsx
+msgid "Agent token"
+msgstr "代理程式權杖"
+
+
+#: src/components/token-value.tsx
+msgid "Copy token"
+msgstr "複製權杖"
+
+
+#: src/components/token-value.tsx
+msgid "Hide token"
+msgstr "隱藏權杖"
+
+
+#: src/components/token-value.tsx
+msgid "Reveal token"
+msgstr "顯示權杖"
+
+
+#: src/components/token-value.tsx
+msgid "Token hidden"
+msgstr "權杖已隱藏"
+
+#. placeholder {0}: data.length
+#: src/components/systems-table/systems-table.tsx
+msgid "{0, plural, one {# system} other {# systems}}"
+msgstr "{0, plural, one {# 個系統} other {# 個系統}}"
+
 #. placeholder {0}: newVersion.v
 #: src/components/footer-repo-link.tsx
 msgctxt "New version available"
@@ -176,12 +206,18 @@ msgstr "新增 {foo}"
 #: src/components/add-system.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
+#: src/components/systems-table/systems-table.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Add System"
 msgstr "新增 系統"
 
 #: src/components/routes/settings/notifications.tsx
 msgid "Add URL"
 msgstr "添加 URL"
+
+#: src/components/systems-table/systems-table.tsx
+msgid "Add your first system"
+msgstr "新增第一個系統"
 
 #: src/components/routes/settings/general.tsx
 msgid "Adjust display options for charts."
@@ -245,6 +281,7 @@ msgstr "所有系統"
 msgid "Also written unchanged:"
 msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Applied Duty"
 msgstr ""
@@ -258,17 +295,21 @@ msgstr "您確定要刪除 {name} 嗎？"
 msgid "Are you sure?"
 msgstr "您確定嗎？"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Auto"
+msgstr "自動"
+
 #: src/components/copy-to-clipboard.tsx
 msgid "Automatic copy requires a secure context."
 msgstr "自動複製需要安全的上下文。"
 
-#: src/components/routes/system/storage-pools-table.tsx
-msgctxt "Disk space available"
+#. Package version available to install
+#: src/components/routes/system/package-updates-table.tsx
 msgid "Available"
 msgstr "可用"
 
-#. Package version available to install
-#: src/components/routes/system/package-updates-table.tsx
+#: src/components/routes/system/storage-pools-table.tsx
+msgctxt "Disk space available"
 msgid "Available"
 msgstr "可用"
 
@@ -383,7 +424,6 @@ msgstr "Beszel支持OpenID Connect和許多OAuth2認證提供者。"
 msgid "Beszel uses <0>Shoutrrr</0> to integrate with popular notification services."
 msgstr "Beszel 使用 <0>Shoutrrr</0> 與流行的通知服務集成。"
 
-#: src/components/routes/system/plus-sheet.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "beszel-new"
 msgstr ""
@@ -559,8 +599,8 @@ msgid "Click on a pool to view vdev and dataset details."
 msgstr "按一下 pool 以查看 vdev 和 dataset 的詳細資料。"
 
 #: src/components/systems-table/systems-table.tsx
-msgid "Click on a system to view more information."
-msgstr "點擊系統以查看更多資訊。"
+#~ msgid "Click on a system to view more information."
+#~ msgstr "點擊系統以查看更多資訊。"
 
 #: src/components/ui/input-copy.tsx
 msgid "Click to copy"
@@ -592,7 +632,6 @@ msgid "Confirm"
 msgstr ""
 
 #: src/components/login/auth-form.tsx
-#: src/components/login/auth-form.tsx
 msgid "Confirm password"
 msgstr "確認密碼"
 
@@ -616,6 +655,7 @@ msgstr "容器"
 msgid "Container Health"
 msgstr "容器健康狀態"
 
+#: src/components/navbar.tsx
 #: src/components/routes/system.tsx
 msgid "Containers"
 msgstr "容器"
@@ -674,6 +714,7 @@ msgid "Copy name"
 msgstr "複製名稱"
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
+#: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Copy public key"
 msgstr "複製公鑰"
 
@@ -699,6 +740,7 @@ msgid "Core"
 msgstr "核心"
 
 #: src/components/containers-table/containers-table-columns.tsx
+#: src/components/routes/system/info-bar.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "CPU"
@@ -790,7 +832,6 @@ msgstr "累計寫入"
 
 #. Current package version
 #: src/components/routes/system/package-updates-table.tsx
-#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Current"
 msgstr "目前"
 
@@ -802,9 +843,11 @@ msgid "Current state"
 msgstr "目前狀態"
 
 #: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Curve running"
 msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Curve stopped"
 msgstr ""
@@ -838,6 +881,7 @@ msgstr "預設時間段"
 
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
+#: src/components/routes/settings/notifications.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/systems-table/systems-table-columns.tsx
@@ -870,6 +914,7 @@ msgid "Discharging"
 msgstr "放電中"
 
 #: src/components/routes/system.tsx
+#: src/components/routes/system/info-bar.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Disk"
 msgstr "磁碟"
@@ -918,10 +963,10 @@ msgstr "Docker 網絡 I/O"
 msgid "Documentation"
 msgstr "文件"
 
-#. Context: System is down
 #: src/components/alerts-history-columns.tsx
-#: src/components/routes/system/info-bar.tsx
+#: src/components/system-status.tsx
 #: src/components/systems-table/systems-table-columns.tsx
+#: src/components/systems-table/systems-table.tsx
 #: src/lib/alerts.ts
 msgid "Down"
 msgstr "中斷"
@@ -938,6 +983,8 @@ msgstr "下載"
 msgid "Duration"
 msgstr "持續時間"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Duty"
 msgstr ""
@@ -1040,6 +1087,10 @@ msgstr ""
 msgid "Error"
 msgstr "錯誤"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Every value beyond the preview card. A reading the agent did not report is absent, not zero."
+msgstr "預覽卡以外的每個值。代理程式未上報的讀數會顯示為缺失，而非零。"
+
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Example:"
 msgstr "範例："
@@ -1083,6 +1134,10 @@ msgstr "匯出設定"
 msgid "Export your current systems configuration."
 msgstr "匯出您現在的系統設定。"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Extended metrics"
+msgstr "擴展指標"
+
 #: src/components/routes/settings/general.tsx
 msgid "Fahrenheit (°F)"
 msgstr "華氏 (°F)"
@@ -1103,6 +1158,10 @@ msgstr "認證失敗"
 msgid "Failed to delete monitors."
 msgstr "刪除監控失敗。"
 
+#: src/components/routes/settings/quiet-hours.tsx
+msgid "Failed to delete quiet hours."
+msgstr "刪除靜默時段失敗。"
+
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Failed to load logs."
@@ -1111,6 +1170,10 @@ msgstr "無法載入日誌。"
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Failed to load package updates"
 msgstr "無法載入軟件包更新"
+
+#: src/components/systems-table/systems-table.tsx
+msgid "Failed to load systems."
+msgstr "載入系統失敗。"
 
 #: src/components/routes/settings/layout.tsx
 #: src/components/routes/settings/notifications.tsx
@@ -1161,6 +1224,7 @@ msgstr "風扇"
 
 #: src/components/containers-table/containers-table.tsx
 #: src/components/network-monitors-table/network-monitors-table.tsx
+#: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/system/chart-card.tsx
 #: src/components/routes/system/package-updates-table.tsx
@@ -1214,6 +1278,10 @@ msgstr ""
 msgid "Full"
 msgstr "滿電"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Full-speed backstop: the firmware carries this value, so it is fixed here."
+msgstr "全速後備：韌體已內建此值，因此在此固定。"
+
 #: src/components/containers-table/containers-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Fullscreen"
@@ -1228,6 +1296,22 @@ msgstr "一般"
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Global"
 msgstr "全域"
+
+#: src/components/routes/settings/alerts-history-data-table.tsx
+msgid "Go to first page"
+msgstr "前往第一頁"
+
+#: src/components/routes/settings/alerts-history-data-table.tsx
+msgid "Go to last page"
+msgstr "前往最後一頁"
+
+#: src/components/routes/settings/alerts-history-data-table.tsx
+msgid "Go to next page"
+msgstr "前往下一頁"
+
+#: src/components/routes/settings/alerts-history-data-table.tsx
+msgid "Go to previous page"
+msgstr "前往上一頁"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Governor"
@@ -1275,6 +1359,10 @@ msgstr "Heartbeat 發送成功"
 msgid "Hide timestamps"
 msgstr "隱藏時間戳記"
 
+#: src/components/navbar.tsx
+msgid "Home"
+msgstr "首頁"
+
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgctxt "Button to copy install command"
@@ -1313,6 +1401,7 @@ msgid "I/O Utilization"
 msgstr "I/O 利用率"
 
 #. Context: Battery state
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/lib/i18n.ts
 msgid "Idle"
 msgstr "閒置"
@@ -1333,6 +1422,7 @@ msgid "Image update available"
 msgstr "有可用的鏡像更新"
 
 #: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "In force"
 msgstr ""
 
@@ -1343,6 +1433,10 @@ msgstr ""
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Inactive"
 msgstr "未啟用"
+
+#: src/components/systems-table/systems-table.tsx
+msgid "Install the agent on a machine to start monitoring it here."
+msgstr "在機器上安裝代理程式後，即可在此開始監控。"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Intel DPTF sensors. A zone the collector could not read is left out rather than shown as zero."
@@ -1414,8 +1508,13 @@ msgstr "載入狀態"
 
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Loading..."
 msgstr "載入中..."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Locked"
+msgstr "已鎖定"
 
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
@@ -1464,6 +1563,10 @@ msgstr "主要"
 #: src/components/routes/settings/layout.tsx
 msgid "Manage display and notification preferences."
 msgstr "管理顯示和通知偏好。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Manual"
+msgstr "手動"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
@@ -1520,6 +1623,8 @@ msgstr "1 小時最小"
 msgid "Minor"
 msgstr "次要"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Mode"
 msgstr ""
@@ -1558,6 +1663,7 @@ msgid "Net"
 msgstr "網絡"
 
 #: src/components/routes/system.tsx
+#: src/components/routes/system/info-bar.tsx
 msgid "Network"
 msgstr "網絡"
 
@@ -1571,6 +1677,7 @@ msgid "Network Monitor Loss"
 msgstr "網絡監控封包遺失"
 
 #: src/components/command-palette.tsx
+#: src/components/navbar.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
@@ -1602,9 +1709,17 @@ msgstr "網路單位"
 msgid "No"
 msgstr "否"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "No curve on record."
+msgstr "沒有曲線記錄。"
+
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "No detail data for this pool."
 msgstr "此 pool 沒有可用的詳細資料。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "No fan state is on record."
+msgstr "沒有風扇狀態記錄。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "No hand-set duty is on record. One set before an agent restarted would still be driving the fan, and this panel cannot see it."
@@ -1693,9 +1808,11 @@ msgid "One-time"
 msgstr "一次性"
 
 #: src/components/login/auth-form.tsx
+#: src/components/login/otp-forms.tsx
 msgid "One-time password"
 msgstr "一次性密碼"
 
+#: src/components/navbar.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
@@ -1713,6 +1830,10 @@ msgstr "選填。預設為 Agent 的系統解析器。"
 #: src/components/login/auth-form.tsx
 msgid "Or continue with"
 msgstr "或繼續使用"
+
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "OS"
+msgstr "作業系統"
 
 #. Package version
 #: src/components/routes/system/cpu-sheet.tsx
@@ -1733,15 +1854,15 @@ msgstr "覆蓋現有警報"
 msgid "P-State"
 msgstr ""
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgctxt "CPU package"
-msgid "Package"
-msgstr ""
-
 #. Software package
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Package"
 msgstr "軟件包"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgctxt "CPU package"
+msgid "Package"
+msgstr ""
 
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Package Updates"
@@ -1772,7 +1893,6 @@ msgid "Pages / Settings"
 msgstr "頁面 / 設定"
 
 #: src/components/login/auth-form.tsx
-#: src/components/login/auth-form.tsx
 msgid "Password"
 msgstr "密碼"
 
@@ -1788,6 +1908,10 @@ msgstr "密碼必須少於 72 個字節。"
 msgid "Password reset request received"
 msgstr "已收到密碼重設請求"
 
+#: src/components/login/auth-form.tsx
+msgid "Passwords must match"
+msgstr "兩次輸入的密碼不一致"
+
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Past"
 msgstr "過去"
@@ -1802,7 +1926,9 @@ msgstr "修補"
 msgid "Pause"
 msgstr "暫停"
 
+#: src/components/system-status.tsx
 #: src/components/systems-table/systems-table-columns.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Paused"
 msgstr "已暫停"
 
@@ -1813,6 +1939,11 @@ msgstr "已暫停 ({pausedSystemsLength})"
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Payload format"
 msgstr "負載 (Payload) 格式"
+
+#. Context: System status is pending its first connection
+#: src/components/system-status.tsx
+msgid "Pending"
+msgstr "等待中"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Per core, named by cpu number, plus the active tuning policy"
@@ -1995,7 +2126,12 @@ msgstr "讀取"
 msgid "Read errors"
 msgstr "讀取錯誤"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Reading the fan state…"
+msgstr "正在讀取風扇狀態…"
+
 #: src/components/routes/system/charts/network-charts.tsx
+#: src/components/routes/system/info-bar.tsx
 msgid "Received"
 msgstr "接收"
 
@@ -2062,10 +2198,24 @@ msgstr "重啟次數"
 msgid "Resume"
 msgstr "恢復"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/systems-table/systems-table.tsx
+msgid "Retry"
+msgstr "重試"
+
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Retry since previous sample"
 msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Return to the curve"
 msgstr ""
@@ -2074,6 +2224,10 @@ msgstr ""
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Revision"
 msgstr "修訂"
+
+#: src/components/routes/system/info-bar.tsx
+msgid "Root"
+msgstr ""
 
 #: src/components/routes/system/charts/disk-charts.tsx
 #: src/components/routes/system/charts/disk-charts.tsx
@@ -2137,6 +2291,7 @@ msgid "Schedule quiet hours where notifications will not be sent."
 msgstr "安排不會發送通知的靜音時段。"
 
 #: src/components/navbar.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Search"
 msgstr "搜索"
 
@@ -2155,6 +2310,10 @@ msgstr "搜尋目標"
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Seconds between pings (default: 60)"
 msgstr "Ping 之間的秒數 (預設：60)"
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Sections"
+msgstr "分區"
 
 #. Security update
 #: src/components/routes/system/package-updates-table.tsx
@@ -2180,6 +2339,7 @@ msgstr "選擇系統"
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "Select all"
 msgstr "全選"
 
@@ -2187,7 +2347,12 @@ msgstr "全選"
 msgid "Select matches"
 msgstr "選擇符合項目"
 
+#: src/components/routes/settings/sidebar-nav.tsx
+msgid "Select page"
+msgstr "選擇頁面"
+
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "Select row"
 msgstr "選擇列"
 
@@ -2212,6 +2377,7 @@ msgid "Send test heartbeat"
 msgstr "發送測試 heartbeat"
 
 #: src/components/routes/system/charts/network-charts.tsx
+#: src/components/routes/system/info-bar.tsx
 msgid "Sent"
 msgstr "發送"
 
@@ -2240,11 +2406,17 @@ msgstr "在您的 Beszel hub 上設置以下環境變數以啟用 heartbeat 監�
 #: src/components/command-palette.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
+#: src/components/navbar.tsx
 #: src/components/routes/settings/layout.tsx
 #: src/components/routes/settings/layout.tsx
+#: src/components/routes/settings/sidebar-nav.tsx
 #: src/components/routes/system/info-bar.tsx
 msgid "Settings"
 msgstr "設置"
+
+#: src/components/routes/settings/sidebar-nav.tsx
+msgid "Settings navigation"
+msgstr "設定導覽"
 
 #: src/components/routes/settings/layout.tsx
 msgid "Settings saved"
@@ -2267,6 +2439,10 @@ msgstr ""
 msgid "Signal strength of connected Wi-Fi interfaces"
 msgstr "已連線 Wi-Fi 介面的訊號強度"
 
+#: src/main.tsx
+msgid "Skip to content"
+msgstr "跳至主要內容"
+
 #: src/components/routes/system/plus-sheet.tsx
 msgid "SMART log. A field the drive omits reads as unknown, not as zero."
 msgstr ""
@@ -2284,6 +2460,11 @@ msgstr "排序依據"
 msgid "stale"
 msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Stale"
+msgstr "資料過期"
+
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Start Time"
@@ -2300,6 +2481,7 @@ msgstr "狀態"
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
+#: src/components/systems-table/systems-table-columns.tsx
 #: src/components/systems-table/systems-table.tsx
 #: src/lib/alerts.ts
 msgid "Status"
@@ -2370,14 +2552,21 @@ msgid "Tabs"
 msgstr "分頁"
 
 #: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Take manual control"
 msgstr ""
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Target"
 msgstr "目標"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Target duty"
+msgstr "目標佔空比"
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
@@ -2395,6 +2584,8 @@ msgid "Temp"
 msgstr "溫度"
 
 #: src/components/routes/system/charts/sensor-charts.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-sheet.tsx
 #: src/components/routes/system/plus-sheet.tsx
 #: src/lib/alerts.ts
@@ -2458,6 +2649,10 @@ msgid "The curve failed validation and was rejected before anything was written.
 msgstr ""
 
 #: src/components/routes/system/plus-fan-tab.tsx
+msgid "The daemon picks the curve up on its next restart."
+msgstr "常駐程式會在下次重新啟動時載入該曲線。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "the edited curve"
 msgstr ""
 
@@ -2468,6 +2663,18 @@ msgstr ""
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The fan is not holding the duty that was requested; the old one was put back."
 msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The fan state could not be read."
+msgstr "無法讀取風扇狀態。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The fan state could not be refreshed. Showing the last reading."
+msgstr "無法重新整理風扇狀態，顯示上次讀數。"
+
+#: src/components/systems-table/systems-table.tsx
+msgid "The hub could not be reached. Check the connection and try again."
+msgstr "無法連線至 Hub，請檢查連線後再試。"
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
@@ -2482,9 +2689,14 @@ msgid "The package temperature could not be read, so no duty was written and the
 msgstr ""
 
 #: src/components/routes/system/plus-fan-tab.tsx
+msgid "The package temperature could not be read."
+msgstr "無法讀取封裝溫度。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "The previous duty could not be restored: the fan is holding one you did not ask for."
 msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The request never reached the server."
 msgstr ""
@@ -2565,6 +2777,7 @@ msgstr "令牌允許代理程式連接和註冊。指紋是每個系統唯一的
 msgid "Tokens and fingerprints are used to authenticate WebSocket connections to the hub."
 msgstr "令牌和指紋用於驗證到中心的WebSocket連接。"
 
+#: src/components/routes/system/info-bar.tsx
 #: src/components/ui/chart.tsx
 #: src/components/ui/chart.tsx
 msgid "Total"
@@ -2673,6 +2886,12 @@ msgstr "當任何磁碟的使用超過閾值時觸發"
 msgid "Type"
 msgstr "類型"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Unavailable"
+msgstr "無法使用"
+
 #: src/lib/alerts.ts
 msgid "Unhealthy"
 msgstr "不健康"
@@ -2687,6 +2906,7 @@ msgid "Unit preferences"
 msgstr "單位偏好"
 
 #: src/components/command-palette.tsx
+#: src/components/routes/settings/tokens-fingerprints.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Universal token"
 msgstr "通用令牌"
@@ -2707,9 +2927,13 @@ msgstr "無限制"
 msgid "Unsafe Shutdowns"
 msgstr ""
 
-#. Context: System is up
-#: src/components/routes/system/info-bar.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Unsaved changes"
+msgstr "未儲存的變更"
+
+#: src/components/system-status.tsx
 #: src/components/systems-table/systems-table-columns.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Up"
 msgstr "上線"
 
@@ -2729,9 +2953,13 @@ msgstr "更新"
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/system/info-bar.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/routes/system/storage-pools-table.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
+#: src/components/systems-table/systems-table-columns.tsx
 msgid "Updated"
 msgstr "已更新"
 
@@ -2775,6 +3003,10 @@ msgstr "Pool {displayName} 的使用量"
 msgid "Used"
 msgstr "已用"
 
+#: src/components/navbar.tsx
+msgid "User actions"
+msgstr "使用者操作"
+
 #: src/components/command-palette.tsx
 #: src/components/navbar.tsx
 msgid "Users"
@@ -2805,6 +3037,7 @@ msgstr "檢視詳情"
 #: src/components/routes/system/cpu-sheet.tsx
 #: src/components/routes/system/disk-io-sheet.tsx
 #: src/components/routes/system/network-sheet.tsx
+#: src/components/routes/system/plus-sheet.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "View more"
 msgstr "查看更多"
@@ -2841,6 +3074,10 @@ msgstr "警告閾值"
 #: src/components/routes/settings/notifications.tsx
 msgid "Webhook / Push notifications"
 msgstr "Webhook / 推送通知"
+
+#: src/components/routes/settings/notifications.tsx
+msgid "Webhook URL"
+msgstr "Webhook 網址"
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "When enabled, this token allows agents to self-register without prior system creation."
@@ -2880,13 +3117,15 @@ msgid "Write errors"
 msgstr "寫入錯誤"
 
 #: src/components/routes/system/plus-fan-tab.tsx
-msgid "Write this curve"
-msgstr ""
+#~ msgid "Write this curve"
+#~ msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Write this curve to the disk"
 msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Write this duty to the firmware"
 msgstr ""
@@ -2900,6 +3139,7 @@ msgid "YAML Config"
 msgstr "YAML配置"
 
 #: src/components/routes/settings/config-yaml.tsx
+#: src/components/routes/settings/config-yaml.tsx
 msgid "YAML Configuration"
 msgstr "YAML配置"
 
@@ -2912,3 +3152,19 @@ msgstr "是"
 #: src/components/routes/settings/layout.tsx
 msgid "Your user settings have been updated."
 msgstr "您的用戶設置已更新。"
+
+#: src/components/routes/settings/tokens-fingerprints.tsx
+msgid "Copy token"
+msgstr "複製權杖"
+
+#: src/components/routes/settings/tokens-fingerprints.tsx
+msgid "Hide token"
+msgstr "隱藏權杖"
+
+#: src/components/routes/settings/tokens-fingerprints.tsx
+msgid "Reveal token"
+msgstr "顯示權杖"
+
+#: src/components/routes/settings/tokens-fingerprints.tsx
+msgid "Token hidden"
+msgstr "權杖已隱藏"

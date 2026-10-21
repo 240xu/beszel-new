@@ -114,6 +114,10 @@ type Deps struct {
 	SetLevel  func(int) error
 	GetLevel  func() (int, error)
 	PfandUp   func() bool
+	// ResolveDutySet reports the duties this machine can actually write
+	// (profile ∩ firmware). The emergency duty must be one of them: the thermal
+	// floor writes E through SetLevel, which refuses anything outside the set.
+	ResolveDutySet func() (plus.DutySet, error)
 
 	ReadCurveBytes  func() ([]byte, error)
 	WriteCurveBytes func([]byte) error
@@ -285,6 +289,19 @@ func (g *Guard) writeCurveLocked(c *plus.Curve, req Request, now time.Time) (Res
 	}
 	if err := c.Validate(); err != nil {
 		return Result{}, fmt.Errorf("%w: %v", ErrCurveRejected, err)
+	}
+	// Validate() is machine-independent. The emergency duty is written through
+	// SetLevel, which refuses a duty outside the resolved profile ∩ firmware set;
+	// accepting one here would store a curve whose emergency write can never land
+	// and whose failures latch the breaker. Refuse it at the same boundary.
+	if g.d.ResolveDutySet != nil {
+		set, err := g.d.ResolveDutySet()
+		if err != nil {
+			return Result{}, fmt.Errorf("%w: cannot resolve the writable duty set: %v", ErrCurveRejected, err)
+		}
+		if err := plus.ValidateDuty(c.E, set); err != nil {
+			return Result{}, fmt.Errorf("%w: emergency duty: %v", ErrCurveRejected, err)
+		}
 	}
 	// Admission past the guards, as in setLevelLocked.
 	if err := g.admit(now); err != nil {

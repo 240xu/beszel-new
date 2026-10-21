@@ -94,8 +94,8 @@ export const alertsHistoryColumns: ColumnDef<AlertsHistoryRecord>[] = [
 					className={cn(
 						"capitalize pointer-events-none",
 						resolved
-							? "bg-green-100 text-green-800 border-green-200 dark:opacity-80"
-							: "bg-yellow-100 text-yellow-800 border-yellow-200"
+							? "bg-success-muted text-success-text border-success/30"
+							: "bg-warning-muted text-warning-text border-warning/30"
 					)}
 				>
 					{/* {resolved ? <CircleCheckIcon className="size-3 me-0.5" /> : <CircleAlertIcon className="size-3 me-0.5" />} */}

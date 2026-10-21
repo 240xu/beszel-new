@@ -1,10 +1,9 @@
 import { t } from "@lingui/core/macro"
 import { MoreHorizontalIcon } from "lucide-react"
-import { memo, useRef, useState } from "react"
+import { memo, useRef, useState, type ReactNode } from "react"
 import ChartTimeSelect from "@/components/charts/chart-time-select"
 import { Button } from "@/components/ui/button"
-import { DialogTitle } from "@/components/ui/dialog"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
 	cpufreqRows,
@@ -144,101 +143,109 @@ const PlusSheet = memo(function PlusSheet({ chartData, grid }: { chartData: Char
 	const netall = netRows(records)
 	const steps = hasOpened.current ? fanStepRows(records) : []
 
+	const sections: Array<{ id: string; title: string; description: string; body: ReactNode }> = []
+	if (dptf.length > 0) {
+		sections.push({
+			id: "plus-thermal-zones",
+			title: t`Thermal Zones`,
+			description: t`Intel DPTF sensors. A zone the collector could not read is left out rather than shown as zero.`,
+			body: <MetricGrid rows={dptf} />,
+		})
+	}
+	if (cpufreq.length > 0) {
+		sections.push({
+			id: "plus-cpu-frequency",
+			title: t`CPU Frequency`,
+			description: t`Per core, named by cpu number, plus the active tuning policy`,
+			body: <MetricGrid rows={cpufreq} />,
+		})
+	}
+	if (nvme.length > 0) {
+		sections.push({
+			id: "plus-nvme-health",
+			title: t`NVMe Health`,
+			description: t`SMART log. A field the drive omits reads as unknown, not as zero.`,
+			body: <MetricGrid rows={nvme} />,
+		})
+	}
+	if (wifi.length > 0) {
+		sections.push({
+			id: "plus-wifi",
+			title: t`WiFi`,
+			description: t`Radio link. Retry is a difference between two samples, not a counter reading.`,
+			body: <MetricGrid rows={wifi} />,
+		})
+	}
+	if (netall.length > 0) {
+		sections.push({
+			id: "plus-all-interfaces",
+			title: t`All Interfaces`,
+			description: t`Cumulative counters, including veth pairs and docker bridges`,
+			body: <MetricGrid rows={netall} />,
+		})
+	}
+	if (fan.length > 0) {
+		sections.push({
+			id: "plus-fan",
+			title: t`Fan`,
+			description: t`Duty programmed, duty applied and package temperature.`,
+			body: <MetricGrid rows={fan} />,
+		})
+	}
+	if (steps.length > 0) {
+		sections.push({
+			id: "plus-firmware-fan-table",
+			title: t`Firmware Fan Table`,
+			description: t`The steps the firmware itself publishes. Power is the duty scaled by a fixed constant.`,
+			body: <FanStepTable rows={steps} />,
+		})
+	}
+
 	return (
 		<Sheet open={open} onOpenChange={setOpen}>
-			<DialogTitle className="sr-only">{t`beszel-new`}</DialogTitle>
 			<SheetTrigger asChild>
-				<Button title={t`View more`} variant="outline" size="icon" className="shrink-0">
+				<Button title={t`View more`} aria-label={t`View more`} variant="outline" size="icon" className="shrink-0">
 					<MoreHorizontalIcon />
 				</Button>
 			</SheetTrigger>
 			{hasOpened.current && (
-				<SheetContent aria-describedby={undefined} className="overflow-auto w-200 !max-w-full p-4 sm:p-6">
+				<SheetContent className="h-full w-full overflow-y-auto bg-popover p-4 shadow-xl sm:max-w-3xl sm:p-6">
+					<SheetHeader className="gap-1 p-0 pe-10 text-start">
+						<SheetTitle className="text-xl">{t`Extended metrics`}</SheetTitle>
+						<SheetDescription>
+							{t`Every value beyond the preview card. A reading the agent did not report is absent, not zero.`}
+						</SheetDescription>
+					</SheetHeader>
+
 					<ChartTimeSelect className="w-[calc(100%-2em)] bg-card" agentVersion={chartData.agentVersion} />
 
-					{dptf.length > 0 && (
-						<ChartCard
-							key="plus-dptf"
-							grid={grid}
-							className="min-h-auto"
-							title={t`Thermal Zones`}
-							description={t`Intel DPTF sensors. A zone the collector could not read is left out rather than shown as zero.`}
-						>
-							<MetricGrid rows={dptf} />
-						</ChartCard>
-					)}
+					<nav aria-label={t`Sections`} className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+						{sections.map((section) => (
+							<a
+								key={section.id}
+								href={`#${section.id}`}
+								className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+							>
+								{section.title}
+							</a>
+						))}
+					</nav>
 
-					{cpufreq.length > 0 && (
-						<ChartCard
-							key="plus-cpufreq"
-							grid={grid}
-							className="min-h-auto"
-							title={t`CPU Frequency`}
-							description={t`Per core, named by cpu number, plus the active tuning policy`}
-						>
-							<MetricGrid rows={cpufreq} />
-						</ChartCard>
-					)}
-
-					{nvme.length > 0 && (
-						<ChartCard
-							key="plus-nvme"
-							grid={grid}
-							className="min-h-auto"
-							title={t`NVMe Health`}
-							description={t`SMART log. A field the drive omits reads as unknown, not as zero.`}
-						>
-							<MetricGrid rows={nvme} />
-						</ChartCard>
-					)}
-
-					{wifi.length > 0 && (
-						<ChartCard
-							key="plus-wifi"
-							grid={grid}
-							className="min-h-auto"
-							title={t`WiFi`}
-							description={t`Radio link. Retry is a difference between two samples, not a counter reading.`}
-						>
-							<MetricGrid rows={wifi} />
-						</ChartCard>
-					)}
-
-					{netall.length > 0 && (
-						<ChartCard
-							key="plus-netall"
-							grid={grid}
-							className="min-h-auto"
-							title={t`All Interfaces`}
-							description={t`Cumulative counters, including veth pairs and docker bridges`}
-						>
-							<MetricGrid rows={netall} />
-						</ChartCard>
-					)}
-
-					{fan.length > 0 && (
-						<ChartCard
-							key="plus-fan"
-							grid={grid}
-							className="min-h-auto"
-							title={t`Fan`}
-							description={t`Duty programmed, duty applied and package temperature.`}
-						>
-							<MetricGrid rows={fan} />
-						</ChartCard>
-					)}
-
-					{steps.length > 0 && (
-						<ChartCard
-							key="plus-fan-steps"
-							grid={grid}
-							className="min-h-auto"
-							title={t`Firmware Fan Table`}
-							description={t`The steps the firmware itself publishes. Power is the duty scaled by a fixed constant.`}
-						>
-							<FanStepTable rows={steps} />
-						</ChartCard>
-					)}
+					<div className="space-y-4">
+						{sections.map((section) => (
+							<section key={section.id} id={section.id} className="scroll-mt-4">
+								<ChartCard
+									grid={grid}
+									autoHeight
+									title={section.title}
+									description={section.description}
+									className="border-0 bg-muted/30 shadow-none"
+								>
+									{section.body}
+								</ChartCard>
+							</section>
+						))}
+					</div>
 				</SheetContent>
 			)}
 		</Sheet>
@@ -259,7 +266,7 @@ export function PlusChart({ chartData, grid }: { chartData: ChartData; grid: boo
 	return (
 		<ChartCard
 			grid={grid}
-			className="min-h-auto"
+			autoHeight
 			title={t`beszel-new`}
 			description={t`Thermal zones, per core frequency, NVMe health, WiFi and fan`}
 			cornerEl={<PlusSheet chartData={chartData} grid={grid} />}

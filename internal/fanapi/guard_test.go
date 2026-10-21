@@ -67,6 +67,9 @@ type fixture struct {
 
 	pfand bool
 
+	// duties is the resolved writable duty set; nil means the fixture default.
+	duties []int
+
 	curveBytes []byte
 	curveErr   error
 	writeErr   error
@@ -109,6 +112,12 @@ func newFixture(t *testing.T) *fixture {
 		SetLevel: f.setLevel,
 		GetLevel: f.getLevel,
 		PfandUp:  func() bool { return f.pfand },
+		ResolveDutySet: func() (plus.DutySet, error) {
+			if f.duties != nil {
+				return plus.DutySetFrom(f.duties), nil
+			}
+			return plus.DutySetFrom([]int{0, 25, 50, 60, 70, 80, 85, 90, 95, 100}), nil
+		},
 		ReadCurveBytes: func() ([]byte, error) {
 			if f.curveErr != nil {
 				return nil, f.curveErr

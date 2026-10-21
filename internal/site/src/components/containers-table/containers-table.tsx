@@ -189,7 +189,7 @@ export default function ContainersTable({ systemId }: { systemId?: string }) {
 								variant="ghost"
 								size="icon"
 								aria-label={t`Clear`}
-								className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
+								className="absolute end-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
 								onClick={() => setGlobalFilter("")}
 							>
 								<XIcon className="h-4 w-4" />
@@ -239,7 +239,7 @@ const AllContainersTable = memo(function AllContainersTable({
 	return (
 		<div
 			className={cn(
-				"h-min max-h-[calc(100dvh-17rem)] max-w-full relative overflow-auto border rounded-md",
+				"relative grid max-h-[70svh] min-h-0 max-w-full overflow-auto border rounded-md",
 				// don't set min height if there are less than 2 rows, do set if we need to display the empty state
 				(!rows.length || rows.length > 2) && "min-h-50"
 			)}
@@ -516,7 +516,7 @@ function InfoFullscreenDialog({
 }) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="w-[calc(100vw-20px)] h-[calc(100dvh-20px)] max-w-none p-0 bg-gh-dark border-0 text-white">
+			<DialogContent className="w-[calc(100vw-20px)] h-[calc(100svh-20px)] max-w-none p-0 bg-gh-dark border-0 text-white">
 				<DialogTitle className="sr-only">{containerName} info</DialogTitle>
 				<div className="flex-1 overflow-auto">
 					<div className="h-full w-full overflow-auto p-3 rounded-md bg-gh-dark text-sm leading-relaxed">

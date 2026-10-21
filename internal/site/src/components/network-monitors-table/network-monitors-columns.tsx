@@ -37,7 +37,7 @@ import { formatBulkMonitorLine } from "@/components/network-monitors-table/monit
 import { Badge } from "../ui/badge"
 import { getCertDaysLeft, getCertExpiryLevel, getMonitorTarget } from "@/lib/network-monitor-utils"
 
-const certExpiryDotColors = { ok: "bg-green-500", warning: "bg-yellow-500", critical: "bg-red-500" }
+const certExpiryDotColors = { ok: "bg-success", warning: "bg-warning", critical: "bg-destructive" }
 
 declare module "@tanstack/react-table" {
 	interface ColumnMeta<TData, TValue> {
@@ -46,17 +46,17 @@ declare module "@tanstack/react-table" {
 }
 
 const protocolColors: Record<string, string> = {
-	icmp: "bg-blue-500/15! text-blue-600 dark:text-blue-400",
+	icmp: "bg-info-muted text-info-text",
 	tcp: "bg-purple-500/15! text-purple-600 dark:text-purple-400",
-	http: "bg-green-500/15! text-green-700 dark:text-green-400",
+	http: "bg-success-muted text-success-text",
 	dns: "bg-amber-500/15! text-amber-600 dark:text-amber-400",
 }
 
 const SYSTEM_STATUS_COLORS = {
-	[SystemStatus.Up]: "bg-green-500",
-	[SystemStatus.Down]: "bg-red-500",
+	[SystemStatus.Up]: "bg-success",
+	[SystemStatus.Down]: "bg-destructive",
 	[SystemStatus.Paused]: "bg-primary/40",
-	[SystemStatus.Pending]: "bg-yellow-500",
+	[SystemStatus.Pending]: "bg-warning",
 } as const
 
 /**
@@ -149,13 +149,13 @@ export function getMonitorColumns(
 				const monitor = row.original
 				const { status } = useStore($allSystemsById)[monitor.system] || {}
 
-				let color = "bg-green-500"
+				let color = "bg-success"
 				if (!monitor.enabled || status === SystemStatus.Paused) {
 					color = "bg-primary/40"
 				} else if (status === SystemStatus.Down || status === SystemStatus.Pending) {
-					color = "bg-yellow-500"
+					color = "bg-warning"
 				} else if (monitor.updated && !monitor.res) {
-					color = "bg-red-500"
+					color = "bg-destructive"
 				}
 				return (
 					<div className="ms-1.5 max-w-64 flex gap-2 items-center tabular-nums">
@@ -235,11 +235,11 @@ export function getMonitorColumns(
 				}
 
 				const muted = isMuted(row.original, systemRecord)
-				let color = "bg-green-500"
+				let color = "bg-success"
 				if (muted) {
 					color = "bg-muted-foreground/50"
 				} else if (loss1h) {
-					color = loss1h > 20 ? "bg-red-500" : "bg-yellow-500"
+					color = loss1h > 20 ? "bg-destructive" : "bg-warning"
 				}
 				return (
 					<span className="ms-1.5 tabular-nums flex gap-2 items-center">
@@ -383,14 +383,14 @@ function responseTimeCell(cell: CellContext<NetworkMonitorRecord, unknown>) {
 	}
 
 	const muted = isMuted(monitor, systemRecord)
-	let color = "bg-green-500"
+	let color = "bg-success"
 	if (muted) {
 		color = "bg-muted-foreground/50"
 	} else if (responseTime > responseTimeThresholds[monitor.protocol].warning) {
-		color = "bg-yellow-500"
+		color = "bg-warning"
 	}
 	if (!muted && responseTime > responseTimeThresholds[monitor.protocol].critical) {
-		color = "bg-red-500"
+		color = "bg-destructive"
 	}
 	return (
 		<span className="ms-1.5 tabular-nums flex gap-2 items-center">

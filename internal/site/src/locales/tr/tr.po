@@ -18,6 +18,36 @@ msgstr ""
 "X-Crowdin-File: /main/internal/site/src/locales/en/en.po\n"
 "X-Crowdin-File-ID: 32\n"
 
+
+#: src/components/token-value.tsx
+msgid "Agent token"
+msgstr ""
+
+
+#: src/components/token-value.tsx
+msgid "Copy token"
+msgstr ""
+
+
+#: src/components/token-value.tsx
+msgid "Hide token"
+msgstr ""
+
+
+#: src/components/token-value.tsx
+msgid "Reveal token"
+msgstr ""
+
+
+#: src/components/token-value.tsx
+msgid "Token hidden"
+msgstr ""
+
+#. placeholder {0}: data.length
+#: src/components/systems-table/systems-table.tsx
+msgid "{0, plural, one {# system} other {# systems}}"
+msgstr ""
+
 #. placeholder {0}: newVersion.v
 #: src/components/footer-repo-link.tsx
 msgctxt "New version available"
@@ -176,12 +206,18 @@ msgstr "{foo} ekle"
 #: src/components/add-system.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
+#: src/components/systems-table/systems-table.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Add System"
 msgstr "Sistem ekle"
 
 #: src/components/routes/settings/notifications.tsx
 msgid "Add URL"
 msgstr "URL Ekle"
+
+#: src/components/systems-table/systems-table.tsx
+msgid "Add your first system"
+msgstr ""
 
 #: src/components/routes/settings/general.tsx
 msgid "Adjust display options for charts."
@@ -245,6 +281,7 @@ msgstr "Tüm Sistemler"
 msgid "Also written unchanged:"
 msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Applied Duty"
 msgstr ""
@@ -258,19 +295,23 @@ msgstr "{name} silmek istediğinizden emin misiniz?"
 msgid "Are you sure?"
 msgstr "Emin misiniz?"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Auto"
+msgstr ""
+
 #: src/components/copy-to-clipboard.tsx
 msgid "Automatic copy requires a secure context."
 msgstr "Otomatik kopyalama güvenli bir bağlam gerektirir."
-
-#: src/components/routes/system/storage-pools-table.tsx
-msgctxt "Disk space available"
-msgid "Available"
-msgstr "Kullanılabilir"
 
 #. Package version available to install
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Available"
 msgstr "Mevcut"
+
+#: src/components/routes/system/storage-pools-table.tsx
+msgctxt "Disk space available"
+msgid "Available"
+msgstr "Kullanılabilir"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Available Spare"
@@ -383,7 +424,6 @@ msgstr "Beszel, OpenID Connect ve birçok OAuth2 kimlik doğrulama sağlayıcıs
 msgid "Beszel uses <0>Shoutrrr</0> to integrate with popular notification services."
 msgstr "Beszel, popüler bildirim hizmetleriyle entegre olmak için <0>Shoutrrr</0> kullanır."
 
-#: src/components/routes/system/plus-sheet.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "beszel-new"
 msgstr ""
@@ -559,8 +599,8 @@ msgid "Click on a pool to view vdev and dataset details."
 msgstr "Pool'a tıklayarak vdev ve dataset ayrıntılarını görüntüleyin."
 
 #: src/components/systems-table/systems-table.tsx
-msgid "Click on a system to view more information."
-msgstr "Daha fazla bilgi görmek için bir sisteme tıklayın."
+#~ msgid "Click on a system to view more information."
+#~ msgstr "Daha fazla bilgi görmek için bir sisteme tıklayın."
 
 #: src/components/ui/input-copy.tsx
 msgid "Click to copy"
@@ -592,7 +632,6 @@ msgid "Confirm"
 msgstr ""
 
 #: src/components/login/auth-form.tsx
-#: src/components/login/auth-form.tsx
 msgid "Confirm password"
 msgstr "Şifreyi onayla"
 
@@ -616,6 +655,7 @@ msgstr "Konteyner"
 msgid "Container Health"
 msgstr "Konteyner Sağlığı"
 
+#: src/components/navbar.tsx
 #: src/components/routes/system.tsx
 msgid "Containers"
 msgstr "Konteynerler"
@@ -674,6 +714,7 @@ msgid "Copy name"
 msgstr "Adı kopyala"
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
+#: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Copy public key"
 msgstr "Açık anahtarı kopyala"
 
@@ -699,6 +740,7 @@ msgid "Core"
 msgstr "Çekirdek"
 
 #: src/components/containers-table/containers-table-columns.tsx
+#: src/components/routes/system/info-bar.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "CPU"
@@ -790,7 +832,6 @@ msgstr "Toplam yazma"
 
 #. Current package version
 #: src/components/routes/system/package-updates-table.tsx
-#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Current"
 msgstr "Mevcut sürüm"
 
@@ -802,9 +843,11 @@ msgid "Current state"
 msgstr "Mevcut durum"
 
 #: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Curve running"
 msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Curve stopped"
 msgstr ""
@@ -838,6 +881,7 @@ msgstr "Varsayılan zaman dilimi"
 
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
+#: src/components/routes/settings/notifications.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/systems-table/systems-table-columns.tsx
@@ -870,6 +914,7 @@ msgid "Discharging"
 msgstr "Boşalıyor"
 
 #: src/components/routes/system.tsx
+#: src/components/routes/system/info-bar.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Disk"
 msgstr "Depolama alanı"
@@ -918,10 +963,10 @@ msgstr "Docker Ağ G/Ç"
 msgid "Documentation"
 msgstr "Dokümantasyon"
 
-#. Context: System is down
 #: src/components/alerts-history-columns.tsx
-#: src/components/routes/system/info-bar.tsx
+#: src/components/system-status.tsx
 #: src/components/systems-table/systems-table-columns.tsx
+#: src/components/systems-table/systems-table.tsx
 #: src/lib/alerts.ts
 msgid "Down"
 msgstr "Kapalı"
@@ -938,6 +983,8 @@ msgstr "İndir"
 msgid "Duration"
 msgstr "Süre"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Duty"
 msgstr ""
@@ -1040,6 +1087,10 @@ msgstr ""
 msgid "Error"
 msgstr "Hata"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Every value beyond the preview card. A reading the agent did not report is absent, not zero."
+msgstr ""
+
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Example:"
 msgstr "Örnek:"
@@ -1083,6 +1134,10 @@ msgstr "Yapılandırmayı dışa aktar"
 msgid "Export your current systems configuration."
 msgstr "Mevcut sistem yapılandırmanızı dışa aktarın."
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Extended metrics"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 msgid "Fahrenheit (°F)"
 msgstr "Fahrenhayt (°F)"
@@ -1103,6 +1158,10 @@ msgstr "Kimlik doğrulama başarısız"
 msgid "Failed to delete monitors."
 msgstr "Monitörler silinemedi."
 
+#: src/components/routes/settings/quiet-hours.tsx
+msgid "Failed to delete quiet hours."
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Failed to load logs."
@@ -1111,6 +1170,10 @@ msgstr "Günlükler yüklenemedi."
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Failed to load package updates"
 msgstr "Paket güncellemeleri yüklenemedi"
+
+#: src/components/systems-table/systems-table.tsx
+msgid "Failed to load systems."
+msgstr ""
 
 #: src/components/routes/settings/layout.tsx
 #: src/components/routes/settings/notifications.tsx
@@ -1161,6 +1224,7 @@ msgstr "Fanlar"
 
 #: src/components/containers-table/containers-table.tsx
 #: src/components/network-monitors-table/network-monitors-table.tsx
+#: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/system/chart-card.tsx
 #: src/components/routes/system/package-updates-table.tsx
@@ -1214,6 +1278,10 @@ msgstr ""
 msgid "Full"
 msgstr "Dolu"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Full-speed backstop: the firmware carries this value, so it is fixed here."
+msgstr ""
+
 #: src/components/containers-table/containers-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Fullscreen"
@@ -1228,6 +1296,22 @@ msgstr "Genel"
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Global"
 msgstr "Genel"
+
+#: src/components/routes/settings/alerts-history-data-table.tsx
+msgid "Go to first page"
+msgstr ""
+
+#: src/components/routes/settings/alerts-history-data-table.tsx
+msgid "Go to last page"
+msgstr ""
+
+#: src/components/routes/settings/alerts-history-data-table.tsx
+msgid "Go to next page"
+msgstr ""
+
+#: src/components/routes/settings/alerts-history-data-table.tsx
+msgid "Go to previous page"
+msgstr ""
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Governor"
@@ -1275,6 +1359,10 @@ msgstr "Heartbeat başarıyla gönderildi"
 msgid "Hide timestamps"
 msgstr "Zaman damgalarını gizle"
 
+#: src/components/navbar.tsx
+msgid "Home"
+msgstr ""
+
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgctxt "Button to copy install command"
@@ -1313,6 +1401,7 @@ msgid "I/O Utilization"
 msgstr "G/Ç Kullanımı"
 
 #. Context: Battery state
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/lib/i18n.ts
 msgid "Idle"
 msgstr "Boşta"
@@ -1333,6 +1422,7 @@ msgid "Image update available"
 msgstr "Görüntü güncellemesi mevcut"
 
 #: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "In force"
 msgstr ""
 
@@ -1343,6 +1433,10 @@ msgstr ""
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Inactive"
 msgstr "Pasif"
+
+#: src/components/systems-table/systems-table.tsx
+msgid "Install the agent on a machine to start monitoring it here."
+msgstr ""
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Intel DPTF sensors. A zone the collector could not read is left out rather than shown as zero."
@@ -1414,8 +1508,13 @@ msgstr "Yükleme durumu"
 
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Loading..."
 msgstr "Yükleniyor..."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Locked"
+msgstr ""
 
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
@@ -1464,6 +1563,10 @@ msgstr "Ana"
 #: src/components/routes/settings/layout.tsx
 msgid "Manage display and notification preferences."
 msgstr "Görüntüleme ve bildirim tercihlerini yönetin."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Manual"
+msgstr ""
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
@@ -1520,6 +1623,8 @@ msgstr "Min. 1 saat"
 msgid "Minor"
 msgstr "Ara"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Mode"
 msgstr ""
@@ -1558,6 +1663,7 @@ msgid "Net"
 msgstr "Ağ"
 
 #: src/components/routes/system.tsx
+#: src/components/routes/system/info-bar.tsx
 msgid "Network"
 msgstr "Ağ"
 
@@ -1571,6 +1677,7 @@ msgid "Network Monitor Loss"
 msgstr "Ağ monitörü kaybı"
 
 #: src/components/command-palette.tsx
+#: src/components/navbar.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
@@ -1602,9 +1709,17 @@ msgstr "Ağ birimi"
 msgid "No"
 msgstr "Hayır"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "No curve on record."
+msgstr ""
+
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "No detail data for this pool."
 msgstr "Bu pool için ayrıntılı veri mevcut değil."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "No fan state is on record."
+msgstr ""
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "No hand-set duty is on record. One set before an agent restarted would still be driving the fan, and this panel cannot see it."
@@ -1693,9 +1808,11 @@ msgid "One-time"
 msgstr "Bir seferlik"
 
 #: src/components/login/auth-form.tsx
+#: src/components/login/otp-forms.tsx
 msgid "One-time password"
 msgstr "Tek kullanımlık şifre"
 
+#: src/components/navbar.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
@@ -1713,6 +1830,10 @@ msgstr "İsteğe bağlı. Varsayılan olarak ajanın sistem çözümleyicisi kul
 #: src/components/login/auth-form.tsx
 msgid "Or continue with"
 msgstr "Veya devam et"
+
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "OS"
+msgstr ""
 
 #. Package version
 #: src/components/routes/system/cpu-sheet.tsx
@@ -1733,15 +1854,15 @@ msgstr "Mevcut uyarıların üzerine yaz"
 msgid "P-State"
 msgstr ""
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgctxt "CPU package"
-msgid "Package"
-msgstr ""
-
 #. Software package
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Package"
 msgstr "Paket"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgctxt "CPU package"
+msgid "Package"
+msgstr ""
 
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Package Updates"
@@ -1772,7 +1893,6 @@ msgid "Pages / Settings"
 msgstr "Sayfalar / Ayarlar"
 
 #: src/components/login/auth-form.tsx
-#: src/components/login/auth-form.tsx
 msgid "Password"
 msgstr "Şifre"
 
@@ -1788,6 +1908,10 @@ msgstr "Parola 72 bayttan küçük olmalıdır."
 msgid "Password reset request received"
 msgstr "Şifre sıfırlama isteği alındı"
 
+#: src/components/login/auth-form.tsx
+msgid "Passwords must match"
+msgstr ""
+
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Past"
 msgstr "Geçmiş"
@@ -1802,7 +1926,9 @@ msgstr "Yama"
 msgid "Pause"
 msgstr "Duraklat"
 
+#: src/components/system-status.tsx
 #: src/components/systems-table/systems-table-columns.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Paused"
 msgstr "Duraklatıldı"
 
@@ -1813,6 +1939,11 @@ msgstr "Duraklatıldı ({pausedSystemsLength})"
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Payload format"
 msgstr "Yük (Payload) formatı"
+
+#. Context: System status is pending its first connection
+#: src/components/system-status.tsx
+msgid "Pending"
+msgstr ""
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Per core, named by cpu number, plus the active tuning policy"
@@ -1995,7 +2126,12 @@ msgstr "Oku"
 msgid "Read errors"
 msgstr "Okuma hataları"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Reading the fan state…"
+msgstr ""
+
 #: src/components/routes/system/charts/network-charts.tsx
+#: src/components/routes/system/info-bar.tsx
 msgid "Received"
 msgstr "Alındı"
 
@@ -2062,10 +2198,24 @@ msgstr "Yeniden başlatmalar"
 msgid "Resume"
 msgstr "Devam et"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/systems-table/systems-table.tsx
+msgid "Retry"
+msgstr ""
+
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Retry since previous sample"
 msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Return to the curve"
 msgstr ""
@@ -2074,6 +2224,10 @@ msgstr ""
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Revision"
 msgstr "Revizyon"
+
+#: src/components/routes/system/info-bar.tsx
+msgid "Root"
+msgstr ""
 
 #: src/components/routes/system/charts/disk-charts.tsx
 #: src/components/routes/system/charts/disk-charts.tsx
@@ -2137,6 +2291,7 @@ msgid "Schedule quiet hours where notifications will not be sent."
 msgstr "Bildirimlerin gönderilmeyeceği sessiz saatleri zamanlayın."
 
 #: src/components/navbar.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Search"
 msgstr "Ara"
 
@@ -2155,6 +2310,10 @@ msgstr "Hedef ara"
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Seconds between pings (default: 60)"
 msgstr "Pingler arasındaki saniye (varsayılan: 60)"
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Sections"
+msgstr ""
 
 #. Security update
 #: src/components/routes/system/package-updates-table.tsx
@@ -2180,6 +2339,7 @@ msgstr "Bir sistem seçin"
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "Select all"
 msgstr "Tümünü seç"
 
@@ -2187,7 +2347,12 @@ msgstr "Tümünü seç"
 msgid "Select matches"
 msgstr "Eşleşmeleri seç"
 
+#: src/components/routes/settings/sidebar-nav.tsx
+msgid "Select page"
+msgstr ""
+
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "Select row"
 msgstr "Satırı seç"
 
@@ -2212,6 +2377,7 @@ msgid "Send test heartbeat"
 msgstr "Test heartbeat gönder"
 
 #: src/components/routes/system/charts/network-charts.tsx
+#: src/components/routes/system/info-bar.tsx
 msgid "Sent"
 msgstr "Gönderildi"
 
@@ -2240,11 +2406,17 @@ msgstr "Heartbeat izlemeyi etkinleştirmek için Beszel hub'ınızda aşağıdak
 #: src/components/command-palette.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
+#: src/components/navbar.tsx
 #: src/components/routes/settings/layout.tsx
 #: src/components/routes/settings/layout.tsx
+#: src/components/routes/settings/sidebar-nav.tsx
 #: src/components/routes/system/info-bar.tsx
 msgid "Settings"
 msgstr "Ayarlar"
+
+#: src/components/routes/settings/sidebar-nav.tsx
+msgid "Settings navigation"
+msgstr ""
 
 #: src/components/routes/settings/layout.tsx
 msgid "Settings saved"
@@ -2267,6 +2439,10 @@ msgstr ""
 msgid "Signal strength of connected Wi-Fi interfaces"
 msgstr "Bağlı Wi-Fi arayüzlerinin sinyal gücü"
 
+#: src/main.tsx
+msgid "Skip to content"
+msgstr ""
+
 #: src/components/routes/system/plus-sheet.tsx
 msgid "SMART log. A field the drive omits reads as unknown, not as zero."
 msgstr ""
@@ -2282,6 +2458,11 @@ msgstr "Sıralama Ölçütü"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "stale"
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Stale"
 msgstr ""
 
 #: src/components/routes/settings/quiet-hours.tsx
@@ -2300,6 +2481,7 @@ msgstr "Durum"
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
+#: src/components/systems-table/systems-table-columns.tsx
 #: src/components/systems-table/systems-table.tsx
 #: src/lib/alerts.ts
 msgid "Status"
@@ -2370,14 +2552,21 @@ msgid "Tabs"
 msgstr "Sekmeler"
 
 #: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Take manual control"
 msgstr ""
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Target"
 msgstr "Hedef"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Target duty"
+msgstr ""
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
@@ -2395,6 +2584,8 @@ msgid "Temp"
 msgstr "Sıc"
 
 #: src/components/routes/system/charts/sensor-charts.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-sheet.tsx
 #: src/components/routes/system/plus-sheet.tsx
 #: src/lib/alerts.ts
@@ -2458,6 +2649,10 @@ msgid "The curve failed validation and was rejected before anything was written.
 msgstr ""
 
 #: src/components/routes/system/plus-fan-tab.tsx
+msgid "The daemon picks the curve up on its next restart."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "the edited curve"
 msgstr ""
 
@@ -2467,6 +2662,18 @@ msgstr ""
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The fan is not holding the duty that was requested; the old one was put back."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The fan state could not be read."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The fan state could not be refreshed. Showing the last reading."
+msgstr ""
+
+#: src/components/systems-table/systems-table.tsx
+msgid "The hub could not be reached. Check the connection and try again."
 msgstr ""
 
 #: src/components/routes/settings/heartbeat.tsx
@@ -2482,9 +2689,14 @@ msgid "The package temperature could not be read, so no duty was written and the
 msgstr ""
 
 #: src/components/routes/system/plus-fan-tab.tsx
+msgid "The package temperature could not be read."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "The previous duty could not be restored: the fan is holding one you did not ask for."
 msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The request never reached the server."
 msgstr ""
@@ -2565,6 +2777,7 @@ msgstr "Token'lar agentların bağlanıp kaydolmasına izin verir. Parmak izleri
 msgid "Tokens and fingerprints are used to authenticate WebSocket connections to the hub."
 msgstr "Token'lar ve parmak izleri hub'a WebSocket bağlantılarını doğrulamak için kullanılır."
 
+#: src/components/routes/system/info-bar.tsx
 #: src/components/ui/chart.tsx
 #: src/components/ui/chart.tsx
 msgid "Total"
@@ -2673,6 +2886,12 @@ msgstr "Herhangi bir diskin kullanımı bir eşiği aştığında tetiklenir"
 msgid "Type"
 msgstr "Tür"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Unavailable"
+msgstr ""
+
 #: src/lib/alerts.ts
 msgid "Unhealthy"
 msgstr "Sağlıksız"
@@ -2687,6 +2906,7 @@ msgid "Unit preferences"
 msgstr "Birim tercihleri"
 
 #: src/components/command-palette.tsx
+#: src/components/routes/settings/tokens-fingerprints.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Universal token"
 msgstr "Evrensel token"
@@ -2707,9 +2927,13 @@ msgstr "Sınırsız"
 msgid "Unsafe Shutdowns"
 msgstr ""
 
-#. Context: System is up
-#: src/components/routes/system/info-bar.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Unsaved changes"
+msgstr ""
+
+#: src/components/system-status.tsx
 #: src/components/systems-table/systems-table-columns.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Up"
 msgstr "Açık"
 
@@ -2729,9 +2953,13 @@ msgstr "Güncelle"
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/system/info-bar.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/routes/system/storage-pools-table.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
+#: src/components/systems-table/systems-table-columns.tsx
 msgid "Updated"
 msgstr "Güncellendi"
 
@@ -2775,6 +3003,10 @@ msgstr "Depolama pool'u {displayName} kullanımı"
 msgid "Used"
 msgstr "Kullanıldı"
 
+#: src/components/navbar.tsx
+msgid "User actions"
+msgstr ""
+
 #: src/components/command-palette.tsx
 #: src/components/navbar.tsx
 msgid "Users"
@@ -2805,6 +3037,7 @@ msgstr "Ayrıntıları görüntüle"
 #: src/components/routes/system/cpu-sheet.tsx
 #: src/components/routes/system/disk-io-sheet.tsx
 #: src/components/routes/system/network-sheet.tsx
+#: src/components/routes/system/plus-sheet.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "View more"
 msgstr "Daha fazla göster"
@@ -2841,6 +3074,10 @@ msgstr "Uyarı eşikleri"
 #: src/components/routes/settings/notifications.tsx
 msgid "Webhook / Push notifications"
 msgstr "Webhook / Anlık bildirimler"
+
+#: src/components/routes/settings/notifications.tsx
+msgid "Webhook URL"
+msgstr ""
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "When enabled, this token allows agents to self-register without prior system creation."
@@ -2880,13 +3117,15 @@ msgid "Write errors"
 msgstr "Yazma hataları"
 
 #: src/components/routes/system/plus-fan-tab.tsx
-msgid "Write this curve"
-msgstr ""
+#~ msgid "Write this curve"
+#~ msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Write this curve to the disk"
 msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Write this duty to the firmware"
 msgstr ""
@@ -2899,6 +3138,7 @@ msgstr ""
 msgid "YAML Config"
 msgstr "YAML Yapılandırması"
 
+#: src/components/routes/settings/config-yaml.tsx
 #: src/components/routes/settings/config-yaml.tsx
 msgid "YAML Configuration"
 msgstr "YAML Yapılandırması"

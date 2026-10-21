@@ -18,6 +18,36 @@ msgstr ""
 "X-Crowdin-File: /main/internal/site/src/locales/en/en.po\n"
 "X-Crowdin-File-ID: 32\n"
 
+
+#: src/components/token-value.tsx
+msgid "Agent token"
+msgstr ""
+
+
+#: src/components/token-value.tsx
+msgid "Copy token"
+msgstr ""
+
+
+#: src/components/token-value.tsx
+msgid "Hide token"
+msgstr ""
+
+
+#: src/components/token-value.tsx
+msgid "Reveal token"
+msgstr ""
+
+
+#: src/components/token-value.tsx
+msgid "Token hidden"
+msgstr ""
+
+#. placeholder {0}: data.length
+#: src/components/systems-table/systems-table.tsx
+msgid "{0, plural, one {# system} other {# systems}}"
+msgstr ""
+
 #. placeholder {0}: newVersion.v
 #: src/components/footer-repo-link.tsx
 msgctxt "New version available"
@@ -176,12 +206,18 @@ msgstr "{foo}を追加"
 #: src/components/add-system.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
+#: src/components/systems-table/systems-table.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Add System"
 msgstr "システムを追加"
 
 #: src/components/routes/settings/notifications.tsx
 msgid "Add URL"
 msgstr "URLを追加"
+
+#: src/components/systems-table/systems-table.tsx
+msgid "Add your first system"
+msgstr ""
 
 #: src/components/routes/settings/general.tsx
 msgid "Adjust display options for charts."
@@ -245,6 +281,7 @@ msgstr "すべてのシステム"
 msgid "Also written unchanged:"
 msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Applied Duty"
 msgstr ""
@@ -258,17 +295,21 @@ msgstr "{name}を削除してもよろしいですか？"
 msgid "Are you sure?"
 msgstr "よろしいですか？"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Auto"
+msgstr ""
+
 #: src/components/copy-to-clipboard.tsx
 msgid "Automatic copy requires a secure context."
 msgstr "自動コピーには安全なコンテキストが必要です。"
 
-#: src/components/routes/system/storage-pools-table.tsx
-msgctxt "Disk space available"
+#. Package version available to install
+#: src/components/routes/system/package-updates-table.tsx
 msgid "Available"
 msgstr "利用可能"
 
-#. Package version available to install
-#: src/components/routes/system/package-updates-table.tsx
+#: src/components/routes/system/storage-pools-table.tsx
+msgctxt "Disk space available"
 msgid "Available"
 msgstr "利用可能"
 
@@ -383,7 +424,6 @@ msgstr "BeszelはOpenID Connectと多くのOAuth2認証プロバイダーをサ�
 msgid "Beszel uses <0>Shoutrrr</0> to integrate with popular notification services."
 msgstr "Beszelは<0>Shoutrrr</0>を使用して、人気のある通知サービスと統合します。"
 
-#: src/components/routes/system/plus-sheet.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "beszel-new"
 msgstr ""
@@ -559,8 +599,8 @@ msgid "Click on a pool to view vdev and dataset details."
 msgstr "プールをクリックして、vdev とデータセットの詳細を表示します。"
 
 #: src/components/systems-table/systems-table.tsx
-msgid "Click on a system to view more information."
-msgstr "システムをクリックして詳細を表示します。"
+#~ msgid "Click on a system to view more information."
+#~ msgstr "システムをクリックして詳細を表示します。"
 
 #: src/components/ui/input-copy.tsx
 msgid "Click to copy"
@@ -592,7 +632,6 @@ msgid "Confirm"
 msgstr ""
 
 #: src/components/login/auth-form.tsx
-#: src/components/login/auth-form.tsx
 msgid "Confirm password"
 msgstr "パスワードを確認"
 
@@ -616,6 +655,7 @@ msgstr "コンテナ"
 msgid "Container Health"
 msgstr "コンテナのヘルス"
 
+#: src/components/navbar.tsx
 #: src/components/routes/system.tsx
 msgid "Containers"
 msgstr "コンテナ"
@@ -674,6 +714,7 @@ msgid "Copy name"
 msgstr "名前をコピーする"
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
+#: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Copy public key"
 msgstr "公開鍵をコピー"
 
@@ -699,6 +740,7 @@ msgid "Core"
 msgstr "コア"
 
 #: src/components/containers-table/containers-table-columns.tsx
+#: src/components/routes/system/info-bar.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "CPU"
@@ -790,7 +832,6 @@ msgstr "累積書き込み"
 
 #. Current package version
 #: src/components/routes/system/package-updates-table.tsx
-#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Current"
 msgstr "現在"
 
@@ -802,9 +843,11 @@ msgid "Current state"
 msgstr "現在の状態"
 
 #: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Curve running"
 msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Curve stopped"
 msgstr ""
@@ -838,6 +881,7 @@ msgstr "デフォルトの期間"
 
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
+#: src/components/routes/settings/notifications.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/systems-table/systems-table-columns.tsx
@@ -870,6 +914,7 @@ msgid "Discharging"
 msgstr "放電中"
 
 #: src/components/routes/system.tsx
+#: src/components/routes/system/info-bar.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Disk"
 msgstr "ディスク"
@@ -918,10 +963,10 @@ msgstr "DockerネットワークI/O"
 msgid "Documentation"
 msgstr "ドキュメント"
 
-#. Context: System is down
 #: src/components/alerts-history-columns.tsx
-#: src/components/routes/system/info-bar.tsx
+#: src/components/system-status.tsx
 #: src/components/systems-table/systems-table-columns.tsx
+#: src/components/systems-table/systems-table.tsx
 #: src/lib/alerts.ts
 msgid "Down"
 msgstr "停止"
@@ -938,6 +983,8 @@ msgstr "ダウンロード"
 msgid "Duration"
 msgstr "期間"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Duty"
 msgstr ""
@@ -1040,6 +1087,10 @@ msgstr ""
 msgid "Error"
 msgstr "エラー"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Every value beyond the preview card. A reading the agent did not report is absent, not zero."
+msgstr ""
+
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Example:"
 msgstr "例:"
@@ -1083,6 +1134,10 @@ msgstr "設定をエクスポート"
 msgid "Export your current systems configuration."
 msgstr "現在のシステム設定をエクスポートします。"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Extended metrics"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 msgid "Fahrenheit (°F)"
 msgstr "華氏 (°F)"
@@ -1103,6 +1158,10 @@ msgstr "認証に失敗しました"
 msgid "Failed to delete monitors."
 msgstr "モニターの削除に失敗しました。"
 
+#: src/components/routes/settings/quiet-hours.tsx
+msgid "Failed to delete quiet hours."
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Failed to load logs."
@@ -1111,6 +1170,10 @@ msgstr "ログの読み込みに失敗しました。"
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Failed to load package updates"
 msgstr "パッケージの更新の読み込みに失敗しました"
+
+#: src/components/systems-table/systems-table.tsx
+msgid "Failed to load systems."
+msgstr ""
 
 #: src/components/routes/settings/layout.tsx
 #: src/components/routes/settings/notifications.tsx
@@ -1161,6 +1224,7 @@ msgstr "ファン"
 
 #: src/components/containers-table/containers-table.tsx
 #: src/components/network-monitors-table/network-monitors-table.tsx
+#: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/system/chart-card.tsx
 #: src/components/routes/system/package-updates-table.tsx
@@ -1214,6 +1278,10 @@ msgstr ""
 msgid "Full"
 msgstr "フル"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Full-speed backstop: the firmware carries this value, so it is fixed here."
+msgstr ""
+
 #: src/components/containers-table/containers-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Fullscreen"
@@ -1228,6 +1296,22 @@ msgstr "一般"
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Global"
 msgstr "グローバル"
+
+#: src/components/routes/settings/alerts-history-data-table.tsx
+msgid "Go to first page"
+msgstr ""
+
+#: src/components/routes/settings/alerts-history-data-table.tsx
+msgid "Go to last page"
+msgstr ""
+
+#: src/components/routes/settings/alerts-history-data-table.tsx
+msgid "Go to next page"
+msgstr ""
+
+#: src/components/routes/settings/alerts-history-data-table.tsx
+msgid "Go to previous page"
+msgstr ""
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Governor"
@@ -1275,6 +1359,10 @@ msgstr "ハートビートが正常に送信されました"
 msgid "Hide timestamps"
 msgstr "タイムスタンプを非表示"
 
+#: src/components/navbar.tsx
+msgid "Home"
+msgstr ""
+
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgctxt "Button to copy install command"
@@ -1313,6 +1401,7 @@ msgid "I/O Utilization"
 msgstr "I/O 利用率"
 
 #. Context: Battery state
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/lib/i18n.ts
 msgid "Idle"
 msgstr "アイドル"
@@ -1333,6 +1422,7 @@ msgid "Image update available"
 msgstr "イメージの更新があります"
 
 #: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "In force"
 msgstr ""
 
@@ -1343,6 +1433,10 @@ msgstr ""
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Inactive"
 msgstr "非アクティブ"
+
+#: src/components/systems-table/systems-table.tsx
+msgid "Install the agent on a machine to start monitoring it here."
+msgstr ""
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Intel DPTF sensors. A zone the collector could not read is left out rather than shown as zero."
@@ -1414,8 +1508,13 @@ msgstr "ロード状態"
 
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Loading..."
 msgstr "読み込み中..."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Locked"
+msgstr ""
 
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
@@ -1464,6 +1563,10 @@ msgstr "メジャー"
 #: src/components/routes/settings/layout.tsx
 msgid "Manage display and notification preferences."
 msgstr "表示と通知の設定を管理します。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Manual"
+msgstr ""
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
@@ -1520,6 +1623,8 @@ msgstr "1時間最小"
 msgid "Minor"
 msgstr "マイナー"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Mode"
 msgstr ""
@@ -1558,6 +1663,7 @@ msgid "Net"
 msgstr "帯域"
 
 #: src/components/routes/system.tsx
+#: src/components/routes/system/info-bar.tsx
 msgid "Network"
 msgstr "ネットワーク"
 
@@ -1571,6 +1677,7 @@ msgid "Network Monitor Loss"
 msgstr "ネットワークモニターのパケットロス"
 
 #: src/components/command-palette.tsx
+#: src/components/navbar.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
@@ -1602,9 +1709,17 @@ msgstr "ネットワーク単位"
 msgid "No"
 msgstr "いいえ"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "No curve on record."
+msgstr ""
+
 #: src/components/routes/system/storage-pools-table.tsx
 msgid "No detail data for this pool."
 msgstr "このプールの詳細データはありません。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "No fan state is on record."
+msgstr ""
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "No hand-set duty is on record. One set before an agent restarted would still be driving the fan, and this panel cannot see it."
@@ -1693,9 +1808,11 @@ msgid "One-time"
 msgstr "1回限り"
 
 #: src/components/login/auth-form.tsx
+#: src/components/login/otp-forms.tsx
 msgid "One-time password"
 msgstr "ワンタイムパスワード"
 
+#: src/components/navbar.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
@@ -1713,6 +1830,10 @@ msgstr "任意。デフォルトはエージェントのシステムリゾルバ
 #: src/components/login/auth-form.tsx
 msgid "Or continue with"
 msgstr "または、以下の方法でログイン"
+
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "OS"
+msgstr ""
 
 #. Package version
 #: src/components/routes/system/cpu-sheet.tsx
@@ -1733,15 +1854,15 @@ msgstr "既存のアラートを上書き"
 msgid "P-State"
 msgstr ""
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgctxt "CPU package"
-msgid "Package"
-msgstr ""
-
 #. Software package
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Package"
 msgstr "パッケージ"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgctxt "CPU package"
+msgid "Package"
+msgstr ""
 
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Package Updates"
@@ -1772,7 +1893,6 @@ msgid "Pages / Settings"
 msgstr "ページ / 設定"
 
 #: src/components/login/auth-form.tsx
-#: src/components/login/auth-form.tsx
 msgid "Password"
 msgstr "パスワード"
 
@@ -1788,6 +1908,10 @@ msgstr "パスワードは72バイト未満でなければなりません。"
 msgid "Password reset request received"
 msgstr "パスワードリセットのリクエストを受け取りました"
 
+#: src/components/login/auth-form.tsx
+msgid "Passwords must match"
+msgstr ""
+
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Past"
 msgstr "過去"
@@ -1802,7 +1926,9 @@ msgstr "パッチ"
 msgid "Pause"
 msgstr "一時停止"
 
+#: src/components/system-status.tsx
 #: src/components/systems-table/systems-table-columns.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Paused"
 msgstr "一時停止中"
 
@@ -1813,6 +1939,11 @@ msgstr "一時停止 ({pausedSystemsLength})"
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Payload format"
 msgstr "ペイロード形式"
+
+#. Context: System status is pending its first connection
+#: src/components/system-status.tsx
+msgid "Pending"
+msgstr ""
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Per core, named by cpu number, plus the active tuning policy"
@@ -1995,7 +2126,12 @@ msgstr "読み取り"
 msgid "Read errors"
 msgstr "読み取りエラー"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Reading the fan state…"
+msgstr ""
+
 #: src/components/routes/system/charts/network-charts.tsx
+#: src/components/routes/system/info-bar.tsx
 msgid "Received"
 msgstr "受信"
 
@@ -2062,10 +2198,24 @@ msgstr "再起動"
 msgid "Resume"
 msgstr "再開"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/systems-table/systems-table.tsx
+msgid "Retry"
+msgstr ""
+
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Retry since previous sample"
 msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Return to the curve"
 msgstr ""
@@ -2074,6 +2224,10 @@ msgstr ""
 #: src/components/routes/system/package-updates-table.tsx
 msgid "Revision"
 msgstr "リビジョン"
+
+#: src/components/routes/system/info-bar.tsx
+msgid "Root"
+msgstr ""
 
 #: src/components/routes/system/charts/disk-charts.tsx
 #: src/components/routes/system/charts/disk-charts.tsx
@@ -2137,6 +2291,7 @@ msgid "Schedule quiet hours where notifications will not be sent."
 msgstr "通知が送信されないサイレント時間をスケジュールします。"
 
 #: src/components/navbar.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Search"
 msgstr "検索"
 
@@ -2155,6 +2310,10 @@ msgstr "ターゲットを検索"
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Seconds between pings (default: 60)"
 msgstr "ping 間の秒数 (デフォルト: 60)"
+
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Sections"
+msgstr ""
 
 #. Security update
 #: src/components/routes/system/package-updates-table.tsx
@@ -2180,6 +2339,7 @@ msgstr "システムを選択"
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "Select all"
 msgstr "すべて選択"
 
@@ -2187,7 +2347,12 @@ msgstr "すべて選択"
 msgid "Select matches"
 msgstr "一致を選択"
 
+#: src/components/routes/settings/sidebar-nav.tsx
+msgid "Select page"
+msgstr ""
+
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "Select row"
 msgstr "行を選択"
 
@@ -2212,6 +2377,7 @@ msgid "Send test heartbeat"
 msgstr "テストハートビートを送信"
 
 #: src/components/routes/system/charts/network-charts.tsx
+#: src/components/routes/system/info-bar.tsx
 msgid "Sent"
 msgstr "送信"
 
@@ -2240,11 +2406,17 @@ msgstr "ハートビート監視を有効にするには、Beszel ハブで次�
 #: src/components/command-palette.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
+#: src/components/navbar.tsx
 #: src/components/routes/settings/layout.tsx
 #: src/components/routes/settings/layout.tsx
+#: src/components/routes/settings/sidebar-nav.tsx
 #: src/components/routes/system/info-bar.tsx
 msgid "Settings"
 msgstr "設定"
+
+#: src/components/routes/settings/sidebar-nav.tsx
+msgid "Settings navigation"
+msgstr ""
 
 #: src/components/routes/settings/layout.tsx
 msgid "Settings saved"
@@ -2267,6 +2439,10 @@ msgstr ""
 msgid "Signal strength of connected Wi-Fi interfaces"
 msgstr "接続中のWi-Fiインターフェースの信号強度"
 
+#: src/main.tsx
+msgid "Skip to content"
+msgstr ""
+
 #: src/components/routes/system/plus-sheet.tsx
 msgid "SMART log. A field the drive omits reads as unknown, not as zero."
 msgstr ""
@@ -2282,6 +2458,11 @@ msgstr "並び替え基準"
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "stale"
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Stale"
 msgstr ""
 
 #: src/components/routes/settings/quiet-hours.tsx
@@ -2300,6 +2481,7 @@ msgstr "状態"
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
+#: src/components/systems-table/systems-table-columns.tsx
 #: src/components/systems-table/systems-table.tsx
 #: src/lib/alerts.ts
 msgid "Status"
@@ -2370,14 +2552,21 @@ msgid "Tabs"
 msgstr "タブ"
 
 #: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Take manual control"
 msgstr ""
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Target"
 msgstr "対象"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Target duty"
+msgstr ""
 
 #: src/components/network-monitors-table/monitor-dialog.tsx
 #: src/components/network-monitors-table/monitor-dialog.tsx
@@ -2395,6 +2584,8 @@ msgid "Temp"
 msgstr "温度"
 
 #: src/components/routes/system/charts/sensor-charts.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-sheet.tsx
 #: src/components/routes/system/plus-sheet.tsx
 #: src/lib/alerts.ts
@@ -2458,6 +2649,10 @@ msgid "The curve failed validation and was rejected before anything was written.
 msgstr ""
 
 #: src/components/routes/system/plus-fan-tab.tsx
+msgid "The daemon picks the curve up on its next restart."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "the edited curve"
 msgstr ""
 
@@ -2467,6 +2662,18 @@ msgstr ""
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The fan is not holding the duty that was requested; the old one was put back."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The fan state could not be read."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The fan state could not be refreshed. Showing the last reading."
+msgstr ""
+
+#: src/components/systems-table/systems-table.tsx
+msgid "The hub could not be reached. Check the connection and try again."
 msgstr ""
 
 #: src/components/routes/settings/heartbeat.tsx
@@ -2482,9 +2689,14 @@ msgid "The package temperature could not be read, so no duty was written and the
 msgstr ""
 
 #: src/components/routes/system/plus-fan-tab.tsx
+msgid "The package temperature could not be read."
+msgstr ""
+
+#: src/components/routes/system/plus-fan-tab.tsx
 msgid "The previous duty could not be restored: the fan is holding one you did not ask for."
 msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The request never reached the server."
 msgstr ""
@@ -2565,6 +2777,7 @@ msgstr "トークンはエージェントの接続と登録を可能にします
 msgid "Tokens and fingerprints are used to authenticate WebSocket connections to the hub."
 msgstr "トークンとフィンガープリントは、ハブへのWebSocket接続の認証に使用されます。"
 
+#: src/components/routes/system/info-bar.tsx
 #: src/components/ui/chart.tsx
 #: src/components/ui/chart.tsx
 msgid "Total"
@@ -2673,6 +2886,12 @@ msgstr "ディスクの使用量がしきい値を超えたときにトリガー
 msgid "Type"
 msgstr "タイプ"
 
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Unavailable"
+msgstr ""
+
 #: src/lib/alerts.ts
 msgid "Unhealthy"
 msgstr "異常"
@@ -2687,6 +2906,7 @@ msgid "Unit preferences"
 msgstr "単位の設定"
 
 #: src/components/command-palette.tsx
+#: src/components/routes/settings/tokens-fingerprints.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Universal token"
 msgstr "ユニバーサルトークン"
@@ -2707,9 +2927,13 @@ msgstr "無制限"
 msgid "Unsafe Shutdowns"
 msgstr ""
 
-#. Context: System is up
-#: src/components/routes/system/info-bar.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Unsaved changes"
+msgstr ""
+
+#: src/components/system-status.tsx
 #: src/components/systems-table/systems-table-columns.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "Up"
 msgstr "正常"
 
@@ -2729,9 +2953,13 @@ msgstr "更新"
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
 #: src/components/network-monitors-table/network-monitors-columns.tsx
+#: src/components/routes/system/info-bar.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/routes/system/storage-pools-table.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
+#: src/components/systems-table/systems-table-columns.tsx
 msgid "Updated"
 msgstr "更新済み"
 
@@ -2775,6 +3003,10 @@ msgstr "ストレージプール {displayName} の使用量"
 msgid "Used"
 msgstr "使用中"
 
+#: src/components/navbar.tsx
+msgid "User actions"
+msgstr ""
+
 #: src/components/command-palette.tsx
 #: src/components/navbar.tsx
 msgid "Users"
@@ -2805,6 +3037,7 @@ msgstr "詳細を表示"
 #: src/components/routes/system/cpu-sheet.tsx
 #: src/components/routes/system/disk-io-sheet.tsx
 #: src/components/routes/system/network-sheet.tsx
+#: src/components/routes/system/plus-sheet.tsx
 #: src/components/routes/system/plus-sheet.tsx
 msgid "View more"
 msgstr "もっと見る"
@@ -2841,6 +3074,10 @@ msgstr "警告のしきい値"
 #: src/components/routes/settings/notifications.tsx
 msgid "Webhook / Push notifications"
 msgstr "Webhook / プッシュ通知"
+
+#: src/components/routes/settings/notifications.tsx
+msgid "Webhook URL"
+msgstr ""
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "When enabled, this token allows agents to self-register without prior system creation."
@@ -2880,13 +3117,15 @@ msgid "Write errors"
 msgstr "書き込みエラー"
 
 #: src/components/routes/system/plus-fan-tab.tsx
-msgid "Write this curve"
-msgstr ""
+#~ msgid "Write this curve"
+#~ msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Write this curve to the disk"
 msgstr ""
 
+#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Write this duty to the firmware"
 msgstr ""
@@ -2899,6 +3138,7 @@ msgstr ""
 msgid "YAML Config"
 msgstr "YAML設定"
 
+#: src/components/routes/settings/config-yaml.tsx
 #: src/components/routes/settings/config-yaml.tsx
 msgid "YAML Configuration"
 msgstr "YAML設定"

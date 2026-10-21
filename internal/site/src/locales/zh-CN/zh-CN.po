@@ -39,6 +39,11 @@ msgid "Reveal token"
 msgstr "显示令牌"
 
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The hub is acting on a reading it could not verify. The emergency duty is held until the sensor recovers."
+msgstr "中枢正在依据一项无法验证的读数动作。中枢正在依据一项无法验证的读数动作。在传感器恢复前，会持续保持紧急档位。"
+
+
 #: src/components/token-value.tsx
 msgid "Token hidden"
 msgstr "令牌已隐藏"

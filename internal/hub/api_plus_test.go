@@ -898,6 +898,26 @@ func TestStateMarksEachReadingRatherThanBorrowingAZero(t *testing.T) {
 	assert.Nil(t, body["curve"])
 }
 
+// The display must know what it may trust: two real readings, one failed, or
+// both failed (in which case the floor is holding a value it could not verify).
+func TestStateReportsReadingHealthInsteadOfLeavingItToInference(t *testing.T) {
+	h := newFanHarness(t)
+
+	body := decodeBody(t, h.do(t, "admin", http.MethodGet, "/api/plus/fan/state", nil))
+	assert.Equal(t, "ok", body["health"], "both readings success -> ok")
+	assert.Equal(t, "", body["failsafe_reason"])
+
+	h.rig.tempErr = errors.New("sensor gone")
+	body = decodeBody(t, h.do(t, "admin", http.MethodGet, "/api/plus/fan/state", nil))
+	assert.Equal(t, "stale", body["health"], "one failed reading -> stale")
+	assert.Equal(t, "temperature_unreadable", body["failsafe_reason"])
+
+	h.rig.getErr = errors.New("device gone")
+	body = decodeBody(t, h.do(t, "admin", http.MethodGet, "/api/plus/fan/state", nil))
+	assert.Equal(t, "failsafe", body["health"], "both failed -> failsafe")
+	assert.Equal(t, "level_and_temperature_unreadable", body["failsafe_reason"])
+}
+
 // TestStateReportsARegressDeadlineOnlyWhenThereIsOne. An operator shown a
 // countdown to nothing will wait out a regress that a pending lost to an agent
 // restart no longer owns, which is how a manual duty outlives its own term.

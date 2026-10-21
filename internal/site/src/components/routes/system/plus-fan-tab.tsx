@@ -810,6 +810,21 @@ export function PlusFanTab(_props: { grid: boolean; dataEmpty: boolean }) {
 				{status === "error" && state && <ReadProblem stale={true} onRetry={retry} />}
 				{state && (
 					<>
+						{state.health === "failsafe" && (
+							<output
+								className={cn(
+									"flex flex-col gap-2 rounded-md border-s-4 p-3 text-sm sm:flex-row sm:items-center sm:justify-between",
+									STATUS_TONE.warning
+								)}
+							>
+								<span>
+									{t`The hub is acting on a reading it could not verify. The emergency duty is held until the sensor recovers.`}
+								</span>
+								<Button size="sm" variant="outline" onClick={retry}>
+									{t`Retry`}
+								</Button>
+							</output>
+						)}
 						<div className="grid gap-3 sm:grid-cols-3">
 							<ReadoutCell
 								title={OUTCOME_TEXT.appliedDuty}

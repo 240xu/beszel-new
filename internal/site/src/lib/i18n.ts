@@ -18,18 +18,6 @@ function activateLocale(locale: string, messages: Messages = enMessages) {
 	$direction.set(rtlLanguages.has(locale) ? "rtl" : "ltr")
 }
 
-/** Locales whose catalog is incomplete and borrow from a fuller parent.
- *
- *  zh-HK is the only reader-visible catalog that is not complete: it covers the
- *  interface but not every plus string. Lingui resolves a missing message by
- *  falling back to the source locale (English), so without this a Hong Kong
- *  reader would see Chinese everywhere except the fan panel. Merging `zh` under
- *  zh-HK keeps the parent's strings as the default and lets zh-HK's own entries
- *  win, which is the same precedence Crowdin uses. */
-const partialLocaleParents: Record<string, string> = {
-	"zh-HK": "zh",
-}
-
 async function loadMessages(locale: string): Promise<Messages> {
 	const { messages }: { messages: Messages } = await import(`../locales/${locale}/${locale}.ts`)
 	return messages
@@ -42,19 +30,6 @@ export async function dynamicActivate(locale: string) {
 		return
 	}
 	try {
-		const parent = partialLocaleParents[locale]
-		if (parent) {
-			const [base, own] = await Promise.all([loadMessages(parent), loadMessages(locale)])
-			// An untranslated entry compiles to an empty string, and spreading it
-			// would overwrite the parent with "". Keep the parent's text for those
-			// and let only non-empty zh-HK entries win.
-			const merged: Messages = { ...base }
-			for (const [id, text] of Object.entries(own)) {
-				if (text !== "") merged[id] = text
-			}
-			activateLocale(locale, merged)
-			return
-		}
 		activateLocale(locale, await loadMessages(locale))
 	} catch (error) {
 		console.error(`Error loading ${locale}`, error)

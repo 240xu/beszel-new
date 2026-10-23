@@ -33,8 +33,9 @@ import (
 // the interface rather than zero-fill it -- docker0 and enp0s31f6 idle at zero,
 // so "unknown" must stay distinct from "idle".
 //
-// Speed is Mbit/s, 0 meaning unknown (collectCpufreq's fill); the kernel's -1
-// sentinel is normalised and omitempty then drops the key.
+// Speed is Mbit/s; the kernel's -1 "unknown" sentinel and any unreadable or
+// non-positive value leave the field nil, so the key is absent rather than a
+// reported 0 Mbit/s.
 func collectNetAll(root string) map[string]*NetIfaceStats {
 	matches, err := filepath.Glob(filepath.Join(root, "class", "net", "*"))
 	if err != nil || len(matches) == 0 {

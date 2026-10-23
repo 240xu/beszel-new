@@ -54,13 +54,16 @@ type CpufreqStats struct {
 
 // NetIfaceStats is one interface's counters and link attributes.
 //
-// Rx/TxBytes are CUMULATIVE, not rates, and unlike every other field here they
-// carry no omitempty: 0 means the interface is genuinely idle, not that the read
-// failed, because an unreadable counter drops the interface instead. Rx/TxPackets
-// DO carry omitempty and disappear at 0, so an idle interface has bytes but no
-// packets -- the two fields disagree on purpose. Read the Contract paragraph of
-// collectNetAll in netall.go for the reset rule consumers must apply; this type
-// only owns the wire names.
+// Rx/TxBytes and Rx/TxPackets are CUMULATIVE, not rates. A counter the kernel
+// reported as zero is a measurement (the interface is idle), and the wire must
+// carry it: a consumer detects a counter reset by the drop in value, so an absent
+// key would be indistinguishable from an unread one. Rx/TxBytes are plain uint64
+// and therefore always present. Rx/TxPackets are pointers for the same reason the
+// optional attributes below are: encoding/json v2 keeps a numeric zero under
+// omitempty, so a bare uint64 could not express "read, and it was zero" either --
+// the pointer makes the distinction explicit rather than accidental. Read the
+// Contract paragraph of collectNetAll in netall.go for the reset rule consumers
+// must apply; this type only owns the wire names.
 type NetIfaceStats struct {
 	RxBytes   uint64  `json:"rx_bytes"`
 	TxBytes   uint64  `json:"tx_bytes"`

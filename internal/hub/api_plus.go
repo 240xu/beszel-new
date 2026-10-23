@@ -493,8 +493,8 @@ func decodeBody(e *core.RequestEvent, dst any) error {
 	return nil
 }
 
-// faultReason reads the shape fault a typed reader returned. Every error from
-// readFanBodyTyped/strictJSONTyped is a *bodyFault; the fallback keeps a future
+// faultReason reads the shape fault a body reader returned. Every error from
+// readFanBody and strictJSON is a *bodyFault; the fallback keeps a future
 // non-typed error from panicking instead of being reported as unreadable.
 func faultReason(err error) string {
 	var fault *bodyFault

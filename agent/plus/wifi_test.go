@@ -16,9 +16,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestWiFiZeroValuesAreOmitted pins the presence contract where Task 17 reads it:
-// the three keys must be absent rather than zero, since that zero is the absence of
-// a reading, not a measurement.
+// TestWiFiValuesAreOmittedWhenUnread pins the presence contract where Task 17 reads
+// it: a field that was never assigned must be absent rather than zero, since that
+// zero is the absence of a reading, not a measurement. The fields are pointers
+// because encoding/json v2, which PocketBase uses, keeps a numeric zero under
+// omitempty -- a bare int would emit "signal_dbm":0 for a station query that never
+// answered. A genuinely measured zero still encodes as 0 (see wire_v2_test.go).
 func TestWiFiZeroValuesAreOmitted(t *testing.T) {
 	t.Run("a complete payload carries all five keys", func(t *testing.T) {
 		b, err := json.Marshal(&WiFiStats{
@@ -41,11 +44,11 @@ func TestWiFiZeroValuesAreOmitted(t *testing.T) {
 		assert.NotContains(t, string(b), `"retry":0`, "an unread counter must not reach the wire as a zero")
 	})
 
-	t.Run("a value of zero sends no key at all", func(t *testing.T) {
+	t.Run("an unset struct sends no keys at all", func(t *testing.T) {
 		b, err := json.Marshal(&WiFiStats{})
 		require.NoError(t, err)
 		assert.JSONEq(t, `{}`, string(b),
-			"every field carries omitempty, as TestNvmeZeroValuesAreOmitted requires of NvmeStats")
+			"unassigned pointers stay absent; a measured zero is covered by wire_v2_test.go")
 	})
 }
 

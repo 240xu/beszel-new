@@ -244,3 +244,13 @@ test("a duty that could not be read says so where the reading is shown", async (
 	expect(occurrences(source, /!state\.level_read\s*&&/)).not.toEqual([])
 	expect(occurrences(source, /could not be read; the fan's present duty is unknown/)).not.toEqual([])
 })
+
+// An "unreadable answer" banner says the write may be in force. A later successful
+// read replaces that guess with knowledge, so the banner has to go without waiting
+// for another write. It also has to key on the real success state ("ready"), which
+// this asserts alongside the effect's presence.
+test("the unreadable banner is cleared by a successful read", async () => {
+	const source = await read(TAB)
+	expect(occurrences(source, /status === "ready"\) setUnreadable\(false\)/)).toHaveLength(2)
+	expect(occurrences(source, /status === "ok"\) setUnreadable/)).toEqual([])
+})

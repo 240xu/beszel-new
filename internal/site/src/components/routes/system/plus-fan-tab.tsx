@@ -799,6 +799,13 @@ export function PlusFanTab(_props: { grid: boolean; dataEmpty: boolean }) {
 
 	const { state, status, retry, lastUpdated } = useFanState()
 	const host = useFanHost()
+	// An unreadable write answer says "the change may be in force". Once a later
+	// read succeeds the panel is no longer guessing, so the warning must go even
+	// though no second write happened. Without this it stayed up until the next
+	// write settled, which is a banner outliving its own claim.
+	useEffect(() => {
+		if (status === "ready") setUnreadable(false)
+	}, [status])
 	const written = useFanWrite((settled, write) => {
 		applySettled(settled, setOutcome, setRefusal, setOffline, setUnreadable)
 		setArmed(null)
@@ -983,6 +990,13 @@ export function PlusFanCurveTab(_props: { grid: boolean; dataEmpty: boolean }) {
 
 	const { state, status, retry, lastUpdated } = useFanState()
 	const host = useFanHost()
+	// An unreadable write answer says "the change may be in force". Once a later
+	// read succeeds the panel is no longer guessing, so the warning must go even
+	// though no second write happened. Without this it stayed up until the next
+	// write settled, which is a banner outliving its own claim.
+	useEffect(() => {
+		if (status === "ready") setUnreadable(false)
+	}, [status])
 	const written = useFanWrite((settled, write) => {
 		applySettled(settled, setOutcome, setRefusal, setOffline, setUnreadable)
 		setArmed(null)

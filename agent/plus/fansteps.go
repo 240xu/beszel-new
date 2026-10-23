@@ -173,10 +173,13 @@ func parseFpsLine(line string) (FanSpeedStep, bool) {
 		rpm = v
 	}
 	var noise, power int
-	if v, err := strconv.Atoi(strings.TrimSpace(parts[3])); err == nil {
+	// Both are physical quantities in millidecibels and milliwatts, so a negative
+	// value is not a reading the firmware can have made: it stays 0 ("no value")
+	// rather than being published as a negative noise floor or power draw.
+	if v, err := strconv.Atoi(strings.TrimSpace(parts[3])); err == nil && v >= 0 {
 		noise = v
 	}
-	if v, err := strconv.Atoi(strings.TrimSpace(parts[4])); err == nil {
+	if v, err := strconv.Atoi(strings.TrimSpace(parts[4])); err == nil && v >= 0 {
 		power = v
 	}
 	return FanSpeedStep{

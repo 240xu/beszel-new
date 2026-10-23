@@ -477,3 +477,13 @@ func TestParseFpsLineStillNeedsTheDuty(t *testing.T) {
 		assert.False(t, ok, line)
 	}
 }
+
+// Millidecibels and milliwatts cannot be negative, so a negative field is not a
+// measurement; it must not be published as one.
+func TestParseFpsLineRejectsNegativePhysicalFields(t *testing.T) {
+	step, ok := parseFpsLine("50:not-defined:5000:-12000:-400")
+	require.True(t, ok, "the duty is still valid")
+	assert.Equal(t, 0, step.NoiseMdb, "a negative noise floor is not a reading")
+	assert.Equal(t, 0, step.PowerMw, "a negative power draw is not a reading")
+	assert.Equal(t, uint16(5000), step.RPMEst, "the speed is independent")
+}

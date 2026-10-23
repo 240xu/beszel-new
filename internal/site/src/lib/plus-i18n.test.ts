@@ -488,10 +488,10 @@ test("the fan tab asks for the CPU package by context, so it cannot claim the up
 	expect(zh).toContain('msgstr "套件"')
 })
 
-// zh-HK is the one reader-visible catalog that is not complete. It must borrow
-// the missing entries from zh rather than fall through to English, or a Hong Kong
-// reader gets English in exactly the panel this project added.
-test("zh-HK falls back to zh for untranslated entries", () => {
+// zh-HK is the one reader-visible catalog that is not complete. dynamicActivate
+// merges zh underneath it, so every untranslated entry must have a non-empty zh
+// counterpart or a Hong Kong reader would fall through to English in that spot.
+test("zh-HK untranslated entries all have a zh counterpart", () => {
 	const hk = entries("zh-HK")
 	const zh = new Map(entries("zh").map((e) => [e.msgid, e.msgstr]))
 	const missing = hk.filter((e) => e.msgstr === "" && e.msgid !== "")

@@ -6,3 +6,6 @@ dist/
 # Lox: build output (48MB production binaries)
 build/
 beszel_data/
+
+# Local engineering state, not part of the product.
+.project-state/

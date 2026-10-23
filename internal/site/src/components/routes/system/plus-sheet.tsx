@@ -80,22 +80,93 @@ function noteText(note: RowNote): string {
 	}
 }
 
-function MetricGrid({ rows }: { rows: MetricRow[] }) {
+/** One metric as a stacked pair: the label is the quiet part and the value is
+ *  what the eye lands on. Reading a wall of `label: value` in a 4-up grid made
+ *  every reading the same weight, so an operator scanning for the one number that
+ *  matters had to read all of them. A definition list is also the honest markup:
+ *  these really are terms and their values. */
+function MetricValue({ row }: { row: MetricRow }) {
 	const LABELS = labelCopy()
-	const labelFor = (row: MetricRow): string => LABELS[row.key as StaticLabelKey] ?? row.label
+	const label = LABELS[row.key as StaticLabelKey] ?? row.label
 	return (
-		<div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+		<div className="min-w-0">
+			<dt className="text-xs leading-snug text-muted-foreground">{label}</dt>
+			<dd className="mt-0.5 font-mono text-[0.9375rem] leading-tight tabular-nums">
+				{row.value}
+				{row.notes?.map((note) => (
+					<span key={note.kind} className="ms-1.5 font-sans text-xs font-normal text-muted-foreground">
+						{noteText(note)}
+					</span>
+				))}
+			</dd>
+		</div>
+	)
+}
+
+/** A run of related readings. `columns` is chosen by the caller from the data's
+ *  shape, not applied uniformly: a device list wants wide cells, a handful of
+ *  scalars wants narrow ones, and the same 4-up grid for both is what made the
+ *  panel read as a dump. */
+function MetricGroup({ rows, columns = 2 }: { rows: MetricRow[]; columns?: 2 | 3 | 4 }) {
+	const cols = {
+		2: "grid-cols-2",
+		3: "grid-cols-2 sm:grid-cols-3",
+		4: "grid-cols-2 sm:grid-cols-4",
+	}[columns]
+	return (
+		<dl className={`grid gap-x-4 gap-y-3 ${cols}`}>
 			{rows.map((row) => (
-				<div key={row.key}>
-					<span className="text-muted-foreground">{labelFor(row)}: </span>
-					<span className="font-mono">{row.value}</span>
-					{row.notes?.map((note) => (
-						<span key={note.kind} className="ms-1 text-xs text-muted-foreground">
-							({noteText(note)})
-						</span>
-					))}
-				</div>
+				<MetricValue key={row.key} row={row} />
 			))}
+		</dl>
+	)
+}
+
+/** Device rows carry a name in the label and a compound reading in the value, so
+ *  they get a full-width row each: a grid of two would put a long interface name
+ *  and its two counters in half a line and truncate both. */
+function DeviceList({ rows }: { rows: MetricRow[] }) {
+	const LABELS = labelCopy()
+	return (
+		<dl className="divide-y divide-border/60">
+			{rows.map((row) => {
+				const label = LABELS[row.key as StaticLabelKey] ?? row.label
+				return (
+					<div key={row.key} className="flex items-baseline justify-between gap-4 py-1.5 first:pt-0 last:pb-0">
+						<dt className="min-w-0 truncate font-mono text-xs text-muted-foreground" title={label}>
+							{label}
+						</dt>
+						<dd className="shrink-0 font-mono text-[0.9375rem] tabular-nums">{row.value}</dd>
+					</div>
+				)
+			})}
+		</dl>
+	)
+}
+
+/** NVMe's twelve fields are two different questions: how healthy the drive is,
+ *  and how much work it has done. Stacking them in one eleven-cell grid hid the
+ *  health numbers among the cumulative counters, which is backwards for a panel
+ *  whose job is to show a failing disk at a glance. */
+const NVME_HEALTH_KEYS = new Set([
+	"nvme.model",
+	"nvme.temp_c",
+	"nvme.percentage_used_pct",
+	"nvme.available_spare_pct",
+	"nvme.media_errors",
+	"nvme.critical_comp_time_min",
+])
+
+function NvmeBody({ rows }: { rows: MetricRow[] }) {
+	const health = rows.filter((row) => NVME_HEALTH_KEYS.has(row.key))
+	const wear = rows.filter((row) => !NVME_HEALTH_KEYS.has(row.key))
+	return (
+		<div className="space-y-4">
+			<MetricGroup rows={health} columns={3} />
+			<div>
+				<h4 className="mb-2 text-xs font-medium text-muted-foreground">{t`Lifetime counters`}</h4>
+				<MetricGroup rows={wear} columns={4} />
+			</div>
 		</div>
 	)
 }
@@ -149,7 +220,7 @@ const PlusSheet = memo(function PlusSheet({ chartData, grid }: { chartData: Char
 			id: "plus-thermal-zones",
 			title: t`Thermal Zones`,
 			description: t`Intel DPTF sensors. A zone the collector could not read is left out rather than shown as zero.`,
-			body: <MetricGrid rows={dptf} />,
+			body: <DeviceList rows={dptf} />,
 		})
 	}
 	if (cpufreq.length > 0) {
@@ -157,7 +228,7 @@ const PlusSheet = memo(function PlusSheet({ chartData, grid }: { chartData: Char
 			id: "plus-cpu-frequency",
 			title: t`CPU Frequency`,
 			description: t`Per core, named by cpu number, plus the active tuning policy`,
-			body: <MetricGrid rows={cpufreq} />,
+			body: <MetricGroup rows={cpufreq} columns={4} />,
 		})
 	}
 	if (nvme.length > 0) {
@@ -165,7 +236,7 @@ const PlusSheet = memo(function PlusSheet({ chartData, grid }: { chartData: Char
 			id: "plus-nvme-health",
 			title: t`NVMe Health`,
 			description: t`SMART log. A field the drive omits reads as unknown, not as zero.`,
-			body: <MetricGrid rows={nvme} />,
+			body: <NvmeBody rows={nvme} />,
 		})
 	}
 	if (wifi.length > 0) {
@@ -173,7 +244,7 @@ const PlusSheet = memo(function PlusSheet({ chartData, grid }: { chartData: Char
 			id: "plus-wifi",
 			title: t`WiFi`,
 			description: t`Radio link. Retry is a difference between two samples, not a counter reading.`,
-			body: <MetricGrid rows={wifi} />,
+			body: <MetricGroup rows={wifi} columns={2} />,
 		})
 	}
 	if (netall.length > 0) {
@@ -181,7 +252,7 @@ const PlusSheet = memo(function PlusSheet({ chartData, grid }: { chartData: Char
 			id: "plus-all-interfaces",
 			title: t`All Interfaces`,
 			description: t`Cumulative counters, including veth pairs and docker bridges`,
-			body: <MetricGrid rows={netall} />,
+			body: <DeviceList rows={netall} />,
 		})
 	}
 	if (fan.length > 0) {
@@ -189,7 +260,7 @@ const PlusSheet = memo(function PlusSheet({ chartData, grid }: { chartData: Char
 			id: "plus-fan",
 			title: t`Fan`,
 			description: t`Duty programmed, duty applied and package temperature.`,
-			body: <MetricGrid rows={fan} />,
+			body: <MetricGroup rows={fan} columns={2} />,
 		})
 	}
 	if (steps.length > 0) {
@@ -219,27 +290,39 @@ const PlusSheet = memo(function PlusSheet({ chartData, grid }: { chartData: Char
 
 					<ChartTimeSelect className="w-[calc(100%-2em)] bg-card" agentVersion={chartData.agentVersion} />
 
-					<nav aria-label={t`Sections`} className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+					{/* A contents strip, not a second row of links competing with the
+					    sections below: it is the only navigation in a long sheet, so it
+					    gets its own surface and a horizontal scroll instead of wrapping
+					    into an untidy block of text on a phone. */}
+					<nav
+						aria-label={t`Sections`}
+						className="-mx-1 flex snap-x gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+					>
 						{sections.map((section) => (
 							<a
 								key={section.id}
 								href={`#${section.id}`}
-								className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+								className="shrink-0 snap-start rounded-md border border-border/60 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-border hover:bg-muted/50 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
 							>
 								{section.title}
 							</a>
 						))}
 					</nav>
 
-					<div className="space-y-4">
+					{/* Sections are separated by a rule and breathing room rather than
+					    eleven identical tinted cards. Equal-weight cards were what made
+					    this read as one undifferentiated dump; a rule establishes the
+					    sequence without inventing hierarchy that the data does not have. */}
+					<div className="divide-y divide-border/70">
 						{sections.map((section) => (
-							<section key={section.id} id={section.id} className="scroll-mt-4">
+							<section key={section.id} id={section.id} className="scroll-mt-4 py-5 first:pt-1 last:pb-0">
 								<ChartCard
 									grid={grid}
 									autoHeight
 									title={section.title}
 									description={section.description}
-									className="border-0 bg-muted/30 shadow-none"
+									className="border-0 bg-transparent p-0 shadow-none"
+									contentClassName="ps-0 -ms-0 -me-0"
 								>
 									{section.body}
 								</ChartCard>
@@ -271,7 +354,7 @@ export function PlusChart({ chartData, grid }: { chartData: ChartData; grid: boo
 			description={t`Thermal zones, per core frequency, NVMe health, WiFi and fan`}
 			cornerEl={<PlusSheet chartData={chartData} grid={grid} />}
 		>
-			<MetricGrid rows={rows} />
+			<MetricGroup rows={rows} columns={2} />
 		</ChartCard>
 	)
 }

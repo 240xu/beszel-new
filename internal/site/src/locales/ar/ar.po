@@ -39,6 +39,11 @@ msgid "Hide token"
 msgstr ""
 
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Lifetime counters"
+msgstr ""
+
+
 #: src/components/token-value.tsx
 msgid "Reveal token"
 msgstr ""

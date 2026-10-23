@@ -24,6 +24,11 @@ msgid "Fan writes are latched after repeated failures. The last verified duty is
 msgstr ""
 
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "Lifetime counters"
+msgstr ""
+
+
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The hub is acting on a reading it could not verify. The emergency duty is held until the sensor recovers."
 msgstr ""

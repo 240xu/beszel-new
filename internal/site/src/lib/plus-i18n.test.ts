@@ -500,3 +500,25 @@ test("zh-HK untranslated entries all have a zh counterpart", () => {
 		expect(zh.get(entry.msgid) ?? "").not.toBe("")
 	}
 })
+
+// The runtime cannot repair a wrong fallback: lingui compile has already replaced
+// every untranslated zh-HK entry with the ENGLISH source string, so spreading zh
+// underneath does nothing (English wins by being present). The only place this can
+// be caught is the compiler configuration, and the only proof is the compiled
+// artifact. Skip cleanly when the artifact is absent (fresh clone, gitignored).
+test("zh-HK compiles with the zh fallback, not the English source", async () => {
+	const { existsSync } = await import("node:fs")
+	const dir = fileURLToPath(new URL(`${LOCALE_DIR}/zh-HK/zh-HK.ts`, import.meta.url))
+	if (!existsSync(dir)) return
+	const compiled = (await import(`${LOCALE_DIR}/zh-HK/zh-HK.ts`)) as { messages: Record<string, string[]> }
+	const zh = (await import(`${LOCALE_DIR}/zh/zh.ts`)) as { messages: Record<string, string[]> }
+	const en = (await import(`${LOCALE_DIR}/en/en.ts`)) as { messages: Record<string, string[]> }
+	// A message where zh has a translation but zh-HK does not must not still carry
+	// the English text: that is exactly what the compiler's fallback resolves.
+	const stillEnglish = Object.entries(compiled.messages).filter(([id, value]) => {
+		const zhValue = zh.messages[id]
+		const enValue = en.messages[id]
+		return enValue !== undefined && zhValue !== undefined && JSON.stringify(value) === JSON.stringify(enValue) && JSON.stringify(zhValue) !== JSON.stringify(enValue)
+	})
+	expect(stillEnglish.map(([id]) => id)).toEqual([])
+})

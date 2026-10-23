@@ -159,6 +159,11 @@ type Guard struct {
 	// while the floor stays armed for as long as the daemon is gone.
 	floorOn    bool
 	floorTimer *time.Timer
+	// floorHolding records that the last floor tick could not verify the
+	// temperature (or saw the edge) and successfully wrote the emergency duty.
+	// "armed" only means the floor is watching; "holding" means it acted on an
+	// unverifiable reading, which is what /state must report as failsafe.
+	floorHolding bool
 
 	// closed ends every watch this guard owns. Close sets it, and the entry
 	// points that could put work back on the schedule read it: a regress
@@ -468,6 +473,7 @@ func (g *Guard) holdEmergencyLocked(now time.Time, duty int) error {
 			ErrWriteUnconfirmed, duty, got, err)
 	}
 	g.record()
+	g.floorHolding = true
 	return nil
 }
 
@@ -548,6 +554,35 @@ func (g *Guard) clearRegressLocked() {
 	if g.timer != nil {
 		g.timer.Stop()
 		g.timer = nil
+	}
+}
+
+// ReadingHealth is what /state may report about the trustworthiness of its
+// readings. It is derived from what the guard actually did, not from whether two
+// independent reads happened to fail: the floor acts on a single unreadable
+// temperature, so "both failed" would understate the condition.
+type ReadingHealth struct {
+	// Failsafe is true while the floor is holding the emergency duty because it
+	// could not verify the temperature (or saw the edge).
+	Failsafe bool
+	// BreakerOpen is true while the control path is latched after repeated
+	// failures, so no write can land until the cooldown probe.
+	BreakerOpen bool
+	// LevelReadable / TempReadable are the raw read results the caller observed.
+	LevelReadable bool
+	TempReadable  bool
+}
+
+// Health reports the guard's own view. The caller supplies the two read results
+// it just took, because only the guard knows whether the floor is holding.
+func (g *Guard) Health(levelReadable, tempReadable bool) ReadingHealth {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return ReadingHealth{
+		Failsafe:      g.floorHolding,
+		BreakerOpen:   g.brk.state == breakerOpen,
+		LevelReadable: levelReadable,
+		TempReadable:  tempReadable,
 	}
 }
 
@@ -641,6 +676,7 @@ func (g *Guard) DisarmThermalFloor() {
 
 func (g *Guard) disarmFloorLocked() {
 	g.floorOn = false
+	g.floorHolding = false
 	if g.floorTimer != nil {
 		g.floorTimer.Stop()
 		g.floorTimer = nil
@@ -693,6 +729,10 @@ func (g *Guard) floorTick() {
 	// sensor would be less safe than the daemon it replaced.
 	if terr != nil || temp >= c.Emerg {
 		g.holdFloorLocked(now, c.E, temp, terr)
+	} else {
+		// A real reading below the edge means the emergency duty is no longer
+		// being held on unverifiable data.
+		g.floorHolding = false
 	}
 	g.armFloorLocked(now)
 }

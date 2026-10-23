@@ -1,3 +1,5 @@
+//go:build !mips && !mipsle && !mips64 && !mips64le
+
 package pfanel
 
 import (
@@ -12,20 +14,10 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// DBPath is pfanel's database on this platform.
-const DBPath = "/var/lib/pfanel/pfanel.db"
-
 // latestRowSQL names its columns rather than using *, so a pfanel release adding a
 // column cannot break this reader. ts is the table's INTEGER PRIMARY KEY -- the
 // rowid -- so it is unique and DESC is the newest row. It is Unix SECONDS.
 const latestRowSQL = `SELECT ts, temp, level, ec76, rpm, gov FROM samples ORDER BY ts DESC LIMIT 1`
-
-// ErrNoRow: see the package comment for why it is separate from every other error.
-var ErrNoRow = errors.New("pfanel: samples table is empty")
-
-// ErrOpen and ErrRead split opening from reading so the caller can grade them; both wrap the driver's own error.
-var ErrOpen = errors.New("pfanel: cannot open database")
-var ErrRead = errors.New("pfanel: cannot read newest row")
 
 // dsn opens read-only and waits out pfanel's write transaction. WHY both parts are
 // here, and what each costs, is in the package comment.

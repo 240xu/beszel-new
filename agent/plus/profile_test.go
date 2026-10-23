@@ -499,3 +499,44 @@ func TestThePanelLiteralStillDescribesTheCalibratedMachine(t *testing.T) {
 	assert.Len(t, set.duties, len(validLevels),
 		"the calibrated machine resolves exactly the ladder the panel offers")
 }
+
+// A catalogue written before schema_version existed keeps working: the field is
+// additive and unstated means version 0.
+func TestProfilesWithoutSchemaVersionStillLoad(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "profiles.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{"profiles":[{"match":{"product_name":"Test"},
+		"fan":{"static_duties":[40],"min_duty":20,"max_duty":100},
+		"thermal":{"max_temp_c":90,"max_temp_label":"Tctl"}}]}`), 0o600))
+
+	set, err := loadProfiles(path)
+	require.NoError(t, err)
+	assert.Zero(t, set.SchemaVersion)
+	require.Len(t, set.Profiles, 1)
+}
+
+// A file from a future build states a version this one cannot parse, and must be
+// refused rather than silently read as the current shape.
+func TestProfilesWithAnUnknownSchemaVersionAreRefused(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "profiles.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{"schema_version":99,"profiles":[]}`), 0o600))
+
+	_, err := loadProfiles(path)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrPlatformUnknown)
+	assert.Contains(t, err.Error(), "schema_version 99")
+}
+
+// The declared version is accepted.
+func TestProfilesWithTheCurrentSchemaVersionLoad(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "profiles.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{"schema_version":1,"profiles":[{"match":{"product_name":"T"},
+		"fan":{"static_duties":[40],"min_duty":20,"max_duty":100},
+		"thermal":{"max_temp_c":90,"max_temp_label":"Tctl"}}]}`), 0o600))
+
+	set, err := loadProfiles(path)
+	require.NoError(t, err)
+	assert.Equal(t, 1, set.SchemaVersion)
+}

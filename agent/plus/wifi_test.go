@@ -22,7 +22,8 @@ import (
 func TestWiFiZeroValuesAreOmitted(t *testing.T) {
 	t.Run("a complete payload carries all five keys", func(t *testing.T) {
 		b, err := json.Marshal(&WiFiStats{
-			SignalDbm: -42, TxMBit: 780, FreqMHz: 5180, Retry: 1146, Iface: "wlp0s20f3",
+			SignalDbm: intPtr(-42), TxMBit: floatPtr(780), FreqMHz: intPtr(5180),
+			Retry: uintPtr(1146), Iface: "wlp0s20f3",
 		})
 		require.NoError(t, err)
 		assert.JSONEq(t,
@@ -31,7 +32,7 @@ func TestWiFiZeroValuesAreOmitted(t *testing.T) {
 	})
 
 	t.Run("association without station statistics carries two", func(t *testing.T) {
-		b, err := json.Marshal(&WiFiStats{FreqMHz: 5180, Iface: "wlp0s20f3"})
+		b, err := json.Marshal(&WiFiStats{FreqMHz: intPtr(5180), Iface: "wlp0s20f3"})
 		require.NoError(t, err)
 		assert.JSONEq(t, `{"freq_mhz":5180,"iface":"wlp0s20f3"}`, string(b),
 			"iface and freq_mhz are the proof of association, so they survive")

@@ -58,12 +58,17 @@ export class FanApiError extends Error {
 	readonly code: FanRejectCode | undefined
 	readonly rawCode: string | undefined
 	readonly rawMessage: string | undefined
+	/** Set when the hub rejected the body's shape rather than the fan. A newer panel
+	 *  talking to an older hub lands here, so the panel can say "this build and the
+	 *  hub disagree" instead of implying the fan refused. */
+	readonly reason: FanBodyReason | undefined
 
 	constructor(
 		status: number,
 		code: FanRejectCode | undefined,
 		rawCode: string | undefined,
-		rawMessage: string | undefined
+		rawMessage: string | undefined,
+		reason?: FanBodyReason
 	) {
 		super("fan request refused")
 		this.name = "FanApiError"
@@ -71,11 +76,32 @@ export class FanApiError extends Error {
 		this.code = code
 		this.rawCode = rawCode
 		this.rawMessage = rawMessage
+		this.reason = reason
 	}
 }
 
-/** PocketBase's error envelope: the code lives at `data.code`. */
-type PocketBaseErrorBody = { message?: unknown; data?: { code?: unknown } | unknown }
+/** Why a body could not be read. Mirror of the constants in internal/hub/api_plus.go.
+ *  Additive metadata beside `data.code`, present only on the routes that can answer a
+ *  body fault; the code-less ones carry it alone. */
+export const FAN_BODY_REASONS = [
+	"unknown_field",
+	"body_unreadable",
+	"body_too_large",
+	"empty_body",
+	"not_json",
+	"trailing_content",
+] as const
+
+export type FanBodyReason = (typeof FAN_BODY_REASONS)[number]
+
+const BODY_REASONS: ReadonlySet<string> = new Set(FAN_BODY_REASONS)
+
+/** PocketBase's error envelope: the code lives at `data.code`, the body fault at
+ *  `data.reason`. */
+type PocketBaseErrorBody = {
+	message?: unknown
+	data?: { code?: unknown; reason?: unknown } | unknown
+}
 
 function asString(v: unknown): string | undefined {
 	return typeof v === "string" ? v : undefined
@@ -91,7 +117,9 @@ export function readFanRefusal(status: number, text: string): FanApiError {
 	}
 	const data = body?.data
 	const rawCode = data && typeof data === "object" ? asString((data as { code?: unknown }).code) : undefined
+	const rawReason = data && typeof data === "object" ? asString((data as { reason?: unknown }).reason) : undefined
 	const rawMessage = asString(body?.message)
 	const code = rawCode !== undefined && REJECT_CODES.has(rawCode) ? (rawCode as FanRejectCode) : undefined
-	return new FanApiError(status, code, rawCode, rawMessage)
+	const reason = rawReason !== undefined && BODY_REASONS.has(rawReason) ? (rawReason as FanBodyReason) : undefined
+	return new FanApiError(status, code, rawCode, rawMessage, reason)
 }

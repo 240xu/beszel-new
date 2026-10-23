@@ -43,18 +43,19 @@ func deviceOrder(name string) int {
 // serve one fan's numbers as another's, and that lie is worse than the absent key an
 // absent table leaves. Ordering picks a winner; it never licenses reporting both.
 func fanTableDir(root string) string {
-	devices, err := filepath.Glob(filepath.Join(root, "bus", "acpi", "devices", "INT340*"))
+	devices, err := filepath.Glob(filepath.Join(root, "bus", "acpi", "devices", "*"))
 	if err != nil {
 		return ""
 	}
 	var candidates []string
 	best := ""
 	for _, device := range devices {
-		if !publishesFanTable(device) {
+		if !fanTableDevice(device) || !publishesFanTable(device) {
 			continue
 		}
 		candidates = append(candidates, filepath.Base(device))
-		if best == "" || deviceOrder(device) < deviceOrder(best) {
+		if best == "" || fanDeviceRank(device) < fanDeviceRank(best) ||
+			(fanDeviceRank(device) == fanDeviceRank(best) && deviceOrder(device) < deviceOrder(best)) {
 			best = device
 		}
 	}
@@ -64,6 +65,31 @@ func fanTableDir(root string) string {
 			"candidates", candidates, "chosen", filepath.Base(best))
 	}
 	return best
+}
+
+// fanDeviceRank orders the two HIDs that can carry a table. DPTF (INT340*) ranks first
+// because the EC path this project is built around targets that fan; PNP0C0B is the
+// fallback for firmware that exposes the ACPI fan instead. Ranking is explicit rather
+// than left to glob's lexical order, which happens to put INT3404 first today.
+func fanDeviceRank(device string) int {
+	if strings.HasPrefix(filepath.Base(device), "INT340") {
+		return 0
+	}
+	return 1
+}
+
+// fanTableDevice reports whether an ACPI device is one that carries the fan
+// performance table. INT340* is Intel DPTF; PNP0C0B is the ACPI fan device, which
+// publishes the same state* files on firmware that does not expose a DPTF fan. The
+// earlier INT340-only glob silently hid a real fan on such a machine, leaving
+// fan_steps empty with nothing saying why.
+func fanTableDevice(device string) bool {
+	name := filepath.Base(device)
+	if strings.HasPrefix(name, "INT340") {
+		return true
+	}
+	// PNP0C0B is the ACPI fan; the trailing instance (":00") is optional in sysfs.
+	return name == "PNP0C0B" || strings.HasPrefix(name, "PNP0C0B:")
 }
 
 // publishesFanTable reports whether dir holds at least one state file with a numeric
@@ -129,16 +155,29 @@ func parseFpsLine(line string) (FanSpeedStep, bool) {
 	if err != nil || pct <= 0 {
 		return FanSpeedStep{}, false
 	}
-	rpm, err1 := strconv.ParseUint(strings.TrimSpace(parts[2]), 10, 64)
-	noise, err2 := strconv.Atoi(strings.TrimSpace(parts[3]))
-	power, err3 := strconv.Atoi(strings.TrimSpace(parts[4]))
-	if err1 != nil || err2 != nil || err3 != nil {
-		return FanSpeedStep{}, false
+	// The duty is the only field this table exists to publish, so it is the only one
+	// whose absence drops the row. Speed, noise and power are per-step firmware
+	// measurements that a partial table can leave "not-defined"; dropping the whole
+	// row there discarded a duty the firmware does define. A field that is absent or
+	// unparsable stays 0, which is the same "no value" this wire already uses for a
+	// no-tach fan, rather than a fabricated measurement.
+	var rpm uint64
+	if v, err := strconv.ParseUint(strings.TrimSpace(parts[2]), 10, 64); err == nil {
+		// A parseable speed above uint16 is not an absent field: it is a concrete value
+		// the wire cannot carry, and 0xFFFFFFFF is the no-tachometer sentinel, whose low
+		// 16 bits are a plausible-looking 65535. Drop the row rather than admit a speed
+		// this fan never reported. "not-defined" and unparsable stay 0 and keep the row.
+		if v > 65535 {
+			return FanSpeedStep{}, false
+		}
+		rpm = v
 	}
-	// Rejected above uint16's ceiling, not wrapped into it: fan_speed_rpm is the no-tach
-	// sentinel 0xFFFFFFFF, whose low 16 bits are exactly 65535 — why nothing reads it.
-	if rpm > 65535 {
-		return FanSpeedStep{}, false
+	var noise, power int
+	if v, err := strconv.Atoi(strings.TrimSpace(parts[3])); err == nil {
+		noise = v
+	}
+	if v, err := strconv.Atoi(strings.TrimSpace(parts[4])); err == nil {
+		power = v
 	}
 	return FanSpeedStep{
 		Percent: pct, RPMEst: uint16(rpm), NoiseMdb: noise, PowerMw: power,

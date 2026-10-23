@@ -891,3 +891,22 @@ func TestLockContentionNamesTheLockInUse(t *testing.T) {
 	assert.Contains(t, err.Error(), f.prod().Lock, "name the lock that was contended")
 	assert.NotContains(t, err.Error(), ProdFanLock, "not the constant, which is not the file in use")
 }
+
+// A copy of the daemon under another name, or a wrapper whose name merely ends
+// with "pfand", does not own the fan. Suffix matching used to accept both.
+func TestPfandActiveRejectsLookalikeExecutables(t *testing.T) {
+	for _, argv := range []string{
+		"/opt/notpfand\x00",
+		"/usr/local/bin/mypfand\x00",
+		"/usr/local/bin/pfand-helper\x00",
+		"/usr/local/bin/pfandx\x00",
+	} {
+		t.Run(strings.TrimRight(argv, "\x00"), func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, os.Mkdir(filepath.Join(dir, "4242"), 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "4242", "cmdline"), []byte(argv), 0o600))
+			assert.False(t, pfandActiveIn(dir),
+				"only an executable whose basename is exactly pfand owns the fan")
+		})
+	}
+}

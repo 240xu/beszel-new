@@ -236,12 +236,12 @@ func printNetAll(n map[string]*plus.NetIfaceStats) {
 	unknownSpeed := 0
 	for _, name := range names {
 		s := n[name]
-		if s.SpeedMBit == 0 {
+		if s.SpeedMBit == nil {
 			unknownSpeed++
 		}
-		fmt.Printf("  %-18s rx=%-13d tx=%-12d pkts=%d/%d oper=%-8q speed=%-8s mtu=%d\n",
-			name, s.RxBytes, s.TxBytes, s.RxPackets, s.TxPackets,
-			s.OperState, speedStr(s.SpeedMBit), s.MTU)
+		fmt.Printf("  %-18s rx=%-13d tx=%-12d pkts=%d/%d oper=%-8q speed=%-8s mtu=%s\n",
+			name, s.RxBytes, s.TxBytes, derefU64(s.RxPackets), derefU64(s.TxPackets),
+			s.OperState, speedStr(s.SpeedMBit), mtuStr(s.MTU))
 	}
 	fmt.Printf("  %d interface(s), %d with unknown speed, totals rx=%d tx=%d\n",
 		len(n), unknownSpeed, sumRx, sumTx)
@@ -249,11 +249,26 @@ func printNetAll(n map[string]*plus.NetIfaceStats) {
 
 // speedStr renders the link rate, naming the unknown case rather than printing a
 // bare 0 that reads like a real zero-Mbit link.
-func speedStr(mbit int) string {
-	if mbit == 0 {
+func speedStr(mbit *int) string {
+	if mbit == nil {
 		return "unknown"
 	}
-	return fmt.Sprintf("%dM", mbit)
+	return fmt.Sprintf("%dM", *mbit)
+}
+
+// mtuStr distinguishes "the interface did not report an MTU" from a real value.
+func mtuStr(mtu *int) string {
+	if mtu == nil {
+		return "unknown"
+	}
+	return fmt.Sprintf("%d", *mtu)
+}
+
+func retryStr(v *uint64) string {
+	if v == nil {
+		return "unknown"
+	}
+	return fmt.Sprintf("%d", *v)
 }
 
 // printNvme prints the NVMe health projection one field per line.
@@ -299,31 +314,31 @@ func printNvme(n *plus.NvmeStats) {
 func printWiFi(w *plus.WiFiStats) {
 	fmt.Printf("  iface=%q\n", w.Iface)
 	fmt.Printf("  signal_dbm=%s\n", dbmStr(w.SignalDbm))
-	fmt.Printf("  retry=%d (cumulative, not a rate; resets on reassociation)\n", w.Retry)
+	fmt.Printf("  retry=%s (cumulative, not a rate; resets on reassociation)\n", retryStr(w.Retry))
 	fmt.Printf("  tx_mbit=%s\n", mbitStr(w.TxMBit))
 	fmt.Printf("  freq_mhz=%s\n", mhzStr(w.FreqMHz))
 }
 
 // dbmStr, mbitStr and mhzStr name the unknown case instead of printing a bare 0.
-func dbmStr(v int) string {
-	if v == 0 {
+func dbmStr(v *int) string {
+	if v == nil {
 		return "unknown"
 	}
-	return fmt.Sprintf("%d", v)
+	return fmt.Sprintf("%d", *v)
 }
 
-func mbitStr(v float64) string {
-	if v == 0 {
+func mbitStr(v *float64) string {
+	if v == nil {
 		return "unknown"
 	}
-	return fmt.Sprintf("%.1f", v)
+	return fmt.Sprintf("%.1f", *v)
 }
 
-func mhzStr(v int) string {
-	if v == 0 {
+func mhzStr(v *int) string {
+	if v == nil {
 		return "unknown"
 	}
-	return fmt.Sprintf("%d", v)
+	return fmt.Sprintf("%d", *v)
 }
 
 // printFan prints pfanel's newest history row.
@@ -396,4 +411,11 @@ func printFanSteps(steps []plus.FanSpeedStep) {
 		fmt.Printf("  %3d%% -> %5d rpm, %6d mdb, %5d mW\n",
 			s.Percent, s.RPMEst, s.NoiseMdb, s.PowerMw)
 	}
+}
+
+func derefU64(v *uint64) uint64 {
+	if v == nil {
+		return 0
+	}
+	return *v
 }

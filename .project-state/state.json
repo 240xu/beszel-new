@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "mode": "EXECUTE",
+  "tier": "T2",
+  "phase": "M0-complete",
+  "repository_mode": "git",
+  "state_persistence": "available",
+  "baseline": {
+    "local_branch": "fix/security-batch01",
+    "local_commit": "a222a2855813426c5adcfb91f531994fe2859031",
+    "tree": "9d96cb516c7e186b3c9d35a512524961c94fb91b",
+    "remote_default_branch": "beszel-new",
+    "remote_commit": "f555c6368ffebf36fb671ad401f33f2cfccdc754",
+    "remote_tree": "9d96cb516c7e186b3c9d35a512524961c94fb91b",
+    "production_host": "wuming",
+    "production_service": "beszel-hub",
+    "production_pid": 604922,
+    "production_binary_sha256": "ff7b862132cfdfa796bdd85d8e1db5d740b2b460cb819fd21a1895c50107ee1b",
+    "production_go": "1.27.2",
+    "ci_run_success": 39615745283,
+    "captured_at": "2026-10-23T08:05:00+08:00"
+  },
+  "goal_ledger": [
+    {"goal":"all shipped targets build","metric":"matrix pass rate","baseline":"8/32 linux-only","target":"100% of retained targets","measure":"go build matrix + goreleaser snapshot","stop":"same cell fails twice"},
+    {"goal":"no release blockers","metric":"blocker/high count","baseline":"2 blocker + 4 high","target":"0/0","measure":"re-review six compat reports","stop":"regression"},
+    {"goal":"health semantics correct","metric":"health vs guard","baseline":"inverted","target":"temp-only failure => failsafe","measure":"hub test + /state JSON","stop":"test contradicts code"},
+    {"goal":"hardware discovery","metric":"ACPI HID set","baseline":"INT340* only","target":"INT340* + PNP0C0B","measure":"probe + fixture","stop":"reference host regresses"},
+    {"goal":"absence != zero","metric":"persisted partial reports","baseline":"zeros persisted","target":"absent stays absent","measure":"test hub DB row","stop":"cannot prove"},
+    {"goal":"zh completeness","metric":"zh-HK plus strings","baseline":"27/117","target":"117/117","measure":"lingui fallback + gate","stop":"fallback inert"},
+    {"goal":"CI discovers breakage","metric":"cross-platform job","baseline":"none","target":"one matrix job","measure":"PR CI log","stop":"cost exceeds budget"}
+  ],
+  "constraints": [
+    "repo is MIT; GPL code must not be copied",
+    "Go 1.27.2 via GOTOOLCHAIN=auto on wuming",
+    "wire additions only; Codes()/Outcome unchanged",
+    "every milestone ends with independent read-back"
+  ],
+  "decisions": [],
+  "risks": [],
+  "dependencies": [],
+  "evidence": [
+    {"id":"E1","level":"E2","source":"compat-os/REPORT.md","time":"2026-10-23","scope":"non-linux build failure","repro":"GOOS=darwin go build ./agent/plus/..."},
+    {"id":"E2","level":"E2","source":"compat-test/REPORT.md","time":"2026-10-23","scope":"mips release build failure","repro":"GOOS=linux GOARCH=mips go build ./internal/cmd/agent"},
+    {"id":"E3","level":"E1","source":"api_plus.go:258-266 + guard.go:694","time":"2026-10-23","scope":"health inverted","repro":"read both branches"},
+    {"id":"E4","level":"E3","source":"gh api commit","time":"2026-10-23","scope":"remote tree equals local","repro":"gh api repos/.../commits/f555c636"}
+  ],
+  "protected_assets": ["production /usr/local/bin/beszel", "production beszel_data", "remote beszel-new"],
+  "hypotheses": [
+    {"id":"H1","text":"envOr hoist is behaviour-neutral on linux","status":"unverified"},
+    {"id":"H2","text":"mips can be retained with a pfanel stub","status":"unverified"}
+  ],
+  "assumptions": [],
+  "last_outcome": "CONTINUE",
+  "next_step": "M1: hoist envOr, run 32-cell matrix, decide mips A/B",
+  "next_review_trigger": "matrix shows a new failing cell or mips spike exceeds 30min",
+  "updated_at": "2026-10-23T08:05:00+08:00"
+}

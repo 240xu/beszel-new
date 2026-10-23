@@ -52,10 +52,10 @@ func collectNetAll(root string) map[string]*NetIfaceStats {
 		}
 		s := &NetIfaceStats{RxBytes: rx, TxBytes: tx}
 		if v, err := readUint(filepath.Join(dir, "statistics", "rx_packets")); err == nil {
-			s.RxPackets = v
+			s.RxPackets = &v
 		}
 		if v, err := readUint(filepath.Join(dir, "statistics", "tx_packets")); err == nil {
-			s.TxPackets = v
+			s.TxPackets = &v
 		}
 		if v, err := readTrimmed(filepath.Join(dir, "operstate")); err == nil {
 			s.OperState = v
@@ -63,13 +63,15 @@ func collectNetAll(root string) map[string]*NetIfaceStats {
 		if v, err := readTrimmed(filepath.Join(dir, "speed")); err == nil {
 			// Linux reports the link speed in Mbit/s; the _mbit suffix keeps the
 			// unit explicit and matches the other rate fields. n > 0 rejects the
-			// kernel's -1 "unknown" sentinel, leaving SpeedMBit at its zero fill.
+			// kernel's -1 "unknown" sentinel, leaving SpeedMBit nil: an unreadable
+			// speed is absent from the wire, not a 0 Mbit/s link.
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
-				s.SpeedMBit = n
+				s.SpeedMBit = &n
 			}
 		}
 		if v, err := readUint(filepath.Join(dir, "mtu")); err == nil {
-			s.MTU = int(v)
+			n := int(v)
+			s.MTU = &n
 		}
 		out[filepath.Base(dir)] = s
 	}

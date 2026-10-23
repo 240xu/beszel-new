@@ -29,6 +29,11 @@ msgid "Copy token"
 msgstr "複製權杖"
 
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Fan writes are latched after repeated failures. The last verified duty is held until the control path recovers."
+msgstr "風扇寫入在連續失敗後已鎖定。在控制路徑恢復前，會持續保持最後一次已驗證的檔位。"
+
+
 #: src/components/token-value.tsx
 msgid "Hide token"
 msgstr "隱藏權杖"
@@ -42,6 +47,11 @@ msgstr "顯示權杖"
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The hub is acting on a reading it could not verify. The emergency duty is held until the sensor recovers."
 msgstr "中樞正在依據一項無法驗證的讀數動作。中樞正在依據一項無法驗證的讀數動作。在感測器恢復前，會持續保持緊急檔位。"
+
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "This panel and the hub disagree about the request format, so nothing was sent to the fan. Update the hub or reload the page."
+msgstr "面板與中樞對請求格式的理解不一致，因此沒有向風扇送出任何指令。請更新中樞或重新載入頁面。"
 
 
 #: src/components/token-value.tsx
@@ -3173,3 +3183,8 @@ msgstr "顯示權杖"
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Token hidden"
 msgstr "權杖已隱藏"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The server answered, but this panel could not read the result. The change may be in force; check the current state before writing again."
+msgstr "伺服器已回應，但此面板無法讀取結果。變更可能已經生效；再次寫入前請先確認目前狀態。"
+

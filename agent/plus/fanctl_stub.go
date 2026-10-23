@@ -3,7 +3,6 @@
 package plus
 
 import (
-	"os"
 	"time"
 )
 
@@ -30,12 +29,6 @@ type FanPaths struct {
 }
 
 func ProdFanPaths() FanPaths {
-	envOr := func(name, fallback string) string {
-		if v := os.Getenv(name); v != "" {
-			return v
-		}
-		return fallback
-	}
 	return FanPaths{
 		Device: envOr(fanDeviceEnv, ProdFanDevice),
 		Lock:   envOr(fanLockEnv, ProdFanLock),

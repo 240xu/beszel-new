@@ -51,6 +51,19 @@ async function authorizationHeader(): Promise<Record<string, string>> {
 	return token ? { Authorization: token } : {}
 }
 
+/** The server answered with a status this panel accepted but a body it cannot read:
+ *  empty where a result was promised, or not JSON. Distinct from a network failure,
+ *  because the request did reach the hub and may have been applied. */
+export class UnreadableResponseError extends Error {
+	readonly status: number
+
+	constructor(status: number) {
+		super("the server answered in a shape this panel cannot read")
+		this.name = "UnreadableResponseError"
+		this.status = status
+	}
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
 	const authorization = await authorizationHeader()
 	const res = await fetch(path, {
@@ -61,8 +74,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 	if (!res.ok) {
 		throw readFanRefusal(res.status, text)
 	}
-	if (!text) return undefined as T
-	return JSON.parse(text) as T
+	if (!text) throw new UnreadableResponseError(res.status)
+	try {
+		return JSON.parse(text) as T
+	} catch {
+		throw new UnreadableResponseError(res.status)
+	}
 }
 
 /** The duty, the daemon's state and the curve arrive together, so an editor

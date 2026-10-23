@@ -295,21 +295,44 @@ func TestCollectFanStepsOrdersInstancesNumericallyNotLexically(t *testing.T) {
 	assert.Equal(t, uint16(1111), steps[0].RPMEst)
 }
 
-// TestCollectFanStepsSkipsDevicesOutsideInt340 scopes the discovery glob itself. A table
-// under any other device ID is not read, so a cooler or thermal device that happened to
-// publish one cannot displace a fan's -- _FPS is a property of the ACPI Fan object, whose
-// HID is INT3404, and this collector resolves a fan rather than a thermal device.
-//
-// The lone table-bearing device here is deliberately outside the glob, so the assertion is
-// that the collector finds nothing rather than which of two it preferred.
-func TestCollectFanStepsSkipsDevicesOutsideInt340(t *testing.T) {
+// TestCollectFanStepsSkipsDevicesThatAreNotFanObjects scopes discovery by ACPI HID, not
+// by directory name. The fan object is identified by INT340* (Intel DPTF) or PNP0C0B (the
+// ACPI fan), so a cooler or thermal device that happened to publish a table cannot
+// displace a fan's.
+func TestCollectFanStepsSkipsDevicesThatAreNotFanObjects(t *testing.T) {
 	root := t.TempDir()
 	writeDevice(t, root, "INT3404:00", nil)
 	writeDevice(t, root, "INT3420:00", tableFan1)
 	writeDevice(t, root, "INT346F:00", tableFan2)
 
 	assert.Nil(t, collectFanSteps(root),
-		"a table outside INT340* is not a fan table and must leave the key absent")
+		"a table under a non-fan HID leaves the key absent")
+}
+
+// TestCollectFanStepsFindsTheAcpiFanDevice covers C4: firmware that exposes the ACPI fan
+// as PNP0C0B instead of a DPTF INT340* object publishes the same state* table, and the
+// earlier INT340-only glob hid that fan entirely.
+func TestCollectFanStepsFindsTheAcpiFanDevice(t *testing.T) {
+	root := t.TempDir()
+	writeDevice(t, root, "PNP0C0B:00", tableFan1)
+	writeDevice(t, root, "INT3404:00", nil)
+
+	steps := collectFanSteps(root)
+	require.NotNil(t, steps, "the ACPI fan's table must be found")
+	require.Len(t, steps, 2)
+	assert.Equal(t, 25, steps[0].Percent)
+}
+
+// TestCollectFanStepsPrefersDptfOverTheAcpiFan pins the tie-break when both HIDs publish
+// a table: the DPTF fan is the one this project's EC path is built around, so it wins.
+func TestCollectFanStepsPrefersDptfOverTheAcpiFan(t *testing.T) {
+	root := t.TempDir()
+	writeDevice(t, root, "PNP0C0B:00", tableFan2)
+	writeDevice(t, root, "INT3404:00", tableFan1)
+
+	steps := collectFanSteps(root)
+	require.Len(t, steps, 2)
+	assert.Equal(t, 25, steps[0].Percent, "INT340* table wins over PNP0C0B")
 }
 
 // TestCollectFanStepsIsNilWithoutATable covers the graceful degradation from both ends: a
@@ -416,4 +439,41 @@ func TestCollectExposesFanStepsThroughCollect(t *testing.T) {
 	assert.Equal(t, uint16(3200), s.FanSteps[0].RPMEst)
 	assert.Equal(t, 100, s.FanSteps[10].Percent)
 	assert.Equal(t, uint16(12000), s.FanSteps[10].RPMEst)
+}
+
+// TestParseFpsLineKeepsARowWithAPartialTable covers C5: a firmware table may leave any of
+// the measurement fields "not-defined" while still defining the duty. Dropping the row
+// there discarded a duty the firmware does define, so only the duty decides whether the
+// row survives; the absent fields stay 0 ("no value") instead of becoming measurements.
+func TestParseFpsLineKeepsARowWithAPartialTable(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		line  string
+		rpm   uint16
+		noise int
+		power int
+	}{
+		{"no rpm", "50:not-defined:not-defined:25000:2500", 0, 25000, 2500},
+		{"no noise and power", "50:not-defined:5000:not-defined:not-defined", 5000, 0, 0},
+		{"nothing but duty", "50:not-defined:not-defined:not-defined:not-defined", 0, 0, 0},
+		{"complete row", "50:not-defined:5000:25000:2500", 5000, 25000, 2500},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			step, ok := parseFpsLine(tc.line)
+			require.True(t, ok, "the duty is defined, so the row must survive")
+			assert.Equal(t, 50, step.Percent)
+			assert.Equal(t, tc.rpm, step.RPMEst)
+			assert.Equal(t, tc.noise, step.NoiseMdb)
+			assert.Equal(t, tc.power, step.PowerMw)
+		})
+	}
+}
+
+// The duty itself is not optional: a row without a usable control percentage is not a
+// step this table can publish.
+func TestParseFpsLineStillNeedsTheDuty(t *testing.T) {
+	for _, line := range []string{"not-defined:not-defined:5000:25000:2500", "-10:not-defined:5000:25000:2500"} {
+		_, ok := parseFpsLine(line)
+		assert.False(t, ok, line)
+	}
 }

@@ -62,13 +62,18 @@ type CpufreqStats struct {
 // collectNetAll in netall.go for the reset rule consumers must apply; this type
 // only owns the wire names.
 type NetIfaceStats struct {
-	RxBytes   uint64 `json:"rx_bytes"`
-	TxBytes   uint64 `json:"tx_bytes"`
-	RxPackets uint64 `json:"rx_packets,omitempty"`
-	TxPackets uint64 `json:"tx_packets,omitempty"`
-	OperState string `json:"oper_state,omitempty"`
-	SpeedMBit int    `json:"speed_mbit,omitempty"`
-	MTU       int    `json:"mtu,omitempty"`
+	RxBytes   uint64  `json:"rx_bytes"`
+	TxBytes   uint64  `json:"tx_bytes"`
+	RxPackets *uint64 `json:"rx_packets,omitempty"`
+	TxPackets *uint64 `json:"tx_packets,omitempty"`
+	OperState string  `json:"oper_state,omitempty"`
+	// SpeedMBit and MTU are pointers so an absent key means "this interface did not
+	// report it" (a virtual device with no speed, an unreadable attribute). With a
+	// bare int, encoding/json v2 keeps the zero under omitempty, so the datastore
+	// would record a definitive 0 Mbit/s link or a 0-byte MTU the kernel never said.
+	// A real zero (an interface can report 0 for an unknown speed) still encodes as 0.
+	SpeedMBit *int `json:"speed_mbit,omitempty"`
+	MTU       *int `json:"mtu,omitempty"`
 }
 
 // NvmeStats is the NVMe health log as beszel-new reports it.
@@ -143,14 +148,19 @@ type NvmeStats struct {
 // rather than alone; level low with the rate still high is distance or
 // contention, level healthy with the rate collapsed is a transmit fault.
 type WiFiStats struct {
-	SignalDbm int     `json:"signal_dbm,omitempty"`
-	TxMBit    float64 `json:"tx_mbit,omitempty"`
-	FreqMHz   int     `json:"freq_mhz,omitempty"`
+	// These are pointers because the contract above is "absent means unknown", and
+	// encoding/json v2 keeps a numeric zero under omitempty. A bare int would make
+	// a station query that failed indistinguishable from a 0 dBm / 0 Mbit/s link
+	// once the record is stored. An explicit zero still encodes as 0; only the
+	// never-assigned value disappears.
+	SignalDbm *int     `json:"signal_dbm,omitempty"`
+	TxMBit    *float64 `json:"tx_mbit,omitempty"`
+	FreqMHz   *int     `json:"freq_mhz,omitempty"`
 	// Retry is the wire doc for the cumulative contract above, kept on the field
 	// because that is the line a UI author reads: the name carries no _total, so a
 	// consumer that trusts it as a rate graphs a line that only ever rises.
-	Retry uint64 `json:"retry,omitempty"`
-	Iface string `json:"iface,omitempty"`
+	Retry *uint64 `json:"retry,omitempty"`
+	Iface string  `json:"iface,omitempty"`
 }
 
 // FanSample is one raw row of pfanel's history database, handed in by the caller.

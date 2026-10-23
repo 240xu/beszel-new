@@ -229,6 +229,11 @@ jobs:
           dotnet-version: "9.0.x"
       - name: Build the embedded LHM helper
         run: dotnet build -c Release ./agent/lhm/beszel_lhm.csproj
+      # The Windows agent also embeds smartctl.exe. It is fetched at build time with
+      # a pinned SHA (agent/smart.go), which is exactly what the release does, so the
+      # matrix exercises the real acquisition path instead of stubbing it.
+      - name: Fetch the embedded smartctl.exe
+        run: go generate -run fetchsmartctl ./agent
       - name: Seed the embedded site directory
         run: |
           mkdir -p ./internal/site/dist

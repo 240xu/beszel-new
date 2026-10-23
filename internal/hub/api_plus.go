@@ -481,12 +481,12 @@ const (
 // mode. They carry data.reason instead, which names the shape fault without inventing a
 // member of that set, and lets a panel distinguish a version skew from a malformed body.
 func decodeBody(e *core.RequestEvent, dst any) error {
-	body, err := readFanBodyTyped(e)
+	body, err := readFanBody(e)
 	if err != nil {
 		slog.Warn("fan request body could not be read", "actor", actor(e), "err", err)
 		return codedReason(e, http.StatusBadRequest, "invalid body", faultReason(err))
 	}
-	if err := strictJSONTyped(body, dst); err != nil {
+	if err := strictJSON(body, dst); err != nil {
 		slog.Warn("fan request body would not parse", "actor", actor(e), "err", err)
 		return codedReason(e, http.StatusBadRequest, "invalid body", faultReason(err))
 	}
@@ -505,10 +505,6 @@ func faultReason(err error) string {
 }
 
 func readFanBody(e *core.RequestEvent) ([]byte, error) {
-	return readFanBodyTyped(e)
-}
-
-func readFanBodyTyped(e *core.RequestEvent) ([]byte, error) {
 	if e.Request.Body == nil {
 		return nil, &bodyFault{reasonBodyUnreadable, errors.New("no body")}
 	}
@@ -523,10 +519,6 @@ func readFanBodyTyped(e *core.RequestEvent) ([]byte, error) {
 }
 
 func strictJSON(body []byte, dst any) error {
-	return strictJSONTyped(body, dst)
-}
-
-func strictJSONTyped(body []byte, dst any) error {
 	if len(bytes.TrimSpace(body)) == 0 {
 		return &bodyFault{reasonEmptyBody, errors.New("empty body")}
 	}
@@ -595,13 +587,13 @@ func decodeCurveRequest(e *core.RequestEvent) (*curveRequest, error) {
 	var req curveRequest
 	// A body this route cannot read is a curve it rejected before anything was written,
 	// which is what curve_rejected already means, so it is named rather than guessed at.
-	body, err := readFanBodyTyped(e)
+	body, err := readFanBody(e)
 	if err != nil {
 		slog.Warn("fan curve request body could not be read", "actor", actor(e), "err", err)
 		return nil, codedWithReason(e, http.StatusBadRequest, "invalid body",
 			fanapi.Classify(fanapi.ErrCurveRejected).Code, faultReason(err))
 	}
-	if err := strictJSONTyped(body, &req); err != nil {
+	if err := strictJSON(body, &req); err != nil {
 		slog.Warn("fan curve request body would not parse", "actor", actor(e), "err", err)
 		return nil, codedWithReason(e, http.StatusBadRequest, "invalid body",
 			fanapi.Classify(fanapi.ErrCurveRejected).Code, faultReason(err))

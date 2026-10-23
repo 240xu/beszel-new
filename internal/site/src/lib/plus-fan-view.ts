@@ -1,6 +1,6 @@
 import type { FanCurve, FanMode, FanModeResult, FanState } from "@/types"
-import { FAN_SAVE_STATUS, type CurveSaveResult, saveCurve, setFanLevel, setFanMode } from "@/lib/plus-api"
-import { FanApiError, type FanRejectCode } from "@/lib/plus-refusals"
+import { FAN_SAVE_STATUS, UnreadableResponseError, type CurveSaveResult, saveCurve, setFanLevel, setFanMode } from "@/lib/plus-api"
+import { FanApiError, type FanBodyReason, type FanRejectCode } from "@/lib/plus-refusals"
 import { UNKNOWN } from "@/lib/plus-metrics"
 
 export type { CurveSaveResult }
@@ -107,26 +107,39 @@ export function fanWriteOutcome(result: FanWriteResult): FanWriteOutcome {
 	}
 }
 
-export type FanRefusalKey = FanRejectCode | "unclassified" | "unrecognised"
+/** `version_skew` is not a hub refusal code: it is the shape mismatch the hub reports
+ *  in data.reason when it cannot read the body at all. Keeping it in this union lets the
+ *  panel say something actionable instead of "refused for an unknown reason". */
+export type FanRefusalKey = FanRejectCode | "unclassified" | "unrecognised" | "version_skew"
 
 export interface FanRefusalView {
 	key: FanRefusalKey
 	status: number
 	detail?: string
+	/** Why the body was rejected, when the hub said. Present on a shape mismatch that
+	 *  has no refusal code, which is the version-skew case. */
+	reason?: FanBodyReason
 }
 
-export type FanRefusalError = Pick<FanApiError, "code" | "rawCode" | "status">
+export type FanRefusalError = Pick<FanApiError, "code" | "rawCode" | "status" | "reason">
 
 /** Reads `code` and never `status`. An identifier this build does not know is not
  *  filed under the status it shares with a fault of another kind: a dead sensor
  *  and a hot package are both a 503, and cooling a machine with a broken sensor
  *  sends the operator after the wrong problem. */
 export function fanRefusal(error: FanRefusalError): FanRefusalView {
-	const key: FanRefusalKey = error.code ?? (error.rawCode === undefined ? "unclassified" : "unrecognised")
+	const key: FanRefusalKey =
+		error.code ??
+		(error.reason === "unknown_field"
+			? "version_skew"
+			: error.rawCode === undefined
+				? "unclassified"
+				: "unrecognised")
 	return {
 		key,
 		status: error.status,
 		detail: error.rawCode === error.code ? undefined : error.rawCode,
+		reason: error.reason,
 	}
 }
 
@@ -138,9 +151,19 @@ export function fanRefusal(error: FanRefusalError): FanRefusalView {
  *  rejected curve, a device that refused it) leaves the write before it in force,
  *  so its banner stays. One that says the fan is no longer holding what that write
  *  put there takes the banner down with it. */
+/** `unknown` separates "the request never got an answer" from "the server answered
+ *  in a shape this panel cannot read". Both leave the operator without a result, but
+ *  only the first is a claim about the network, and a 2xx with an unreadable body is
+ *  a claim the server made: it may well have applied the write. */
 export type FanWriteSettled =
 	| { ok: true; outcome: FanWriteOutcome }
-	| { ok: false; offline: boolean; refusal: FanRefusalView | null; dropBanner: boolean }
+	| {
+			ok: false
+			offline: boolean
+			unknown: boolean
+			refusal: FanRefusalView | null
+			dropBanner: boolean
+	  }
 
 /** A refusal that reports the fan no longer holds the duty the last banner claimed:
  *  the restore failed, or the write could not be confirmed and may not have landed. */
@@ -158,11 +181,18 @@ export function fanWriteRefused(write: FanWrite, error: unknown): FanWriteSettle
 		return {
 			ok: false,
 			offline: false,
+			unknown: false,
 			refusal,
 			dropBanner: write.kind === "mode" || LOST_THE_LAST_WRITE.has(refusal.key),
 		}
 	}
-	return { ok: false, offline: true, refusal: null, dropBanner: true }
+	// A response that arrived but could not be read is not proof the request
+	// failed to reach the hub. Say "unknown" and drop the banner: the write may
+	// be in force, so the previous banner is not something to keep standing on.
+	if (error instanceof UnreadableResponseError) {
+		return { ok: false, offline: false, unknown: true, refusal: null, dropBanner: true }
+	}
+	return { ok: false, offline: true, unknown: false, refusal: null, dropBanner: true }
 }
 
 export type RegressKind = "none" | "no_deadline" | "counting_down"

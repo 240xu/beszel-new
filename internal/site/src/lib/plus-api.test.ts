@@ -287,3 +287,20 @@ describe("authorization", () => {
 		expect(calls[0].headers.authorization).toBe("session-token")
 	})
 })
+
+test("a body fault exposes its reason without inventing a code", () => {
+	const err = readFanRefusal(
+		400,
+		JSON.stringify({ status: 400, message: "invalid body", data: { reason: "unknown_field" } })
+	)
+	expect(err.code).toBeUndefined()
+	expect(err.reason).toBe("unknown_field")
+})
+
+test("an unrecognised reason is dropped", () => {
+	const err = readFanRefusal(
+		400,
+		JSON.stringify({ status: 400, message: "invalid body", data: { reason: "made_up" } })
+	)
+	expect(err.reason).toBeUndefined()
+})

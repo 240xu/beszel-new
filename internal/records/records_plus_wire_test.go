@@ -60,6 +60,10 @@ const plusStatsCborKey = 41
 // keeps a real zero distinct from an absent reading.
 func plusIntPtr(v int) *int { return &v }
 
+func plusFloatPtr(v float64) *float64 { return &v }
+
+func plusU64Ptr(v uint64) *uint64 { return &v }
+
 // plusFixture builds a plus.Stats with a distinct non-zero value in every
 // field, for every section, so a transposition, a truncated width or a dropped
 // field shows up as a mismatch instead of as two zeroes that compare equal.
@@ -85,12 +89,12 @@ func plusFixture() *plus.Stats {
 		},
 		NetAll: map[string]*plus.NetIfaceStats{
 			"eth0": {
-				RxBytes: 918273645, TxBytes: 564738291, RxPackets: 7012345,
-				TxPackets: 4890234, OperState: "up", SpeedMBit: 1000, MTU: 1500,
+				RxBytes: 918273645, TxBytes: 564738291, RxPackets: plusU64Ptr(7012345),
+				TxPackets: plusU64Ptr(4890234), OperState: "up", SpeedMBit: plusIntPtr(1000), MTU: plusIntPtr(1500),
 			},
 			"wlan0": {
-				RxBytes: 9182, TxBytes: 5647, RxPackets: 71, TxPackets: 48,
-				OperState: "down", SpeedMBit: 0, MTU: 1500,
+				RxBytes: 9182, TxBytes: 5647, RxPackets: plusU64Ptr(71), TxPackets: plusU64Ptr(48),
+				OperState: "down", SpeedMBit: plusIntPtr(0), MTU: plusIntPtr(1500),
 			},
 		},
 		Nvme: &plus.NvmeStats{
@@ -100,7 +104,8 @@ func plusFixture() *plus.Stats {
 			MediaErrors: 5, ControllerBusyMin: 46, CriticalCompTimeMin: 13,
 		},
 		WiFi: &plus.WiFiStats{
-			SignalDbm: -52, TxMBit: 144.5, FreqMHz: 5180, Retry: 8123, Iface: "wlan0",
+			SignalDbm: plusIntPtr(-52), TxMBit: plusFloatPtr(144.5), FreqMHz: plusIntPtr(5180),
+			Retry: plusU64Ptr(8123), Iface: "wlan0",
 		},
 		Fan: &plus.FanStats{
 			SetLevelPct: plusIntPtr(40), EC76Pct: plusIntPtr(61), RPMEst: 2450,

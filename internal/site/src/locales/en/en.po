@@ -24,6 +24,11 @@ msgid "Copy token"
 msgstr "Copy token"
 
 
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Fan writes are latched after repeated failures. The last verified duty is held until the control path recovers."
+msgstr "Fan writes are latched after repeated failures. The last verified duty is held until the control path recovers."
+
+
 #: src/components/token-value.tsx
 msgid "Hide token"
 msgstr "Hide token"
@@ -37,6 +42,11 @@ msgstr "Reveal token"
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The hub is acting on a reading it could not verify. The emergency duty is held until the sensor recovers."
 msgstr "The hub is acting on a reading it could not verify. The emergency duty is held until the sensor recovers."
+
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "This panel and the hub disagree about the request format, so nothing was sent to the fan. Update the hub or reload the page."
+msgstr "This panel and the hub disagree about the request format, so nothing was sent to the fan. Update the hub or reload the page."
 
 
 #: src/components/token-value.tsx
@@ -3152,3 +3162,8 @@ msgstr "Yes"
 #: src/components/routes/settings/layout.tsx
 msgid "Your user settings have been updated."
 msgstr "Your user settings have been updated."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The server answered, but this panel could not read the result. The change may be in force; check the current state before writing again."
+msgstr "The server answered, but this panel could not read the result. The change may be in force; check the current state before writing again."
+

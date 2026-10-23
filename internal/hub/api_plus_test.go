@@ -654,6 +654,10 @@ func TestUnknownFieldsInAWriteAreRefused(t *testing.T) {
 			h := newFanHarness(t)
 			rec := h.do(t, "admin", http.MethodPost, ep.path, ep.body)
 			assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+			data, ok := decodeBody(t, rec)["data"].(map[string]any)
+			require.True(t, ok, "a body fault must say why: %s", rec.Body.String())
+			assert.Equal(t, "unknown_field", data["reason"],
+				"a version skew must be distinguishable from a malformed body")
 			assert.Empty(t, h.rig.writes())
 			assert.Empty(t, h.rig.actions)
 			assert.Equal(t, testCurveSource, string(h.rig.curve))
@@ -914,8 +918,10 @@ func TestStateReportsReadingHealthInsteadOfLeavingItToInference(t *testing.T) {
 
 	h.rig.getErr = errors.New("device gone")
 	body = decodeBody(t, h.do(t, "admin", http.MethodGet, "/api/plus/fan/state", nil))
-	assert.Equal(t, "failsafe", body["health"], "both failed -> failsafe")
+	assert.Equal(t, "stale", body["health"],
+		"two failed reads alone are still only stale: failsafe means the guard is holding")
 	assert.Equal(t, "level_and_temperature_unreadable", body["failsafe_reason"])
+	assert.Equal(t, false, body["breaker_open"])
 }
 
 // TestStateReportsARegressDeadlineOnlyWhenThereIsOne. An operator shown a
@@ -993,4 +999,37 @@ func TestHubTerminateClosesTheGuard(t *testing.T) {
 		"shutdown must end the pending regress rather than let it fire during teardown")
 	assert.False(t, h.guard.ThermalFloorArmed(),
 		"shutdown must stand the thermal floor down")
+}
+
+// A body fault carries a reason so a panel can tell a shape mismatch (a newer panel
+// against an older hub) from a malformed body. It must not borrow a refusal code: the
+// closed set has no member for it.
+func TestBodyFaultsCarryAReasonAndNoBorrowedCode(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		path   string
+		body   string
+		reason string
+	}{
+		{"empty", "/api/plus/fan/level", "", "empty_body"},
+		{"not json", "/api/plus/fan/level", "{", "not_json"},
+		{"trailing", "/api/plus/fan/level", `{"level":70,"confirm":true}{"level":25}`, "trailing_content"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newFanHarness(t)
+			req := httptest.NewRequest(http.MethodPost, tc.path, strings.NewReader(tc.body))
+			req.Header.Set("content-type", "application/json")
+			req.Header.Set("Authorization", h.tokens["admin"])
+			rec := httptest.NewRecorder()
+			h.handler.ServeHTTP(rec, req)
+
+			assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+			data, ok := decodeBody(t, rec)["data"].(map[string]any)
+			require.True(t, ok)
+			assert.Equal(t, tc.reason, data["reason"])
+			assert.NotContains(t, data, "code",
+				"a body fault has no member in the closed code set, so it must not invent one")
+			assert.Empty(t, h.rig.writes())
+		})
+	}
 }

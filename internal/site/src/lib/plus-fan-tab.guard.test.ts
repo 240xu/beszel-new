@@ -210,7 +210,7 @@ test("no wording that claims a write is running exists outside the two outcome t
 
 test("no two refusals share a sentence in this panel either", async () => {
 	const values = [...tableBody(await read(TAB), "REFUSAL_TEXT").matchAll(/t`([^`]*)`/g)].map((m) => m[1])
-	expect(values).toHaveLength(14)
+	expect(values).toHaveLength(15)
 	expect(new Set(values).size).toBe(values.length)
 })
 

@@ -37,8 +37,8 @@ func TestCollectNetAllIncludesVirtualInterfaces(t *testing.T) {
 	assert.Contains(t, got, "docker0")
 	assert.Equal(t, uint64(21898421), got["wlp0s20f3"].RxBytes)
 	assert.Equal(t, "up", got["wlp0s20f3"].OperState)
-	assert.Equal(t, 1000, got["wlp0s20f3"].SpeedMBit)
-	assert.Equal(t, 1500, got["wlp0s20f3"].MTU)
+	assert.Equal(t, 1000, derefInt(got["wlp0s20f3"].SpeedMBit))
+	assert.Equal(t, 1500, derefInt(got["wlp0s20f3"].MTU))
 }
 
 func TestCollectNetAllReturnsNilWithoutInterfaces(t *testing.T) {
@@ -110,11 +110,11 @@ func TestCollectNetAllTreatsNegativeSpeedAsUnknown(t *testing.T) {
 
 	got := collectNetAll(root)
 	require.Len(t, got, 3)
-	assert.Equal(t, 0, got["docker0"].SpeedMBit, "speed=-1 means unknown, not -1 Mbit/s")
-	assert.Equal(t, 0, got["enp0s31f6"].SpeedMBit, "speed=-1 means unknown, not -1 Mbit/s")
+	assert.Nil(t, got["docker0"].SpeedMBit, "speed=-1 means unknown, not -1 Mbit/s")
+	assert.Nil(t, got["enp0s31f6"].SpeedMBit, "speed=-1 means unknown, not -1 Mbit/s")
 	// Blanking every negative would also pass the two assertions above, so the
 	// real readings have to survive.
-	assert.Equal(t, 1000, got["br-82552716bfdf"].SpeedMBit)
+	assert.Equal(t, 1000, derefInt(got["br-82552716bfdf"].SpeedMBit))
 
 	// The Go field being 0 is only half the claim: omitempty drops it, so an
 	// unknown speed must leave the key out of the payload rather than ship a
@@ -144,7 +144,7 @@ func TestCollectNetAllSurvivesUnreadableSpeed(t *testing.T) {
 	for _, name := range []string{"lo", "wlp0s20f3"} {
 		s := got[name]
 		require.NotNil(t, s, "interface %q must survive a speed it cannot read", name)
-		assert.Equal(t, 0, s.SpeedMBit, "interface %q has no readable speed", name)
+		assert.Nil(t, s.SpeedMBit, "interface %q has no readable speed", name)
 	}
 	assert.Equal(t, uint64(3965781728), got["lo"].RxBytes)
 	assert.Equal(t, uint64(3361763402), got["wlp0s20f3"].RxBytes)
@@ -193,10 +193,10 @@ func TestCollectNetAllKeepsUnknownOperState(t *testing.T) {
 	assert.Equal(t, "down", got["docker0"].OperState)
 	// lo carries a loopback MTU, not the 1500 every physical and virtual NIC
 	// shares here, so a hardcoded or truncated MTU is visible.
-	assert.Equal(t, 65536, got["lo"].MTU)
-	assert.Equal(t, 1500, got["docker0"].MTU)
-	assert.Equal(t, uint64(10), got["lo"].RxPackets)
-	assert.Equal(t, uint64(11), got["lo"].TxPackets)
+	assert.Equal(t, 65536, derefInt(got["lo"].MTU))
+	assert.Equal(t, 1500, derefInt(got["docker0"].MTU))
+	assert.Equal(t, uint64(10), derefU64(got["lo"].RxPackets))
+	assert.Equal(t, uint64(11), derefU64(got["lo"].TxPackets))
 }
 
 // TestCollectNetAllTagsNameTheFieldNotTheFile guards the wire names of this
@@ -341,8 +341,8 @@ func TestCollectNetAllReportsCumulativeCountersVerbatim(t *testing.T) {
 	require.NotNil(t, s)
 	assert.Equal(t, uint64(4003869867), s.RxBytes, "rx_bytes is the raw sysfs counter, not a rate or a delta")
 	assert.Equal(t, uint64(4003869988), s.TxBytes, "tx_bytes is the raw sysfs counter, not a rate or a delta")
-	assert.Equal(t, uint64(5038409), s.RxPackets, "rx_packets is the raw sysfs counter")
-	assert.Equal(t, uint64(5038412), s.TxPackets, "tx_packets is the raw sysfs counter")
+	assert.Equal(t, uint64(5038409), derefU64(s.RxPackets), "rx_packets is the raw sysfs counter")
+	assert.Equal(t, uint64(5038412), derefU64(s.TxPackets), "tx_packets is the raw sysfs counter")
 }
 
 // TestCollectNetAllSurfacesCounterReset guards the other half of the contract:
@@ -378,14 +378,15 @@ func TestCollectNetAllSurfacesCounterReset(t *testing.T) {
 	assert.Less(t, after["lo"].RxBytes, before["lo"].RxBytes,
 		"the decrease is the only reset signal a consumer gets, so it must survive collection")
 
-	// On the wire a reset shows as bytes pinned at 0 while the packet counters
-	// vanish under omitempty. Both halves matter: a consumer cannot read the
-	// reset off a missing packet key, and cannot read it off a missing byte key
-	// either, because bytes have no omitempty and are therefore always present.
+	// A reset is a measured zero, so every counter has to stay on the wire: a
+	// consumer detects the reset by the drop in value, and an absent key would be
+	// indistinguishable from an unread one. Packet counters are pointers, so 0
+	// encodes as 0 rather than being dropped by omitempty (which under
+	// encoding/json v2 keeps the zero anyway, making the old expectation false).
 	b, err := json.Marshal(after)
 	require.NoError(t, err)
-	assert.Contains(t, string(b), `"rx_bytes":0`, "rx_bytes has no omitempty, so zero must still be on the wire")
-	assert.NotContains(t, string(b), `"rx_packets"`, "rx_packets has omitempty, so a zero packet count vanishes")
+	assert.Contains(t, string(b), `"rx_bytes":0`, "rx_bytes is mandatory and a reset is a real zero")
+	assert.Contains(t, string(b), `"rx_packets":0`, "a read packet counter of zero must survive, or a reset is unreadable")
 }
 
 // TestCollectNetAllIsStatelessAcrossCalls is the guard on the choice to keep this
@@ -418,4 +419,18 @@ func TestCollectNetAllIsStatelessAcrossCalls(t *testing.T) {
 	require.NotNil(t, third["veth1255f81"])
 	assert.Equal(t, uint64(8762), third["veth1255f81"].RxBytes, "the new raw value, not a delta against the previous call")
 	assert.Equal(t, uint64(117771), third["veth1255f81"].TxBytes, "the new raw value, not a delta against the previous call")
+}
+
+func derefInt(v *int) int {
+	if v == nil {
+		return 0
+	}
+	return *v
+}
+
+func derefU64(v *uint64) uint64 {
+	if v == nil {
+		return 0
+	}
+	return *v
 }

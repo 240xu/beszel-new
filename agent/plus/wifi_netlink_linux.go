@@ -155,7 +155,8 @@ func collectWiFiWith(client wifiClient) *WiFiStats {
 		if err != nil || bss == nil || bss.Status != native.BSSStatusAssociated {
 			continue
 		}
-		stats := &WiFiStats{Iface: ifi.Name, FreqMHz: bss.Frequency}
+		freq := bss.Frequency
+		stats := &WiFiStats{Iface: ifi.Name, FreqMHz: &freq}
 		if len(bss.BSSID) == 0 {
 			return stats
 		}
@@ -166,13 +167,16 @@ func collectWiFiWith(client wifiClient) *WiFiStats {
 			return stats
 		}
 		if station.Signal >= signalFloorDbM && station.Signal < 0 {
-			stats.SignalDbm = station.Signal
+			signal := station.Signal
+			stats.SignalDbm = &signal
 		}
-		stats.TxMBit = float64(station.TransmitBitrate) / bitsPerMBit
+		tx := float64(station.TransmitBitrate) / bitsPerMBit
+		stats.TxMBit = &tx
 		// Never negative in practice; the guard stops a malformed reply wrapping
 		// into an enormous uint64.
 		if station.TransmitFailed >= 0 {
-			stats.Retry = uint64(station.TransmitFailed)
+			retry := uint64(station.TransmitFailed)
+			stats.Retry = &retry
 		}
 		return stats
 	}

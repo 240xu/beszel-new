@@ -87,13 +87,6 @@ func ProdFanPaths() FanPaths {
 	}
 }
 
-func envOr(name, fallback string) string {
-	if v := os.Getenv(name); v != "" {
-		return v
-	}
-	return fallback
-}
-
 // firstNonEmpty walks in order, which is pfand's own precedence.
 func firstNonEmpty(values ...string) string {
 	for _, v := range values {

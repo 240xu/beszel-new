@@ -251,20 +251,21 @@ func (fc *fanRoutes) state(e *core.RequestEvent) error {
 	}
 	body["thermal_floor_armed"] = fc.guard.ThermalFloorArmed()
 
-	// Health is a state, not an inference the client makes from two booleans.
-	// ok: both readings are real; stale: a reading failed but the other is
-	// real; failsafe: the guard is acting on a value it could not read (the
-	// floor holds the emergency duty). It is separate from a refusal code: this
-	// says what the display may trust, not why a write was rejected.
+	// Health is the guard's own view, not an inference from two read results:
+	// the floor holds the emergency duty on a single unreadable temperature, so
+	// "both reads failed" would understate the condition. The guard is the only
+	// component that knows whether it is holding.
+	health := fc.guard.Health(err == nil, terr == nil)
 	switch {
-	case terr != nil && err != nil:
+	case health.Failsafe:
 		body["health"] = "failsafe"
-	case terr != nil || err != nil:
+	case !health.LevelReadable || !health.TempReadable:
 		body["health"] = "stale"
 	default:
 		body["health"] = "ok"
 	}
 	body["failsafe_reason"] = failsafeReason(err, terr)
+	body["breaker_open"] = health.BreakerOpen
 
 	if c, cerr := fc.deps.ReadCurve(); cerr == nil {
 		body["curve"] = curveToWire(c)
@@ -431,59 +432,120 @@ func coded(e *core.RequestEvent, status int, message, code string) error {
 	return apiErr
 }
 
+// codedReason answers a body fault. There is deliberately no code: the closed set has
+// no member for it. reason is additive metadata a panel may branch on, and its absence
+// (an older hub) is itself the skew signal.
+func codedReason(e *core.RequestEvent, status int, message, reason string) error {
+	apiErr := e.Error(status, message, nil)
+	apiErr.Data = map[string]any{"reason": reason}
+	return apiErr
+}
+
+// codedWithReason keeps an existing refusal code and adds the body fault beside it, so a
+// route that already names its refusal does not lose that name to gain the reason.
+func codedWithReason(e *core.RequestEvent, status int, message, code, reason string) error {
+	apiErr := e.Error(status, message, nil)
+	apiErr.Data = map[string]any{"code": code, "reason": reason}
+	return apiErr
+}
+
+// bodyFault is why a body could not be read. It is not a refusal code: the closed
+// set fanapi publishes has no member for "this body could not be read", and borrowing
+// one would misdescribe it. It travels in data.reason instead, so a panel can tell a
+// panel/hub version skew (unknown_field) from a genuinely malformed body without
+// inventing a member of that set.
+type bodyFault struct {
+	reason string
+	err    error
+}
+
+func (f *bodyFault) Error() string { return f.reason + ": " + f.err.Error() }
+
+const (
+	reasonUnknownField   = "unknown_field"
+	reasonBodyUnreadable = "body_unreadable"
+	reasonBodyTooLarge   = "body_too_large"
+	reasonEmptyBody      = "empty_body"
+	reasonNotJSON        = "not_json"
+	reasonTrailing       = "trailing_content"
+)
+
 // decodeBody reads a request body strictly.
 //
 // Unknown fields are refused. Every field in these bodies is a physical instruction, and
 // a name the panel misspells would be dropped in silence while the operator believes it
 // was applied. The parser in agent/plus takes the same position about the curve file.
 //
-// These two refusals carry no code, and that is the deliberate remainder: the closed set
-// fanapi publishes has no member meaning "this body could not be read" for a duty or a mode,
-// and every member that could be borrowed would misdescribe it. A code-less refusal is
-// answered by a panel that says only what it knows, which is true, where "the request was
-// refused before it reached the fan" was true by accident. Every such path is listed in
-// TestFanRefusalsEitherCarryACodeOrAreOnThisList.
+// These refusals carry no code, and that is the deliberate remainder: the closed set
+// fanapi publishes has no member meaning "this body could not be read" for a duty or a
+// mode. They carry data.reason instead, which names the shape fault without inventing a
+// member of that set, and lets a panel distinguish a version skew from a malformed body.
 func decodeBody(e *core.RequestEvent, dst any) error {
-	body, err := readFanBody(e)
+	body, err := readFanBodyTyped(e)
 	if err != nil {
 		slog.Warn("fan request body could not be read", "actor", actor(e), "err", err)
-		return e.BadRequestError("invalid body", nil)
+		return codedReason(e, http.StatusBadRequest, "invalid body", faultReason(err))
 	}
-	if err := strictJSON(body, dst); err != nil {
+	if err := strictJSONTyped(body, dst); err != nil {
 		slog.Warn("fan request body would not parse", "actor", actor(e), "err", err)
-		return e.BadRequestError("invalid body", nil)
+		return codedReason(e, http.StatusBadRequest, "invalid body", faultReason(err))
 	}
 	return nil
 }
 
+// faultReason reads the shape fault a typed reader returned. Every error from
+// readFanBodyTyped/strictJSONTyped is a *bodyFault; the fallback keeps a future
+// non-typed error from panicking instead of being reported as unreadable.
+func faultReason(err error) string {
+	var fault *bodyFault
+	if errors.As(err, &fault) {
+		return fault.reason
+	}
+	return reasonBodyUnreadable
+}
+
 func readFanBody(e *core.RequestEvent) ([]byte, error) {
+	return readFanBodyTyped(e)
+}
+
+func readFanBodyTyped(e *core.RequestEvent) ([]byte, error) {
 	if e.Request.Body == nil {
-		return nil, errors.New("no body")
+		return nil, &bodyFault{reasonBodyUnreadable, errors.New("no body")}
 	}
 	body, err := io.ReadAll(io.LimitReader(e.Request.Body, maxFanBody+1))
 	if err != nil {
-		return nil, err
+		return nil, &bodyFault{reasonBodyUnreadable, err}
 	}
 	if len(body) > maxFanBody {
-		return nil, errors.New("body too large")
+		return nil, &bodyFault{reasonBodyTooLarge, errors.New("body too large")}
 	}
 	return body, nil
 }
 
 func strictJSON(body []byte, dst any) error {
+	return strictJSONTyped(body, dst)
+}
+
+func strictJSONTyped(body []byte, dst any) error {
 	if len(bytes.TrimSpace(body)) == 0 {
-		return errors.New("empty body")
+		return &bodyFault{reasonEmptyBody, errors.New("empty body")}
 	}
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dst); err != nil {
-		return err
+		reason := reasonNotJSON
+		// go's decoder names the offending key for this class, which is the one a
+		// version skew produces: a newer panel sending a field this hub predates.
+		if strings.Contains(err.Error(), "unknown field") {
+			reason = reasonUnknownField
+		}
+		return &bodyFault{reason, err}
 	}
 	// A second document behind the first is a caller sending something other than
 	// what it means to send, and taking the first half of it is how a body like
 	// {"level":70,...}{"level":25} would program 70.
 	if _, err := dec.Token(); err != io.EOF {
-		return errors.New("trailing content after the body")
+		return &bodyFault{reasonTrailing, errors.New("trailing content after the body")}
 	}
 	return nil
 }
@@ -533,14 +595,16 @@ func decodeCurveRequest(e *core.RequestEvent) (*curveRequest, error) {
 	var req curveRequest
 	// A body this route cannot read is a curve it rejected before anything was written,
 	// which is what curve_rejected already means, so it is named rather than guessed at.
-	body, err := readFanBody(e)
+	body, err := readFanBodyTyped(e)
 	if err != nil {
 		slog.Warn("fan curve request body could not be read", "actor", actor(e), "err", err)
-		return nil, coded(e, http.StatusBadRequest, "invalid body", fanapi.Classify(fanapi.ErrCurveRejected).Code)
+		return nil, codedWithReason(e, http.StatusBadRequest, "invalid body",
+			fanapi.Classify(fanapi.ErrCurveRejected).Code, faultReason(err))
 	}
-	if err := strictJSON(body, &req); err != nil {
+	if err := strictJSONTyped(body, &req); err != nil {
 		slog.Warn("fan curve request body would not parse", "actor", actor(e), "err", err)
-		return nil, coded(e, http.StatusBadRequest, "invalid body", fanapi.Classify(fanapi.ErrCurveRejected).Code)
+		return nil, codedWithReason(e, http.StatusBadRequest, "invalid body",
+			fanapi.Classify(fanapi.ErrCurveRejected).Code, faultReason(err))
 	}
 	for i, v := range req.values() {
 		if v == nil {

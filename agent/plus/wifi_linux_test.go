@@ -112,10 +112,10 @@ func TestCollectWiFiMapsAllFourFields(t *testing.T) {
 	got := collectWiFiWith(associated())
 	require.NotNil(t, got)
 	assert.Equal(t, "wlp0s20f3", got.Iface)
-	assert.Equal(t, 5180, got.FreqMHz)
-	assert.Equal(t, -42, got.SignalDbm)
-	assert.Equal(t, 780.0, got.TxMBit)
-	assert.Equal(t, uint64(1146), got.Retry)
+	assert.Equal(t, 5180, derefInt(got.FreqMHz))
+	assert.Equal(t, -42, derefInt(got.SignalDbm))
+	assert.Equal(t, 780.0, derefFloat(got.TxMBit))
+	assert.Equal(t, uint64(1146), derefUint(got.Retry))
 }
 
 // TestCollectWiFiRetryIsTransmitFailed pins the counter identity. TransmitFailed
@@ -125,8 +125,8 @@ func TestCollectWiFiRetryIsTransmitFailed(t *testing.T) {
 	client := associated()
 	got := collectWiFiWith(client)
 	require.NotNil(t, got)
-	assert.Equal(t, uint64(1146), got.Retry, "retry must be TransmitFailed")
-	assert.NotEqual(t, uint64(98464), got.Retry, "TransmitRetries is a different counter")
+	assert.Equal(t, uint64(1146), derefUint(got.Retry), "retry must be TransmitFailed")
+	assert.NotEqual(t, uint64(98464), derefUint(got.Retry), "TransmitRetries is a different counter")
 }
 
 // TestCollectWiFiTxMBitConvertsBitsPerSecond pins the unit. TransmitBitrate is
@@ -137,8 +137,8 @@ func TestCollectWiFiTxMBitConvertsBitsPerSecond(t *testing.T) {
 	client.station["wlp0s20f3"] = &native.StationInfo{Signal: -42, TransmitBitrate: 780_000_000}
 	got := collectWiFiWith(client)
 	require.NotNil(t, got)
-	assert.Equal(t, 780.0, got.TxMBit, "bits/second divided by 1e6, not by 10")
-	assert.NotEqual(t, 78_000_000.0, got.TxMBit)
+	assert.Equal(t, 780.0, derefFloat(got.TxMBit), "bits/second divided by 1e6, not by 10")
+	assert.NotEqual(t, 78_000_000.0, derefFloat(got.TxMBit))
 }
 
 // TestCollectWiFiSignalIsStationNotBSSCache pins the source and its unit.
@@ -148,9 +148,9 @@ func TestCollectWiFiSignalIsStationNotBSSCache(t *testing.T) {
 	client := associated()
 	got := collectWiFiWith(client)
 	require.NotNil(t, got)
-	assert.Equal(t, -42, got.SignalDbm, "StationInfo.Signal is already dBm")
-	assert.NotEqual(t, -3700, got.SignalDbm, "BSS.Signal is mBm and must not be used")
-	assert.NotEqual(t, -37, got.SignalDbm, "BSS.Signal is not divided here")
+	assert.Equal(t, -42, derefInt(got.SignalDbm), "StationInfo.Signal is already dBm")
+	assert.NotEqual(t, -3700, derefInt(got.SignalDbm), "BSS.Signal is mBm and must not be used")
+	assert.NotEqual(t, -37, derefInt(got.SignalDbm), "BSS.Signal is not divided here")
 }
 
 // TestCollectWiFiFreqIsBSSFrequency pins where freq_mhz comes from. The
@@ -161,8 +161,8 @@ func TestCollectWiFiFreqIsBSSFrequency(t *testing.T) {
 	client.ifaces[0].Frequency = 2412
 	got := collectWiFiWith(client)
 	require.NotNil(t, got)
-	assert.Equal(t, 5180, got.FreqMHz, "the associated BSS frequency")
-	assert.NotEqual(t, 2412, got.FreqMHz, "Interface.Frequency is not the source")
+	assert.Equal(t, 5180, derefInt(got.FreqMHz), "the associated BSS frequency")
+	assert.NotEqual(t, 2412, derefInt(got.FreqMHz), "Interface.Frequency is not the source")
 }
 
 func TestCollectWiFiSkipsUnassociatedAndNonStation(t *testing.T) {
@@ -193,7 +193,7 @@ func TestCollectWiFiTakesTheFirstAssociatedStation(t *testing.T) {
 	got := collectWiFiWith(client)
 	require.NotNil(t, got)
 	assert.Equal(t, "wlp1s20f3", got.Iface, "Stats.WiFi is one object, so the first one wins")
-	assert.Equal(t, 2412, got.FreqMHz)
+	assert.Equal(t, 2412, derefInt(got.FreqMHz))
 	assert.NotEqual(t, "wlp0s20f3", got.Iface)
 }
 
@@ -215,10 +215,10 @@ func assertWifiKeepsAssociationOnly(t *testing.T, deny func(*fakeWiFiClient)) {
 	got := collectWiFiWith(client)
 	require.NotNil(t, got, "the BSS already proved association")
 	assert.Equal(t, "wlp0s20f3", got.Iface)
-	assert.Equal(t, 5180, got.FreqMHz)
-	assert.Zero(t, got.SignalDbm)
-	assert.Zero(t, got.TxMBit)
-	assert.Zero(t, got.Retry)
+	assert.Equal(t, 5180, derefInt(got.FreqMHz))
+	assert.Nil(t, got.SignalDbm)
+	assert.Nil(t, got.TxMBit)
+	assert.Nil(t, got.Retry)
 
 	// The Go zeros above are only half the contract. What reaches the consumer is
 	// this payload, and the rule WiFiStats documents is that three absent keys
@@ -236,8 +236,8 @@ func TestCollectWiFiKeepsAssociationWhenBSSIDIsUnknown(t *testing.T) {
 	client.bss["wlp0s20f3"].BSSID = nil
 	got := collectWiFiWith(client)
 	require.NotNil(t, got)
-	assert.Equal(t, 5180, got.FreqMHz)
-	assert.Zero(t, got.SignalDbm)
+	assert.Equal(t, 5180, derefInt(got.FreqMHz))
+	assert.Nil(t, got.SignalDbm)
 }
 
 func TestCollectWiFiSkipsNilAndNamelessInterfaces(t *testing.T) {
@@ -280,8 +280,8 @@ func TestCollectWiFiRejectsImplausibleSignal(t *testing.T) {
 			}
 			got := collectWiFiWith(client)
 			require.NotNil(t, got)
-			assert.Zero(t, got.SignalDbm, "out-of-range RSSI is dropped, not published")
-			assert.Equal(t, 780.0, got.TxMBit, "the other fields survive")
+			assert.Nil(t, got.SignalDbm, "out-of-range RSSI is dropped, not published as zero")
+			assert.Equal(t, 780.0, derefFloat(got.TxMBit), "the other fields survive")
 		})
 	}
 }
@@ -295,7 +295,7 @@ func TestCollectWiFiDropsNegativeRetry(t *testing.T) {
 	}
 	got := collectWiFiWith(client)
 	require.NotNil(t, got)
-	assert.Zero(t, got.Retry)
+	assert.Nil(t, got.Retry)
 }
 
 // TestCollectWiFiSetsTheDeadline bounds the exchange against a literal rather
@@ -394,4 +394,18 @@ func TestHasWirelessDeviceIgnoresMissingDir(t *testing.T) {
 
 func TestNL80211ClientImplementsWifiClient(t *testing.T) {
 	var _ wifiClient = (*nl80211Client)(nil)
+}
+
+func derefFloat(v *float64) float64 {
+	if v == nil {
+		return 0
+	}
+	return *v
+}
+
+func derefUint(v *uint64) uint64 {
+	if v == nil {
+		return 0
+	}
+	return *v
 }

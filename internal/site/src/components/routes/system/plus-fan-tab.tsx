@@ -1,7 +1,7 @@
 import { t } from "@lingui/core/macro"
 import { useStore } from "@nanostores/react"
 import { LoaderCircleIcon, LockIcon } from "lucide-react"
-import { useCallback, useEffect, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react"
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react"
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -73,6 +73,10 @@ function refusalCopy() {
 		unsupported: t`Fan control is only implemented on Linux.`,
 		internal: t`The write did not complete.`,
 		unclassified: t`The server refused this without naming a reason, so nothing can be concluded about the fan.`,
+		// A body the hub could not read is not a fan refusal. The panel build and the
+		// hub disagree about the request shape, so the operator needs to update one of
+		// them rather than inspect the fan.
+		version_skew: t`This panel and the hub disagree about the request format, so nothing was sent to the fan. Update the hub or reload the page.`,
 		unrecognised: t`The server refused this for a reason this build does not know.`,
 	}
 
@@ -178,16 +182,19 @@ function applySettled(
 	settled: FanWriteSettled,
 	setOutcome: (outcome: FanWriteOutcome | null) => void,
 	setRefusal: (refusal: { key: FanRefusalKey; detail?: string } | null) => void,
-	setOffline: (offline: boolean) => void
+	setOffline: (offline: boolean) => void,
+	setUnreadable: (unreadable: boolean) => void
 ) {
 	if (settled.ok) {
 		setOutcome(settled.outcome)
 		setRefusal(null)
 		setOffline(false)
+		setUnreadable(false)
 		return
 	}
 	if (settled.dropBanner) setOutcome(null)
 	setOffline(settled.offline)
+	setUnreadable(settled.unknown)
 	setRefusal(settled.refusal && { key: settled.refusal.key, detail: settled.refusal.detail })
 }
 
@@ -260,6 +267,18 @@ function ReadoutCell({ title, value, detail }: { title: ReactNode; value: ReactN
 }
 
 function ReadProblem({ stale, onRetry }: { stale: boolean; onRetry: () => void }) {
+	// Retrying unmounts this alert, and the browser drops focus to <body> when the
+	// focused button disappears. A keyboard user then has to tab from the top of the
+	// page to reach the panel again, so hand focus to the retry control's replacement
+	// rather than letting it fall on the floor.
+	const retryRef = useRef<HTMLButtonElement>(null)
+	const handleRetry = useCallback(() => {
+		const restoreTo = retryRef.current
+		onRetry()
+		requestAnimationFrame(() => {
+			if (restoreTo?.isConnected) restoreTo.focus()
+		})
+	}, [onRetry])
 	return (
 		<div
 			role="alert"
@@ -276,7 +295,7 @@ function ReadProblem({ stale, onRetry }: { stale: boolean; onRetry: () => void }
 						: t`The fan state could not be read.`}
 				</p>
 			</div>
-			<Button className="w-full sm:w-auto" size="sm" variant="outline" onClick={onRetry}>
+			<Button ref={retryRef} className="w-full sm:w-auto" size="sm" variant="outline" onClick={handleRetry}>
 				{t`Retry`}
 			</Button>
 		</div>
@@ -625,6 +644,7 @@ function OutcomeBanner({ outcome, onRestart }: { outcome: FanWriteOutcome; onRes
 function WriteFeedback({
 	outcome,
 	offline,
+	unreadable,
 	refusal,
 	retryWrite,
 	onRetry,
@@ -632,6 +652,7 @@ function WriteFeedback({
 }: {
 	outcome: FanWriteOutcome | null
 	offline: boolean
+	unreadable: boolean
 	refusal: { key: FanRefusalKey; detail?: string } | null
 	retryWrite: FanWrite | null
 	onRetry: (write: FanWrite) => void
@@ -641,6 +662,29 @@ function WriteFeedback({
 	return (
 		<>
 			{outcome && <OutcomeBanner outcome={outcome} onRestart={onRestart} />}
+			{unreadable && (
+				<div
+					role="alert"
+					className={cn(
+						"flex flex-col gap-3 rounded-md border-s-4 p-4 sm:flex-row sm:items-center sm:justify-between",
+						STATUS_TONE.warning
+					)}
+				>
+					<p className="text-sm">
+						{t`The server answered, but this panel could not read the result. The change may be in force; check the current state before writing again.`}
+					</p>
+					{retryWrite && (
+						<Button
+							className="w-full sm:w-auto"
+							size="sm"
+							variant="outline"
+							onClick={() => onRetry(retryWrite)}
+						>
+							{t`Retry`}
+						</Button>
+					)}
+				</div>
+			)}
 			{offline && (
 				<div
 					role="alert"
@@ -749,13 +793,14 @@ export function PlusFanTab(_props: { grid: boolean; dataEmpty: boolean }) {
 	const [outcome, setOutcome] = useState<FanWriteOutcome | null>(null)
 	const [refusal, setRefusal] = useState<{ key: FanRefusalKey; detail?: string } | null>(null)
 	const [offline, setOffline] = useState(false)
+	const [unreadable, setUnreadable] = useState(false)
 	const [retryWrite, setRetryWrite] = useState<FanWrite | null>(null)
 	const [targetDuty, setTargetDuty] = useState(60)
 
 	const { state, status, retry, lastUpdated } = useFanState()
 	const host = useFanHost()
 	const written = useFanWrite((settled, write) => {
-		applySettled(settled, setOutcome, setRefusal, setOffline)
+		applySettled(settled, setOutcome, setRefusal, setOffline, setUnreadable)
 		setArmed(null)
 		setRetryWrite(settled.ok ? null : write)
 		if (settled.ok) retry()
@@ -810,15 +855,17 @@ export function PlusFanTab(_props: { grid: boolean; dataEmpty: boolean }) {
 				{status === "error" && state && <ReadProblem stale={true} onRetry={retry} />}
 				{state && (
 					<>
-						{state.health === "failsafe" && (
+						{(state.health === "failsafe" || state.breaker_open) && (
 							<output
 								className={cn(
 									"flex flex-col gap-2 rounded-md border-s-4 p-3 text-sm sm:flex-row sm:items-center sm:justify-between",
-									STATUS_TONE.warning
+									state.breaker_open ? STATUS_TONE.danger : STATUS_TONE.warning
 								)}
 							>
 								<span>
-									{t`The hub is acting on a reading it could not verify. The emergency duty is held until the sensor recovers.`}
+									{state.breaker_open
+										? t`Fan writes are latched after repeated failures. The last verified duty is held until the control path recovers.`
+										: t`The hub is acting on a reading it could not verify. The emergency duty is held until the sensor recovers.`}
 								</span>
 								<Button size="sm" variant="outline" onClick={retry}>
 									{t`Retry`}
@@ -900,6 +947,7 @@ export function PlusFanTab(_props: { grid: boolean; dataEmpty: boolean }) {
 							<WriteFeedback
 								outcome={outcome}
 								offline={offline}
+								unreadable={unreadable}
 								refusal={refusal}
 								retryWrite={retryWrite}
 								onRetry={setArmed}
@@ -930,12 +978,13 @@ export function PlusFanCurveTab(_props: { grid: boolean; dataEmpty: boolean }) {
 	const [outcome, setOutcome] = useState<FanWriteOutcome | null>(null)
 	const [refusal, setRefusal] = useState<{ key: FanRefusalKey; detail?: string } | null>(null)
 	const [offline, setOffline] = useState(false)
+	const [unreadable, setUnreadable] = useState(false)
 	const [retryWrite, setRetryWrite] = useState<FanWrite | null>(null)
 
 	const { state, status, retry, lastUpdated } = useFanState()
 	const host = useFanHost()
 	const written = useFanWrite((settled, write) => {
-		applySettled(settled, setOutcome, setRefusal, setOffline)
+		applySettled(settled, setOutcome, setRefusal, setOffline, setUnreadable)
 		setArmed(null)
 		setRetryWrite(settled.ok ? null : write)
 		if (settled.ok) {
@@ -1014,6 +1063,7 @@ export function PlusFanCurveTab(_props: { grid: boolean; dataEmpty: boolean }) {
 							<WriteFeedback
 								outcome={outcome}
 								offline={offline}
+								unreadable={unreadable}
 								refusal={refusal}
 								retryWrite={retryWrite}
 								onRetry={setArmed}

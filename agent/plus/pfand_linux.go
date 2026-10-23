@@ -9,9 +9,6 @@ import (
 	"strings"
 )
 
-// systemd starts pfand through bash, so it appears as an argument, not argv[0].
-const pfanDaemon = "/usr/local/bin/pfand"
-
 // PfandActive reports whether the curve daemon is running, so Task 15 can tell
 // "pfand owns the curve" (ErrPfandActive) from a lost race. It does not refuse
 // here: that is Task 14's policy, and asking would tie setFanLevelAt's tests to
@@ -35,7 +32,11 @@ func pfandActiveIn(procRoot string) bool {
 			continue
 		}
 		for _, arg := range strings.Split(string(raw), "\x00") {
-			if strings.HasSuffix(arg, pfanDaemon) || arg == "pfand" {
+			// Match the executable by basename, not by suffix: HasSuffix(arg, pfanDaemon)
+			// would also accept a copy at /opt/notpfand, and a wrapper named "pfand-helper"
+			// must not count as the daemon owning the fan. systemd starts pfand through
+			// bash, so the executable appears as an argument as well as argv[0].
+			if filepath.Base(arg) == "pfand" {
 				return true
 			}
 		}

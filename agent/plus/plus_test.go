@@ -112,7 +112,7 @@ func populatedStats() Stats {
 			Governor: "powersave",
 		},
 		NetAll: map[string]*NetIfaceStats{
-			"wlp0s20f3": {RxBytes: 1 << 30, TxBytes: 1 << 29, RxPackets: 10, TxPackets: 20, OperState: "up", SpeedMBit: 866, MTU: 1500},
+			"wlp0s20f3": {RxBytes: 1 << 30, TxBytes: 1 << 29, RxPackets: uintPtr(10), TxPackets: uintPtr(20), OperState: "up", SpeedMBit: intPtr(866), MTU: intPtr(1500)},
 		},
 		Nvme: &NvmeStats{
 			Model: "WD SN770", PercentageUsedPct: 1, UnsafeShutdowns: 2, MediaErrors: 3,
@@ -120,7 +120,7 @@ func populatedStats() Stats {
 			PowerCycles: 7, ControllerBusyMin: 8, CriticalCompTimeMin: 9,
 			TempC: 41.5,
 		},
-		WiFi:     &WiFiStats{SignalDbm: -53, TxMBit: 780, FreqMHz: 5180, Retry: 4, Iface: "wlp0s20f3"},
+		WiFi:     &WiFiStats{SignalDbm: intPtr(-53), TxMBit: floatPtr(780), FreqMHz: intPtr(5180), Retry: uintPtr(4), Iface: "wlp0s20f3"},
 		Fan:      &FanStats{SetLevelPct: intPtr(55), EC76Pct: intPtr(60), RPMEst: 2400, RPMEstFlag: true, Gov: "curve", SampleTsS: 1791333981, TempC: 44},
 		FanSteps: []FanSpeedStep{{Percent: 0, RPMEst: 0, NoiseMdb: 20, PowerMw: 3}, {Percent: 100, RPMEst: 5200, NoiseMdb: 45, PowerMw: 11}},
 	}
@@ -166,6 +166,10 @@ func TestStatsUseUnitSuffixes(t *testing.T) {
 // intPtr builds the *int fields FanStats uses to keep a real 0 distinct from an
 // unknown, which is the whole reason those two fields are pointers.
 func intPtr(v int) *int { return &v }
+
+func floatPtr(v float64) *float64 { return &v }
+
+func uintPtr(v uint64) *uint64 { return &v }
 
 // ambiguousTags are names the unit contract rejects: bare physical units and
 // the megabit/megabyte-ambiguous "_mbps".

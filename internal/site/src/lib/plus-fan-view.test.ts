@@ -476,3 +476,35 @@ describe("the duty whitelist", () => {
 		expect(FAN_DUTIES).not.toContain(1)
 	})
 })
+
+test("a newer panel against an older hub is reported as a version skew", () => {
+	const view = fanRefusal(
+		readFanRefusal(
+			400,
+			JSON.stringify({ status: 400, message: "invalid body", data: { reason: "unknown_field" } })
+		)
+	)
+	expect(view.key).toBe("version_skew")
+	expect(view.detail).toBeUndefined()
+})
+
+test("a malformed body is not called a version skew", () => {
+	const view = fanRefusal(
+		readFanRefusal(400, JSON.stringify({ status: 400, message: "invalid body", data: { reason: "not_json" } }))
+	)
+	expect(view.key).toBe("unclassified")
+})
+
+// A 2xx whose body cannot be read is not proof the request never reached the hub.
+// It must not be reported as "offline": the write may have been applied.
+test("an unreadable success response is unknown, not offline", async () => {
+	const { UnreadableResponseError } = await import("@/lib/plus-api")
+	const settled = fanWriteRefused({ kind: "level" } as never, new UnreadableResponseError(200))
+	expect(settled).toMatchObject({ ok: false, offline: false, unknown: true })
+	expect(settled.ok === false && settled.refusal).toBeNull()
+})
+
+test("a genuine network failure stays offline", () => {
+	const settled = fanWriteRefused({ kind: "level" } as never, new TypeError("Failed to fetch"))
+	expect(settled).toMatchObject({ ok: false, offline: true, unknown: false })
+})

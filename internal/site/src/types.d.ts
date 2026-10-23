@@ -909,6 +909,8 @@ export interface FanState {
 	health?: "ok" | "stale" | "failsafe"
 	/** Which reading failed: level_unreadable, temperature_unreadable, or both. */
 	failsafe_reason?: "" | "level_unreadable" | "temperature_unreadable" | "level_and_temperature_unreadable"
+	/** The control path is latched after repeated write failures (additive). */
+	breaker_open?: boolean
 	/** Rides along, so an editor cannot be built against a stale curve. */
 	curve: FanCurve | null
 }

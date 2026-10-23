@@ -106,9 +106,19 @@ type Profile struct {
 
 // ProfileSet is a parsed catalogue. Order is the operator's: the first entry
 // whose named dimensions all agree wins.
+//
+// SchemaVersion is additive and optional: a file written before the field
+// existed decodes as 0 and keeps working. A file that states a version this
+// build does not know is refused rather than parsed, because a future shape
+// could otherwise be read as if it were this one.
 type ProfileSet struct {
-	Profiles []Profile `json:"profiles"`
+	SchemaVersion int       `json:"schema_version,omitempty"`
+	Profiles      []Profile `json:"profiles"`
 }
+
+// profilesSchemaVersion is the only schema this build understands. Version 0 is
+// "unstated", which is every file written before the field existed.
+const profilesSchemaVersion = 1
 
 func readIdentity(root string) Identity {
 	var id Identity
@@ -198,6 +208,10 @@ func loadProfiles(path string) (ProfileSet, error) {
 	var set ProfileSet
 	if err := strictDecode(raw, &set); err != nil {
 		return ProfileSet{}, fmt.Errorf("%w: %s: %v", ErrPlatformUnknown, filepath.Base(path), err)
+	}
+	if set.SchemaVersion != 0 && set.SchemaVersion != profilesSchemaVersion {
+		return ProfileSet{}, fmt.Errorf("%w: %s: schema_version %d is newer than this build understands (%d)",
+			ErrPlatformUnknown, filepath.Base(path), set.SchemaVersion, profilesSchemaVersion)
 	}
 	for i := range set.Profiles {
 		if err := checkProfile(&set.Profiles[i], i); err != nil {

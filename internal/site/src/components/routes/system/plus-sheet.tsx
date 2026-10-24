@@ -337,6 +337,23 @@ const PlusSheet = memo(function PlusSheet({ chartData, grid }: { chartData: Char
 
 export default PlusSheet
 
+/** How many readings the collapsed card shows before it stops and points at the
+ *  sheet. Four fills two rows of the two-column band; more than that and the card
+ *  stops being a summary and starts being the sheet with a scrollbar. */
+const PREVIEW_LIMIT = 4
+
+/** The collapsed card.
+ *
+ *  Two things were wrong with the flat grid it used to draw. It gave every reading
+ *  the same weight, so a 16-core frequency dump and a single fan temperature
+ *  looked alike; and it printed every row `previewRows` returned, which for a
+ *  many-core or many-interface host made a "summary" card taller than the charts
+ *  beside it.
+ *
+ *  So: one lead reading at display size, the rest as a dense band, and a count of
+ *  what is left over. The lead is the first row because `previewRows` already
+ *  orders by what the host can actually report (fan, then thermal zones, then the
+ *  rest), so the first row is the most specific reading available. */
 export function PlusChart({ chartData, grid }: { chartData: ChartData; grid: boolean }) {
 	const records = chartData.systemStats
 	const rows = previewRows(records, Math.floor(Date.now() / 1000))
@@ -346,15 +363,50 @@ export function PlusChart({ chartData, grid }: { chartData: ChartData; grid: boo
 		return null
 	}
 
+	const LABELS = labelCopy()
+	const labelFor = (row: MetricRow): string => LABELS[row.key as StaticLabelKey] ?? row.label
+	const [lead, ...rest] = rows
+	const shown = rest.slice(0, PREVIEW_LIMIT)
+	const hidden = rest.length - shown.length
+
 	return (
 		<ChartCard
 			grid={grid}
 			autoHeight
-			title={t`beszel-new`}
+			title={t`Extended metrics`}
 			description={t`Thermal zones, per core frequency, NVMe health, WiFi and fan`}
 			cornerEl={<PlusSheet chartData={chartData} grid={grid} />}
 		>
-			<MetricGroup rows={rows} columns={2} />
+			<div className="flex flex-col gap-4">
+				{lead && (
+					<div className="min-w-0">
+						<div className="text-xs text-muted-foreground">{labelFor(lead)}</div>
+						<div className="mt-1 flex items-baseline gap-2">
+							<span className="font-mono text-3xl leading-none tracking-tight tabular-nums">{lead.value}</span>
+							{lead.notes?.map((note) => (
+								<span key={note.kind} className="text-xs text-muted-foreground">
+									{noteText(note)}
+								</span>
+							))}
+						</div>
+					</div>
+				)}
+				{shown.length > 0 && (
+					<dl className="grid grid-cols-2 gap-x-4 gap-y-2 border-t border-border/60 pt-3">
+						{shown.map((row) => (
+							<div key={row.key} className="min-w-0">
+								<dt className="truncate text-xs text-muted-foreground">{labelFor(row)}</dt>
+								<dd className="font-mono text-sm tabular-nums">{row.value}</dd>
+							</div>
+						))}
+					</dl>
+				)}
+				{hidden > 0 && (
+					<p className="text-xs text-muted-foreground">
+						{t`${hidden} more in Extended metrics`}
+					</p>
+				)}
+			</div>
 		</ChartCard>
 	)
 }

@@ -3177,3 +3177,6 @@ msgstr "Ваши настройки пользователя были обнов
 msgid "The server answered, but this panel could not read the result. The change may be in force; check the current state before writing again."
 msgstr ""
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "{hidden} more in Extended metrics"
+msgstr "ещё {hidden} в Расширенных метриках"

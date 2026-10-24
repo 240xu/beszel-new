@@ -63,3 +63,21 @@ test("the sheet keeps one layout per data shape", async () => {
 	expect(occurrences(source, /<NvmeBody rows=\{nvme\} \/>/)).not.toEqual([])
 	expect(occurrences(source, /NVME_HEALTH_KEYS/)).not.toEqual([])
 })
+
+// The collapsed card used to print every row `previewRows` returned, so a
+// many-core host made a "summary" taller than the charts beside it (measured 569px
+// vs 340px at 320px wide for a 16-core host). It now leads with one reading and
+// caps the band, so the card stays a summary.
+test("the collapsed card leads with one reading and caps the rest", async () => {
+	const source = await read()
+	// PREVIEW_LIMIT is declared just above the component, so start at its comment.
+	const card = source.slice(source.indexOf("/** How many readings the collapsed card shows"))
+	expect(occurrences(card, /const PREVIEW_LIMIT = 4/)).not.toEqual([])
+	expect(occurrences(card, /const \[lead, \.\.\.rest\] = rows/)).not.toEqual([])
+	expect(occurrences(card, /rest\.slice\(0, PREVIEW_LIMIT\)/)).not.toEqual([])
+	expect(occurrences(card, /more in Extended metrics/)).not.toEqual([])
+	// The lead reading must be visibly the lead, not another body-size cell.
+	expect(occurrences(card, /text-3xl/)).not.toEqual([])
+	// And the card title is a user-facing name, not the fork's branch name.
+	expect(occurrences(card, /title=\{t`beszel-new`\}/)).toEqual([])
+})

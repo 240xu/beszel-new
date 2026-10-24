@@ -3172,3 +3172,6 @@ msgstr "Your user settings have been updated."
 msgid "The server answered, but this panel could not read the result. The change may be in force; check the current state before writing again."
 msgstr "The server answered, but this panel could not read the result. The change may be in force; check the current state before writing again."
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "{hidden} more in Extended metrics"
+msgstr "{hidden} more in Extended metrics"

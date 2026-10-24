@@ -187,7 +187,10 @@ test("the duty shown as current is the one the server published", async () => {
 	expect(occurrences(source, /fanLevelLabel\(state\)/).length).toBeGreaterThanOrEqual(2)
 	// A second label implementation would let a retuned firmware table disagree with this panel.
 	expect(occurrences(source, /\blevelLabel\(/)).toEqual([])
-	expect(occurrences(source, /(?:const|function)\s+\w*label/i)).toEqual([])
+	// Narrow to duty labels. A bare \w*label was catching the curve plot's
+	// aria-label variable, which has nothing to do with fan duty.
+	expect(occurrences(source, /(?:const|function)\s+\w*level\w*label/i)).toEqual([])
+	expect(occurrences(source, /(?:const|function)\s+dutyLabel/i)).toEqual([])
 })
 
 test("the panel reads the outcome, not the raw write result", async () => {
@@ -277,9 +280,10 @@ test("the curve editor folds without trapping or hiding its safety signals", asy
 	expect(occurrences(summary, /Unsaved changes/)).not.toEqual([])
 	expect(occurrences(summary, /Full-speed backstop fixed/)).not.toEqual([])
 
-	// And the fold itself holds the two field groups. Three uses of the filter are
-	// expected: one builds the collapsed summary, two render the fieldsets.
-	expect(occurrences(editor, /CURVE_FIELDS\.filter/)).toHaveLength(3)
+	// And the fold itself holds the two field groups. Two uses of the filter are
+	// expected: the collapsed summary is drawn from curveBands now, not from the
+	// field list, so only the fieldsets still filter it.
+	expect(occurrences(editor, /CURVE_FIELDS\.filter/)).toHaveLength(2)
 	expect(occurrences(editor, /group === "temperature"/)).not.toEqual([])
 	expect(occurrences(editor, /group === "duty"/)).not.toEqual([])
 })
@@ -307,4 +311,18 @@ test("status surfaces are not one-sided colour bars", async () => {
 	}
 	// And the glyph is rendered next to the heading text, not instead of it.
 	expect(occurrences(source, /<StatusGlyph tone=/)).not.toEqual([])
+})
+
+// The summary draws the curve as a step outline, not a joined line: WantFor holds
+// each duty until the package crosses the next edge and then jumps, so a ramp
+// would describe hardware behaviour that does not exist. The shape also has to be
+// announced in words, because an unlabelled graph is invisible to a screen reader.
+test("the drawn curve is a labelled step outline, not a ramp", async () => {
+	const source = await read(TAB)
+	const plot = source.slice(source.indexOf("function CurvePlot"), source.indexOf("function CurveEditor"))
+
+	expect(occurrences(plot, /curvePath\(curve\)/)).not.toEqual([])
+	expect(occurrences(plot, /role="img"/)).not.toEqual([])
+	expect(occurrences(plot, /aria-label=\{label\}/)).not.toEqual([])
+	expect(occurrences(plot, /<title>\{label\}<\/title>/)).not.toEqual([])
 })

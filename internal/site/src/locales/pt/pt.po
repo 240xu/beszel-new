@@ -3188,3 +3188,43 @@ msgstr "Curva"
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Full-speed backstop fixed"
 msgstr "Limite de velocidade máxima fixo"
+
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Edit curve"
+msgstr "Editar curva"
+
+
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Fan curve: {0} percent at idle, {1} percent up to {2} degrees, {3} percent from {4} degrees."
+msgstr "Curva do ventilador: repouso {0}%, até {2} graus {1}%, a partir de {4} graus {3}%."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Fan curve: {0} percent at idle, {1} percent up to {2} degrees, {3} percent from {4} degrees. Now {5} degrees, asking for {6} percent."
+msgstr "Curva do ventilador: repouso {0}%, até {2} graus {1}%, a partir de {4} graus {3}%. Agora {5} graus, pede {6}%."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Temperature unavailable, so no operating point is shown."
+msgstr "Temperatura indisponível, então nenhum ponto de operação é mostrado."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The curve is not driving the fan right now."
+msgstr "A curva não está controlando o ventilador agora."
+
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "{0}°C → emergency duty {1}%"
+msgstr "{0}°C → ciclo de emergência {1}%"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "{0}°C → {1}% · next {2}°C → {3}%"
+msgstr "{0}°C → {1}% · próximo {2}°C → {3}%"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "{0}% → {1}% → {2}%"
+msgstr "{0}% → {1}% → {2}%"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Curve asks for {0}%, but the fan is running at {1}%."
+msgstr "A curva pede {0}%, o ventilador está em {1}%."

@@ -283,3 +283,28 @@ test("the curve editor folds without trapping or hiding its safety signals", asy
 	expect(occurrences(editor, /group === "temperature"/)).not.toEqual([])
 	expect(occurrences(editor, /group === "duty"/)).not.toEqual([])
 })
+
+// Design doctrine: a tinted bar on one edge only is a generated-UI tell, and it
+// puts the whole severity signal in colour a colour-blind reader does not get.
+// Every status surface now carries a uniform hairline border and a severity icon
+// beside its heading, so the signal survives greyscale.
+test("status surfaces are not one-sided colour bars", async () => {
+	const source = await read(TAB)
+
+	// No one-sided accent borders anywhere in the panel.
+	expect(occurrences(source, /border-[sle]-4/)).toEqual([])
+	expect(occurrences(source, /border-inline-(start|end)-\d/)).toEqual([])
+
+	// The tone map carries a uniform border on every side.
+	const tone = source.slice(source.indexOf("const STATUS_TONE"), source.indexOf("const CHIP_TONE"))
+	expect(occurrences(tone, /\bborder\b/)).not.toEqual([])
+	expect(occurrences(tone, /border-s-/)).toEqual([])
+
+	// Severity is a shape too, not only a colour: one glyph per tone.
+	const icons = source.slice(source.indexOf("const STATUS_ICON"), source.indexOf("const STATUS_TONE"))
+	for (const tone of ["success", "warning", "danger", "info"]) {
+		expect(occurrences(icons, new RegExp(`${tone}: \\w+Icon`))).not.toEqual([])
+	}
+	// And the glyph is rendered next to the heading text, not instead of it.
+	expect(occurrences(source, /<StatusGlyph tone=/)).not.toEqual([])
+})

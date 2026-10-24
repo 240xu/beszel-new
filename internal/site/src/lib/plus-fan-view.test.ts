@@ -3,7 +3,13 @@ import type { FanCurve, FanState } from "@/types"
 import { FAN_REJECT_CODES, type FanRejectCode, readFanRefusal } from "@/lib/plus-refusals"
 import {
 	confirmed,
+	curveAxis,
+	curveBands,
+	curvePath,
+	curveX,
+	operatingPoint,
 	curveWrite,
+	dutyAt,
 	FAN_DUTIES,
 	fanLevelLabel,
 	fanRefusal,
@@ -507,4 +513,213 @@ test("an unreadable success response is unknown, not offline", async () => {
 test("a genuine network failure stays offline", () => {
 	const settled = fanWriteRefused({ kind: "level" } as never, new TypeError("Failed to fetch"))
 	expect(settled).toMatchObject({ ok: false, offline: true, unknown: false })
+})
+
+// WantFor in agent/plus/curve.go is a step function with inclusive right edges.
+// Drawing (T1,L1) pairs as points shifts every band up one, which still looks
+// like a curve. These tests compare the drawn shape against a direct port of
+// WantFor at every whole degree on the axis, so that class of error cannot ship.
+describe("curve outline", () => {
+	const curve: FanCurve = {
+		idle: 45,
+		l0: 25,
+		t1: 55,
+		l1: 30,
+		t2: 65,
+		l2: 40,
+		t3: 72,
+		l3: 50,
+		t4: 80,
+		l4: 60,
+		t5: 88,
+		l5: 70,
+		emerg: 95,
+		e: 100,
+		emerg_rel: 5,
+		cap: 100,
+		trim: 0,
+		gain: 0,
+		hyst: 2,
+		dwell: 5,
+		dead: 3,
+		iv: 10,
+	}
+
+	/** What the drawn bands say the duty is at a temperature. */
+	const drawnDutyAt = (tempC: number): number => {
+		const bands = curveBands(curve)
+		return bands.find((band) => tempC <= band.toC)?.dutyPct ?? bands[bands.length - 1]?.dutyPct ?? 0
+	}
+
+	test("the drawn bands agree with WantFor at every whole degree on the axis", () => {
+		const { minC, maxC } = curveAxis(curve)
+		for (let t = minC; t <= maxC; t++) {
+			expect({ t, duty: drawnDutyAt(t) }).toEqual({ t, duty: dutyAt(curve, t) })
+		}
+	})
+
+	test("a temperature sitting exactly on an edge keeps the lower band's duty", () => {
+		// The inclusive-right-edge rule, stated as its own case: at T1 WantFor
+		// still returns L1, so the riser to L2 belongs just above it.
+		expect(dutyAt(curve, curve.idle)).toBe(curve.l0)
+		expect(dutyAt(curve, curve.t1)).toBe(curve.l1)
+		expect(dutyAt(curve, curve.t2)).toBe(curve.l2)
+		expect(dutyAt(curve, curve.t3)).toBe(curve.l3)
+		expect(dutyAt(curve, curve.t4)).toBe(curve.l4)
+		expect(dutyAt(curve, curve.t5)).toBe(curve.l5)
+	})
+
+	test("the emergency duty takes over at and above the emergency temperature", () => {
+		expect(dutyAt(curve, curve.emerg)).toBe(curve.e)
+		expect(dutyAt(curve, curve.emerg + 10)).toBe(curve.e)
+	})
+
+	test("the axis gives the idle band a width, since L0 holds below the idle edge", () => {
+		const axis = curveAxis(curve)
+		expect(axis.minC).toBeLessThan(curve.idle)
+		expect(axis.maxC).toBeGreaterThan(curve.emerg)
+	})
+
+	test("the emergency transition sits inside the plot, not on its right frame", () => {
+		// `maxC = emerg` put the transition at x=100, so the terminal duty was a
+		// zero-width riser hidden by the frame and an emergency marker drawn there
+		// marked the axis end rather than a transition. The axis must extend past it.
+		const axis = curveAxis(curve)
+		const emergencyX = ((curve.emerg - axis.minC) / (axis.maxC - axis.minC)) * 100
+		expect(emergencyX).toBeLessThan(100)
+		expect(emergencyX).toBeGreaterThan(0)
+	})
+
+	test("a degenerate curve does not divide by zero", () => {
+		const flat: FanCurve = { ...curve, idle: 90, t1: 90, t2: 90, t3: 90, t4: 90, t5: 90, emerg: 90 }
+		const axis = curveAxis(flat)
+		expect(axis.maxC).toBeGreaterThan(axis.minC)
+		expect(curvePath(flat)).not.toContain("NaN")
+	})
+
+	test("the outline uses right angles only, so it reads as a step function", () => {
+		const commands = curvePath(curve).match(/[A-Z]/g) ?? []
+		expect(new Set(commands)).toEqual(new Set(["M", "H", "V"]))
+	})
+
+	// The test above passed while the chart was wrong for 50 of 55 degrees: it
+	// checked the commands were right-angled, and never checked the treads were
+	// at the right HEIGHT. This parses the path back into horizontal treads and
+	// compares each one against WantFor, which is the only check that would have
+	// caught the riser being emitted before the tread instead of after it.
+	test("every tread in the drawn path sits at the duty WantFor returns there", () => {
+		const path = curvePath(curve)
+		const treads: Array<{ x0: number; x1: number; y: number }> = []
+		let px = 0
+		let py = 0
+		for (const token of path.match(/[MHV][^MHV]*/g) ?? []) {
+			const numbers = token.slice(1).trim().split(/\s+/).map(Number)
+			if (token[0] === "M") {
+				px = numbers[0] ?? 0
+				py = numbers[1] ?? 0
+			} else if (token[0] === "H") {
+				treads.push({ x0: px, x1: numbers[0] ?? 0, y: py })
+				px = numbers[0] ?? 0
+			} else {
+				py = numbers[0] ?? 0
+			}
+		}
+		expect(treads.length).toBeGreaterThan(0)
+
+		// The duty drawn at a temperature: the leftmost tread covering that x wins,
+		// because the riser sits at the band's right edge and WantFor resolves that
+		// edge to the band on its left.
+		const dutyDrawnAt = (tempC: number): number | null => {
+			const at = xOf(tempC)
+			let best: { x0: number; x1: number; y: number } | null = null
+			for (const tread of treads) {
+				const lo = Math.min(tread.x0, tread.x1)
+				const hi = Math.max(tread.x0, tread.x1)
+				if (at >= lo - 1e-9 && at <= hi + 1e-9) {
+					if (!best || lo < Math.min(best.x0, best.x1)) best = tread
+				}
+			}
+			return best ? 100 - best.y : null
+		}
+
+		const axis = curveAxis(curve)
+		const span = axis.maxC - axis.minC
+		const xOf = (tempC: number) => ((tempC - axis.minC) / span) * 100
+		const wrong: Array<{ tempC: number; want: number; drawn: number | null }> = []
+		for (let tempC = axis.minC; tempC <= axis.maxC; tempC++) {
+			const want = dutyAt(curve, tempC)
+			const drawn = dutyDrawnAt(tempC)
+			if (drawn !== want) wrong.push({ tempC, want, drawn })
+		}
+		expect(wrong).toEqual([])
+	})
+
+	test("the drawn path ends at the emergency duty, not at the last band", () => {
+		// A zero-width riser on the right frame hides the terminal plateau: the
+		// chart then shows the last BAND duty as the ceiling when the daemon drives
+		// the emergency duty. The path must reach the top of the axis at its right
+		// end, not only on the frame border.
+		const treads = (curvePath(curve).match(/[MHV][^MHV]*/g) ?? [])
+			.filter((token) => token[0] === "H")
+			.map((token) => Number(token.slice(1)))
+		const topDuty = Math.max(...(curvePath(curve).match(/[MHV][^MHV]*/g) ?? [])
+			.filter((token) => token[0] === "V")
+			.map((token) => 100 - Number(token.slice(1))))
+		expect(topDuty).toBe(curve.e)
+		expect(treads.length).toBeGreaterThan(1)
+	})
+
+	test("every coordinate stays inside the 0..100 box", () => {
+		const numbers = (curvePath(curve).match(/-?\d+(\.\d+)?/g) ?? []).map(Number)
+		expect(numbers.length).toBeGreaterThan(0)
+		for (const n of numbers) {
+			expect(Number.isFinite(n)).toBe(true)
+			expect(n).toBeGreaterThanOrEqual(0)
+			expect(n).toBeLessThanOrEqual(100)
+		}
+	})
+})
+
+describe("operating point", () => {
+	const curve: FanCurve = {
+		idle: 45, l0: 25, t1: 55, l1: 30, t2: 65, l2: 40, t3: 72, l3: 50,
+		t4: 80, l4: 60, t5: 88, l5: 70, emerg: 95, e: 100,
+		emerg_rel: 5, cap: 100, trim: 0, gain: 0, hyst: 2, dwell: 5, dead: 3, iv: 10,
+	}
+
+	test("names the band the temperature falls in, and the next jump", () => {
+		const at62 = operatingPoint(curve, 62)
+		expect(at62).toMatchObject({ tempC: 62, dutyPct: 40, bandIndex: 2 })
+		// 62 C is inside the band ending at 65, so the NEXT band ends at 72 and the
+		// jump lands at 73 (the first degree that resolves to the higher duty).
+		expect(at62?.nextEdgeC).toBe(73)
+		expect(at62?.nextDutyPct).toBe(50)
+	})
+
+	test("a temperature on an edge stays in the band that ends there", () => {
+		// WantFor is inclusive on the right edge: 65 still asks for L2, and the jump
+		// to L3 happens at 66. The marker and the caption must agree with that.
+		expect(operatingPoint(curve, 65)?.dutyPct).toBe(40)
+		expect(operatingPoint(curve, 66)?.dutyPct).toBe(50)
+	})
+
+	test("above the last band there is no next edge", () => {
+		const hot = operatingPoint(curve, 96)
+		expect(hot?.dutyPct).toBe(100)
+		expect(hot?.nextEdgeC).toBeNull()
+		expect(hot?.nextDutyPct).toBeNull()
+	})
+
+	test("an unreadable temperature yields no point rather than zero", () => {
+		expect(operatingPoint(curve, null)).toBeNull()
+		expect(operatingPoint(curve, Number.NaN)).toBeNull()
+	})
+
+	test("marker x and the drawn path use the same mapping", () => {
+		const axis = curveAxis(curve)
+		for (const tempC of [45, 55, 70, 88, 95]) {
+			const expected = ((tempC - axis.minC) / (axis.maxC - axis.minC)) * 100
+			expect(curveX(curve, tempC)).toBeCloseTo(expected, 10)
+		}
+	})
 })

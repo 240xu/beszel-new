@@ -31,6 +31,10 @@ import { UNKNOWN, fmtCelsius } from "@/lib/plus-metrics"
 import { getFanState } from "@/lib/plus-api"
 import {
 	FAN_DUTIES,
+	curveBands,
+	curvePath,
+	curveX,
+	operatingPoint,
 	fanLevelLabel,
 	fanRegressView,
 	fanWriteRefused,
@@ -398,6 +402,167 @@ function RegressLine({ state }: { state: FanState }) {
 	)
 }
 
+/** The curve as the panel's subject: a step plot, always visible, with the
+ *  machine's live operating point marked on it.
+ *
+ *  Why a step outline and not a ramp: `WantFor` holds each duty until the package
+ *  crosses the next edge and then jumps. Six of the seven steps are the only
+ *  duties the firmware will ever drive, so a smoothed line would predict numbers
+ *  the fan cannot run.
+ *
+ *  Why the operating point: the panel already reads the package temperature and
+ *  the reported duty into separate cells, and the chart did not connect them. The
+ *  marker answers the three questions an operator has here — which band am I in,
+ *  what does it ask for, how far is the next jump — and doubles as a diagnostic,
+ *  because a marker that disagrees with the reported duty means a mis-mapped
+ *  sensor or a fan that is not following the curve.
+ *
+ *  Geometry is a 100x40 box (5:2), which is also the summary glyph's 80x32, so
+ *  one viewBox serves both sizes with nothing to letterbox. */
+const PLOT = { w: 100, h: 40 }
+
+function CurvePlot({
+	curve,
+	tempC,
+	appliedLevel,
+	active,
+}: {
+	curve: FanCurve
+	tempC: number | null
+	/** The duty the panel last read from the server, or null when unreadable. */
+	appliedLevel: number | null
+	/** Whether pfand is driving the fan from this curve right now. */
+	active: boolean
+}) {
+	const point = operatingPoint(curve, tempC)
+
+	// The accessible name has to describe the picture it sits on, including the
+	// terminal duty. It previously said "rising to {e} at {emerg}" while the path
+	// stopped at l5, so a screen-reader user was told a ceiling the sighted chart
+	// contradicted. Both are built from the same curve now.
+	const label = point
+		? t`Fan curve: ${curve.l0} percent at idle, ${curve.l5} percent up to ${curve.t5} degrees, ${curve.e} percent from ${curve.emerg} degrees. Now ${point.tempC} degrees, asking for ${point.dutyPct} percent.`
+		: t`Fan curve: ${curve.l0} percent at idle, ${curve.l5} percent up to ${curve.t5} degrees, ${curve.e} percent from ${curve.emerg} degrees.`
+
+	const emergencyX = curveX(curve, curve.emerg)
+	const pointX = point ? curveX(curve, point.tempC) : 0
+
+	// Disagreement between what the curve asks and what the hub reports is worth naming:
+	// in auto with no regress pending they should agree, and when they do not the
+	// cause is outside this panel (manual mode, a held band, a stuck write).
+	const disagreement = point && appliedLevel !== null && point.dutyPct !== appliedLevel
+
+	return (
+		<figure className="min-w-0 rounded-md border border-border p-3">
+			<svg
+				viewBox={`0 0 ${PLOT.w} ${PLOT.h}`}
+				preserveAspectRatio="xMidYMid meet"
+				className="block h-auto w-full max-w-[25rem]"
+				role="img"
+				aria-label={label}
+			>
+				<title>{label}</title>
+				<line x1="0" y1="0" x2={PLOT.w} y2="0" className="stroke-border" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+				<line
+					x1="0"
+					y1={PLOT.h}
+					x2={PLOT.w}
+					y2={PLOT.h}
+					className="stroke-border"
+					strokeWidth="1"
+					vectorEffect="non-scaling-stroke"
+				/>
+				{/* One rule per band edge, so the steps can be read against temperatures. */}
+				{curveBands(curve).slice(0, -1).map((band) => {
+					const bx = curveX(curve, band.toC)
+					return (
+						<line
+							key={band.toC}
+							x1={bx}
+							y1="0"
+							x2={bx}
+							y2={PLOT.h}
+							className="stroke-border/60"
+							strokeWidth="1"
+							strokeDasharray="2 4"
+							vectorEffect="non-scaling-stroke"
+						/>
+					)
+				})}
+				{/* curvePath is 0..100 in y; scale it into the 40-unit box. */}
+				<g transform={`scale(1 ${PLOT.h / 100})`}>
+					<path
+						d={curvePath(curve)}
+						fill="none"
+						className="stroke-foreground"
+						strokeWidth="2"
+						vectorEffect="non-scaling-stroke"
+						strokeLinejoin="miter"
+					/>
+				</g>
+				{/* Where the emergency duty takes over. Interior, because the axis runs
+				    past the emergency temperature so the top plateau has width. */}
+				<line
+					x1={emergencyX}
+					y1="0"
+					x2={emergencyX}
+					y2={PLOT.h}
+					className="stroke-destructive"
+					strokeWidth="1"
+					strokeDasharray="3 3"
+					vectorEffect="non-scaling-stroke"
+				/>
+				{point && (
+					<>
+						<line
+							x1={pointX}
+							y1="0"
+							x2={pointX}
+							y2={PLOT.h}
+							className="stroke-foreground/40"
+							strokeWidth="1"
+							vectorEffect="non-scaling-stroke"
+						/>
+						<circle
+							cx={pointX}
+							cy={PLOT.h - (point.dutyPct / 100) * PLOT.h}
+							r="2.5"
+							className={cn("stroke-background", active ? "fill-foreground" : "fill-muted-foreground")}
+							strokeWidth="1"
+							vectorEffect="non-scaling-stroke"
+						/>
+					</>
+				)}
+			</svg>
+			<figcaption className="mt-2 space-y-1 text-xs text-muted-foreground">
+				<div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+					<span className="font-mono tabular-nums">
+						{curve.idle}°C idle · {curve.t5}°C last band · {curve.emerg}°C emergency
+					</span>
+					<span className="font-mono tabular-nums">
+						{t`${curve.l0}% → ${curve.l5}% → ${curve.e}%`}
+					</span>
+				</div>
+				{point ? (
+					<p className="font-mono tabular-nums text-foreground">
+						{point.nextEdgeC === null
+							? t`${point.tempC}°C → emergency duty ${point.dutyPct}%`
+							: t`${point.tempC}°C → ${point.dutyPct}% · next ${point.nextEdgeC}°C → ${point.nextDutyPct ?? 0}%`}
+					</p>
+				) : (
+					<p>{t`Temperature unavailable, so no operating point is shown.`}</p>
+				)}
+				{!active && <p>{t`The curve is not driving the fan right now.`}</p>}
+				{disagreement && (
+					<p className="text-warning-text">
+						{t`Curve asks for ${point.dutyPct}%, but the fan is running at ${appliedLevel ?? 0}%.`}
+					</p>
+				)}
+			</figcaption>
+		</figure>
+	)
+}
+
 function CurveEditor({
 	curve,
 	onChange,
@@ -460,34 +625,14 @@ function CurveEditor({
 	// outside the fold: an unsaved draft, and the locked full-speed backstop. A
 	// collapsed editor that looked idle while holding uncommitted fan instructions
 	// would be the exact failure the rest of this panel is written to avoid.
-	const summary = CURVE_FIELDS.filter((entry) => entry.group === "duty")
-		.map((entry) => {
-			const tempKey = entry.key === "idle" ? null : (`t${String(entry.key).slice(1)}` as keyof FanCurve)
-			const duty = curve[entry.key]
-			return tempKey ? `${curve[tempKey]}°C→${duty}%` : `${t`Idle`} ${duty}%`
-		})
-		.join("  ")
-
+	// The shape carries the relationships; the label underneath says the same
+	// thing in words for a screen reader, and the extreme values in text for
+	// anyone who wants the numbers without opening the editor.
 	return (
 		<div className="flex flex-col gap-5">
-			{/* No controlled `open`: a dirty draft must not trap the operator inside an
-			    editor they cannot collapse. The unsaved chip on the summary carries the
-			    signal instead, and stays visible while the body is closed. */}
 			<details className="group rounded-md border border-border">
 				<summary className="flex cursor-pointer items-center gap-x-2 px-3 py-2.5 text-sm">
-					<span className="shrink-0 font-medium">{t`Curve`}</span>
-					{/* The summary has to stay one line. At 320px the curve text and the
-					    lock note together wrapped the summary to four lines, which is a
-					    fold that hides nothing but still costs the height it was meant to
-					    save. The lock note therefore only appears where there is room; the
-					    locked field itself carries the same warning inside the body. */}
-					<span className="min-w-0 flex-1 truncate font-mono text-xs tabular-nums text-muted-foreground">
-						{summary}
-					</span>
-					{/* The chip is a word at sm and up, a dot below it: at 280px the word
-					    pushed the summary wider than its own row. The dot still says
-					    "there is a draft" and the word is restored as soon as there is
-					    room, which is where it can actually be read. */}
+					<span className="shrink-0 font-medium">{t`Edit curve`}</span>
 					{dirty && (
 						<>
 							<span
@@ -1141,6 +1286,12 @@ export function PlusFanCurveTab(_props: { grid: boolean; dataEmpty: boolean }) {
 				)}
 				{curve && (
 					<>
+						<CurvePlot
+							curve={curve}
+							tempC={state?.pkg_temp_read ? state.pkg_temp_c : null}
+							appliedLevel={state?.level_read ? state.level : null}
+							active={state?.pfand_active === true}
+						/>
 						<CurveEditor curve={curve} onChange={setDraft} dirty={draft !== null} />
 
 						{draft !== null && <p className="text-xs text-muted-foreground">{t`Unsaved changes`}</p>}

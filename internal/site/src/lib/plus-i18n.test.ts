@@ -131,7 +131,17 @@ for (const locale of CHINESE_LOCALES) {
  *  tuning policy and the P-state, and Wi-Fi. The curve field names (`emerg`, `hyst`
  *  and the rest) are not here because they reach the catalog through the
  *  `CURVE_CARRIED` list rather than as literals of their own. */
-const KEEP_IN_ENGLISH = new Set(["beszel-new", "EPP", "WiFi", "P-State", "HWP Dynamic Boost"])
+/** Strings that are the same in every language. `{0}% -> {1}% -> {2}%` is three
+ *  numbers joined by arrows: there is nothing in it to translate, and a catalog
+ *  entry would only be a place for the arrows to drift apart per locale. */
+const KEEP_IN_ENGLISH = new Set([
+	"beszel-new",
+	"EPP",
+	"WiFi",
+	"P-State",
+	"HWP Dynamic Boost",
+	"{0}% → {1}% → {2}%",
+])
 
 test("every configured locale has a catalog of its own", () => {
 	// The gap this reports is the point. The locales we do not own fall back to

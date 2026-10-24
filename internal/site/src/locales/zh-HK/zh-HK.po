@@ -3196,3 +3196,11 @@ msgstr "伺服器已回應，但此面板無法讀取結果。變更可能已經
 #: src/components/routes/system/plus-sheet.tsx
 msgid "{hidden} more in Extended metrics"
 msgstr "另有 {hidden} 項在擴展指標中"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Curve"
+msgstr "曲線"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Full-speed backstop fixed"
+msgstr "全速後備值已固定"

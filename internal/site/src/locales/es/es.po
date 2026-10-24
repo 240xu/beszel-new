@@ -3180,3 +3180,11 @@ msgstr ""
 #: src/components/routes/system/plus-sheet.tsx
 msgid "{hidden} more in Extended metrics"
 msgstr "{hidden} más en Métricas ampliadas"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Curve"
+msgstr "Curva"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Full-speed backstop fixed"
+msgstr "Tope a plena velocidad fijo"

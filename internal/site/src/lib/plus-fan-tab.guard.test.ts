@@ -254,3 +254,32 @@ test("the unreadable banner is cleared by a successful read", async () => {
 	expect(occurrences(source, /status === "ready"\) setUnreadable\(false\)/)).toHaveLength(2)
 	expect(occurrences(source, /status === "ok"\) setUnreadable/)).toEqual([])
 })
+
+// The curve editor used to open twelve numeric inputs at once, which made the
+// card 1415px tall at 320px wide for an operator who usually only wants to read
+// the curve. It is a <details> now (measured 238px collapsed).
+//
+// Two things must not regress with it: the fold must stay uncontrolled, so a dirty
+// draft cannot trap the operator in an editor that refuses to close; and the
+// unsaved/locked signals must stay on the summary, outside the fold, because a
+// closed editor that looks idle while holding uncommitted fan instructions is the
+// failure the rest of this panel exists to prevent.
+test("the curve editor folds without trapping or hiding its safety signals", async () => {
+	const source = await read(TAB)
+	const editor = source.slice(source.indexOf("function CurveEditor"), source.indexOf("function ModeSwitch"))
+
+	// Uncontrolled: no `open={...}` prop on the details element.
+	expect(occurrences(editor, /<details[^>]*\bopen=/)).toEqual([])
+	expect(occurrences(editor, /<details/)).not.toEqual([])
+
+	// The summary carries both signals.
+	const summary = editor.slice(editor.indexOf("<summary"), editor.indexOf("</summary>"))
+	expect(occurrences(summary, /Unsaved changes/)).not.toEqual([])
+	expect(occurrences(summary, /Full-speed backstop fixed/)).not.toEqual([])
+
+	// And the fold itself holds the two field groups. Three uses of the filter are
+	// expected: one builds the collapsed summary, two render the fieldsets.
+	expect(occurrences(editor, /CURVE_FIELDS\.filter/)).toHaveLength(3)
+	expect(occurrences(editor, /group === "temperature"/)).not.toEqual([])
+	expect(occurrences(editor, /group === "duty"/)).not.toEqual([])
+})

@@ -3175,3 +3175,11 @@ msgstr "The server answered, but this panel could not read the result. The chang
 #: src/components/routes/system/plus-sheet.tsx
 msgid "{hidden} more in Extended metrics"
 msgstr "{hidden} more in Extended metrics"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Curve"
+msgstr "Curve"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Full-speed backstop fixed"
+msgstr "Full-speed backstop fixed"

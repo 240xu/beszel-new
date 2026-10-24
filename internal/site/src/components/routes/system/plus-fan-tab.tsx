@@ -1,6 +1,13 @@
 import { t } from "@lingui/core/macro"
 import { useStore } from "@nanostores/react"
-import { LoaderCircleIcon, LockIcon } from "lucide-react"
+import {
+	AlertOctagonIcon,
+	AlertTriangleIcon,
+	CheckCircle2Icon,
+	InfoIcon,
+	LoaderCircleIcon,
+	LockIcon,
+} from "lucide-react"
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react"
 import {
 	AlertDialog,
@@ -121,11 +128,27 @@ function armedCopy() {
 	return ARMED_TITLE
 }
 
+// Every status surface carries a full hairline border. These used to be a 4px
+// bar on the inline-start edge only, which is the tinted-side-stripe pattern: it
+// stands in for hierarchy the layout never established, and it puts the whole
+// severity signal in a colour a colour-blind reader does not get. The border is
+// uniform now and `STATUS_ICON` carries the severity as a shape, next to the
+// heading text that already says it in words.
+/** Severity as a shape. The heading already names it in words; the icon makes it
+ *  survive a greyscale screenshot and a colour-blind reader. `aria-hidden` because
+ *  it repeats the heading, not because it is decoration. */
+const STATUS_ICON = {
+	success: CheckCircle2Icon,
+	warning: AlertTriangleIcon,
+	danger: AlertOctagonIcon,
+	info: InfoIcon,
+} as const
+
 const STATUS_TONE = {
-	success: "border-s-success bg-success-muted/60 text-success-text",
-	warning: "border-s-warning bg-warning-muted/60 text-warning-text",
-	danger: "border-s-destructive bg-destructive/10 text-destructive-text",
-	info: "border-s-info bg-info-muted/60 text-info-text",
+	success: "border border-success/40 bg-success-muted/60 text-success-text",
+	warning: "border border-warning/40 bg-warning-muted/60 text-warning-text",
+	danger: "border border-destructive/40 bg-destructive/10 text-destructive-text",
+	info: "border border-info/40 bg-info-muted/60 text-info-text",
 } as const
 
 const CHIP_TONE = {
@@ -227,6 +250,11 @@ function StatusChip({ tone, children }: { tone: keyof typeof CHIP_TONE; children
 	)
 }
 
+function StatusGlyph({ tone }: { tone: keyof typeof STATUS_TONE }) {
+	const Icon = STATUS_ICON[tone]
+	return <Icon className="size-4 shrink-0" aria-hidden="true" />
+}
+
 function StatusBar({
 	tone,
 	title,
@@ -243,12 +271,15 @@ function StatusBar({
 			role="status"
 			aria-live="polite"
 			className={cn(
-				"flex flex-col gap-3 rounded-md border-s-4 p-4 sm:flex-row sm:items-center sm:justify-between",
+				"flex flex-col gap-3 rounded-md p-4 sm:flex-row sm:items-center sm:justify-between",
 				STATUS_TONE[tone]
 			)}
 		>
 			<div className="min-w-0 space-y-1">
-				<p className="text-sm font-semibold">{title}</p>
+				<p className="flex items-center gap-2 text-sm font-semibold">
+					<StatusGlyph tone={tone} />
+					{title}
+				</p>
 				<div className="text-sm opacity-90">{children}</div>
 			</div>
 			{action}
@@ -283,12 +314,15 @@ function ReadProblem({ stale, onRetry }: { stale: boolean; onRetry: () => void }
 		<div
 			role="alert"
 			className={cn(
-				"flex flex-col gap-3 rounded-md border-s-4 p-4 sm:flex-row sm:items-center sm:justify-between",
+				"flex flex-col gap-3 rounded-md p-4 sm:flex-row sm:items-center sm:justify-between",
 				stale ? STATUS_TONE.warning : STATUS_TONE.danger
 			)}
 		>
 			<div className="min-w-0 space-y-1">
-				<p className="text-sm font-semibold">{stale ? t`Stale` : t`Unavailable`}</p>
+				<p className="flex items-center gap-2 text-sm font-semibold">
+					<StatusGlyph tone={stale ? "warning" : "danger"} />
+					{stale ? t`Stale` : t`Unavailable`}
+				</p>
 				<p className="text-sm opacity-90">
 					{stale
 						? t`The fan state could not be refreshed. Showing the last reading.`
@@ -733,12 +767,15 @@ function WriteFeedback({
 				<div
 					role="alert"
 					className={cn(
-						"flex flex-col gap-3 rounded-md border-s-4 p-4 sm:flex-row sm:items-center sm:justify-between",
+						"flex flex-col gap-3 rounded-md p-4 sm:flex-row sm:items-center sm:justify-between",
 						STATUS_TONE.warning
 					)}
 				>
-					<p className="text-sm">
-						{t`The server answered, but this panel could not read the result. The change may be in force; check the current state before writing again.`}
+					<p className="flex items-start gap-2 text-sm">
+						<StatusGlyph tone="warning" />
+						<span>
+							{t`The server answered, but this panel could not read the result. The change may be in force; check the current state before writing again.`}
+						</span>
 					</p>
 					{retryWrite && (
 						<Button className="w-full sm:w-auto" size="sm" variant="outline" onClick={() => onRetry(retryWrite)}>
@@ -751,11 +788,14 @@ function WriteFeedback({
 				<div
 					role="alert"
 					className={cn(
-						"flex flex-col gap-3 rounded-md border-s-4 p-4 sm:flex-row sm:items-center sm:justify-between",
+						"flex flex-col gap-3 rounded-md p-4 sm:flex-row sm:items-center sm:justify-between",
 						STATUS_TONE.danger
 					)}
 				>
-					<p className="text-sm">{t`The request never reached the server.`}</p>
+					<p className="flex items-start gap-2 text-sm">
+						<StatusGlyph tone="danger" />
+						<span>{t`The request never reached the server.`}</span>
+					</p>
 					{retryWrite && (
 						<Button className="w-full sm:w-auto" size="sm" variant="outline" onClick={() => onRetry(retryWrite)}>
 							{t`Retry`}
@@ -767,13 +807,16 @@ function WriteFeedback({
 				<div
 					role="alert"
 					className={cn(
-						"flex flex-col gap-3 rounded-md border-s-4 p-4 sm:flex-row sm:items-center sm:justify-between",
+						"flex flex-col gap-3 rounded-md p-4 sm:flex-row sm:items-center sm:justify-between",
 						STATUS_TONE.danger
 					)}
 				>
-					<div className="min-w-0 space-y-1">
-						<p className="text-sm">{REFUSAL_TEXT[refusal.key]}</p>
-						{refusal.detail && <p className="font-mono text-xs opacity-70">{refusal.detail}</p>}
+					<div className="flex min-w-0 items-start gap-2">
+						<StatusGlyph tone="danger" />
+						<div className="min-w-0 space-y-1">
+							<p className="text-sm">{REFUSAL_TEXT[refusal.key]}</p>
+							{refusal.detail && <p className="font-mono text-xs opacity-70">{refusal.detail}</p>}
+						</div>
 					</div>
 					{retryWrite && (
 						<Button className="w-full sm:w-auto" size="sm" variant="outline" onClick={() => onRetry(retryWrite)}>
@@ -901,8 +944,11 @@ export function PlusFanTab(_props: { grid: boolean; dataEmpty: boolean }) {
 				{status === "loading" && !state && <ReadingState />}
 				{status === "error" && !state && <ReadProblem stale={false} onRetry={retry} />}
 				{status === "ready" && !state && (
-					<div role="alert" className={cn("rounded-md border-s-4 p-4", STATUS_TONE.danger)}>
-						<p className="text-sm font-semibold">{t`Unavailable`}</p>
+					<div role="alert" className={cn("rounded-md p-4", STATUS_TONE.danger)}>
+						<p className="flex items-center gap-2 text-sm font-semibold">
+							<StatusGlyph tone="danger" />
+							{t`Unavailable`}
+						</p>
 						<p className="text-sm opacity-90">{t`No fan state is on record.`}</p>
 						<Button className="mt-3 w-full sm:w-auto" size="sm" variant="outline" onClick={retry}>
 							{t`Retry`}
@@ -915,14 +961,17 @@ export function PlusFanTab(_props: { grid: boolean; dataEmpty: boolean }) {
 						{(state.health === "failsafe" || state.breaker_open) && (
 							<output
 								className={cn(
-									"flex flex-col gap-2 rounded-md border-s-4 p-3 text-sm sm:flex-row sm:items-center sm:justify-between",
+									"flex flex-col gap-2 rounded-md p-3 text-sm sm:flex-row sm:items-center sm:justify-between",
 									state.breaker_open ? STATUS_TONE.danger : STATUS_TONE.warning
 								)}
 							>
-								<span>
-									{state.breaker_open
-										? t`Fan writes are latched after repeated failures. The last verified duty is held until the control path recovers.`
-										: t`The hub is acting on a reading it could not verify. The emergency duty is held until the sensor recovers.`}
+								<span className="flex items-start gap-2">
+									<StatusGlyph tone={state.breaker_open ? "danger" : "warning"} />
+									<span>
+										{state.breaker_open
+											? t`Fan writes are latched after repeated failures. The last verified duty is held until the control path recovers.`
+											: t`The hub is acting on a reading it could not verify. The emergency duty is held until the sensor recovers.`}
+									</span>
 								</span>
 								<Button size="sm" variant="outline" onClick={retry}>
 									{t`Retry`}
@@ -1080,8 +1129,11 @@ export function PlusFanCurveTab(_props: { grid: boolean; dataEmpty: boolean }) {
 				{status === "error" && !state && <ReadProblem stale={false} onRetry={retry} />}
 				{status === "error" && state && <ReadProblem stale={true} onRetry={retry} />}
 				{state && !curve && (
-					<div role="alert" className={cn("flex flex-col gap-3 rounded-md border-s-4 p-4", STATUS_TONE.warning)}>
-						<p className="text-sm font-semibold">{t`No curve on record.`}</p>
+					<div role="alert" className={cn("flex flex-col gap-3 rounded-md p-4", STATUS_TONE.warning)}>
+						<p className="flex items-center gap-2 text-sm font-semibold">
+							<StatusGlyph tone="warning" />
+							{t`No curve on record.`}
+						</p>
 						<Button className="w-full sm:w-auto" size="sm" variant="outline" onClick={retry}>
 							{t`Retry`}
 						</Button>

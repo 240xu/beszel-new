@@ -364,7 +364,17 @@ function RegressLine({ state }: { state: FanState }) {
 	)
 }
 
-function CurveEditor({ curve, onChange }: { curve: FanCurve; onChange: (curve: FanCurve) => void }) {
+function CurveEditor({
+	curve,
+	onChange,
+	dirty,
+}: {
+	curve: FanCurve
+	onChange: (curve: FanCurve) => void
+	/** The panel holds a draft that is not on disk yet. The collapsed summary has
+	 *  to say so, or a closed editor looks like the running curve. */
+	dirty: boolean
+}) {
 	const LOCK_REASON = t`Full-speed backstop: the firmware carries this value, so it is fixed here.`
 
 	const field = (key: keyof FanCurve, locked: boolean) => {
@@ -408,36 +418,90 @@ function CurveEditor({ curve, onChange }: { curve: FanCurve; onChange: (curve: F
 		)
 	}
 
+	// Twelve numeric fields open at once turned the card into a wall of inputs for
+	// an operator who usually only wants to confirm what the curve says. The editor
+	// collapses to a one-line summary of the curve, and opens on demand.
+	//
+	// Collapsing must not hide a safety signal, so the summary carries two of them
+	// outside the fold: an unsaved draft, and the locked full-speed backstop. A
+	// collapsed editor that looked idle while holding uncommitted fan instructions
+	// would be the exact failure the rest of this panel is written to avoid.
+	const summary = CURVE_FIELDS.filter((entry) => entry.group === "duty")
+		.map((entry) => {
+			const tempKey = entry.key === "idle" ? null : (`t${String(entry.key).slice(1)}` as keyof FanCurve)
+			const duty = curve[entry.key]
+			return tempKey ? `${curve[tempKey]}°C→${duty}%` : `${t`Idle`} ${duty}%`
+		})
+		.join("  ")
+
 	return (
 		<div className="flex flex-col gap-5">
-			<div className="grid gap-5 lg:grid-cols-2">
-				<fieldset className="space-y-3">
-					<legend className="text-sm font-semibold text-foreground">{t`Temperature`}</legend>
-					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-						{CURVE_FIELDS.filter((entry) => entry.group === "temperature").map((entry) =>
-							field(entry.key, entry.locked === true)
-						)}
+			{/* No controlled `open`: a dirty draft must not trap the operator inside an
+			    editor they cannot collapse. The unsaved chip on the summary carries the
+			    signal instead, and stays visible while the body is closed. */}
+			<details className="group rounded-md border border-border">
+				<summary className="flex cursor-pointer items-center gap-x-2 px-3 py-2.5 text-sm">
+					<span className="shrink-0 font-medium">{t`Curve`}</span>
+					{/* The summary has to stay one line. At 320px the curve text and the
+					    lock note together wrapped the summary to four lines, which is a
+					    fold that hides nothing but still costs the height it was meant to
+					    save. The lock note therefore only appears where there is room; the
+					    locked field itself carries the same warning inside the body. */}
+					<span className="min-w-0 flex-1 truncate font-mono text-xs tabular-nums text-muted-foreground">
+						{summary}
+					</span>
+					{/* The chip is a word at sm and up, a dot below it: at 280px the word
+					    pushed the summary wider than its own row. The dot still says
+					    "there is a draft" and the word is restored as soon as there is
+					    room, which is where it can actually be read. */}
+					{dirty && (
+						<>
+							<span
+								className="size-2 shrink-0 rounded-full bg-warning sm:hidden"
+								role="img"
+								aria-label={t`Unsaved changes`}
+							/>
+							<span className="hidden shrink-0 rounded-sm bg-warning-muted px-1.5 py-0.5 text-xs text-warning-text sm:inline">
+								{t`Unsaved changes`}
+							</span>
+						</>
+					)}
+					<span className="ms-auto hidden shrink-0 items-center gap-1 text-xs text-muted-foreground sm:inline-flex">
+						<LockIcon className="size-3" aria-hidden="true" />
+						{t`Full-speed backstop fixed`}
+					</span>
+				</summary>
+				<div className="border-t border-border p-3">
+					<div className="grid gap-5 lg:grid-cols-2">
+						<fieldset className="space-y-3">
+							<legend className="text-sm font-semibold text-foreground">{t`Temperature`}</legend>
+							<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+								{CURVE_FIELDS.filter((entry) => entry.group === "temperature").map((entry) =>
+									field(entry.key, entry.locked === true)
+								)}
+							</div>
+						</fieldset>
+						<fieldset className="space-y-3">
+							<legend className="text-sm font-semibold text-foreground">{t`Duty`}</legend>
+							<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+								{CURVE_FIELDS.filter((entry) => entry.group === "duty").map((entry) =>
+									field(entry.key, entry.locked === true)
+								)}
+							</div>
+						</fieldset>
 					</div>
-				</fieldset>
-				<fieldset className="space-y-3">
-					<legend className="text-sm font-semibold text-foreground">{t`Duty`}</legend>
-					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-						{CURVE_FIELDS.filter((entry) => entry.group === "duty").map((entry) =>
-							field(entry.key, entry.locked === true)
-						)}
-					</div>
-				</fieldset>
-			</div>
-			<details className="rounded-md border border-border bg-muted/30 p-3">
-				<summary className="cursor-pointer text-sm font-medium">{t`Also written unchanged:`}</summary>
-				<dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs tabular-nums sm:grid-cols-3">
-					{CURVE_CARRIED.map((key) => (
-						<div key={String(key)} className="flex justify-between gap-2">
-							<dt className="text-muted-foreground">{String(key)}</dt>
-							<dd>{curve[key]}</dd>
-						</div>
-					))}
-				</dl>
+					<details className="rounded-md border border-border bg-muted/30 p-3">
+						<summary className="cursor-pointer text-sm font-medium">{t`Also written unchanged:`}</summary>
+						<dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs tabular-nums sm:grid-cols-3">
+							{CURVE_CARRIED.map((key) => (
+								<div key={String(key)} className="flex justify-between gap-2">
+									<dt className="text-muted-foreground">{String(key)}</dt>
+									<dd>{curve[key]}</dd>
+								</div>
+							))}
+						</dl>
+					</details>
+				</div>
 			</details>
 		</div>
 	)
@@ -532,9 +596,7 @@ function DutyLadder({
 		// the writing direction (the right edge in RTL, the left edge in LTR).
 		// happy-dom (DOM tests) does not cascade `dir` into computed style, so
 		// consult the nearest [dir] attribute as well as the computed style.
-		const rtl =
-			track.closest("[dir=rtl]") !== null ||
-			getComputedStyle(track).direction === "rtl"
+		const rtl = track.closest("[dir=rtl]") !== null || getComputedStyle(track).direction === "rtl"
 		const at = rtl
 			? ((rect.right - event.clientX) / rect.width) * 100
 			: ((event.clientX - rect.left) / rect.width) * 100
@@ -578,7 +640,9 @@ function DutyLadder({
 				onPointerDown={choose}
 				className={cn(
 					"relative h-12 w-full rounded-md border border-border bg-background outline-none",
-					disabled ? "opacity-60" : "cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+					disabled
+						? "opacity-60"
+						: "cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 				)}
 			>
 				<span className="sr-only">{`${appliedName}: ${appliedLabel}`}</span>
@@ -589,7 +653,10 @@ function DutyLadder({
 					{Array.from({ length: 10 }, (_, i) => (
 						<span
 							key={i}
-							className={cn("border-e border-border/60 last:border-e-0", i * 10 < target ? "bg-signal-muted" : "bg-muted/40")}
+							className={cn(
+								"border-e border-border/60 last:border-e-0",
+								i * 10 < target ? "bg-signal-muted" : "bg-muted/40"
+							)}
 						/>
 					))}
 				</span>
@@ -674,12 +741,7 @@ function WriteFeedback({
 						{t`The server answered, but this panel could not read the result. The change may be in force; check the current state before writing again.`}
 					</p>
 					{retryWrite && (
-						<Button
-							className="w-full sm:w-auto"
-							size="sm"
-							variant="outline"
-							onClick={() => onRetry(retryWrite)}
-						>
+						<Button className="w-full sm:w-auto" size="sm" variant="outline" onClick={() => onRetry(retryWrite)}>
 							{t`Retry`}
 						</Button>
 					)}
@@ -695,12 +757,7 @@ function WriteFeedback({
 				>
 					<p className="text-sm">{t`The request never reached the server.`}</p>
 					{retryWrite && (
-						<Button
-							className="w-full sm:w-auto"
-							size="sm"
-							variant="outline"
-							onClick={() => onRetry(retryWrite)}
-						>
+						<Button className="w-full sm:w-auto" size="sm" variant="outline" onClick={() => onRetry(retryWrite)}>
 							{t`Retry`}
 						</Button>
 					)}
@@ -719,12 +776,7 @@ function WriteFeedback({
 						{refusal.detail && <p className="font-mono text-xs opacity-70">{refusal.detail}</p>}
 					</div>
 					{retryWrite && (
-						<Button
-							className="w-full sm:w-auto"
-							size="sm"
-							variant="outline"
-							onClick={() => onRetry(retryWrite)}
-						>
+						<Button className="w-full sm:w-auto" size="sm" variant="outline" onClick={() => onRetry(retryWrite)}>
 							{t`Retry`}
 						</Button>
 					)}
@@ -825,9 +877,7 @@ export function PlusFanTab(_props: { grid: boolean; dataEmpty: boolean }) {
 				right={
 					<>
 						<div className="flex flex-wrap gap-1.5 sm:justify-end">
-							{state && manual && state.level_read && (
-								<StatusChip tone="success">{OUTCOME_BADGE.held}</StatusChip>
-							)}
+							{state && manual && state.level_read && <StatusChip tone="success">{OUTCOME_BADGE.held}</StatusChip>}
 							{state && outcome?.needsRestart && (
 								<StatusChip tone="warning">{OUTCOME_BADGE.pending_restart}</StatusChip>
 							)}
@@ -1039,16 +1089,12 @@ export function PlusFanCurveTab(_props: { grid: boolean; dataEmpty: boolean }) {
 				)}
 				{curve && (
 					<>
-						<CurveEditor curve={curve} onChange={setDraft} />
+						<CurveEditor curve={curve} onChange={setDraft} dirty={draft !== null} />
 
-						{draft !== null && (
-							<p className="text-xs text-muted-foreground">{t`Unsaved changes`}</p>
-						)}
+						{draft !== null && <p className="text-xs text-muted-foreground">{t`Unsaved changes`}</p>}
 
 						<div className="flex flex-col gap-3 border-t border-border pt-5">
-							<p className="text-sm text-muted-foreground">
-								{t`The daemon picks the curve up on its next restart.`}
-							</p>
+							<p className="text-sm text-muted-foreground">{t`The daemon picks the curve up on its next restart.`}</p>
 							<div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
 								{draft !== null && (
 									<Button

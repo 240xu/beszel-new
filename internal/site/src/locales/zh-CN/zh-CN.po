@@ -3180,3 +3180,11 @@ msgstr "服务器已响应，但此面板无法读取结果。变更可能已经
 #: src/components/routes/system/plus-sheet.tsx
 msgid "{hidden} more in Extended metrics"
 msgstr "另有 {hidden} 项在扩展指标中"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Curve"
+msgstr "曲线"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Full-speed backstop fixed"
+msgstr "全速后备值已固定"

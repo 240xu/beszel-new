@@ -3193,3 +3193,6 @@ msgstr "權杖已隱藏"
 msgid "The server answered, but this panel could not read the result. The change may be in force; check the current state before writing again."
 msgstr "伺服器已回應，但此面板無法讀取結果。變更可能已經生效；再次寫入前請先確認目前狀態。"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "{hidden} more in Extended metrics"
+msgstr "另有 {hidden} 項在擴展指標中"

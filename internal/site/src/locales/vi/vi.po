@@ -3177,3 +3177,6 @@ msgstr "Cài đặt người dùng của bạn đã được cập nhật."
 msgid "The server answered, but this panel could not read the result. The change may be in force; check the current state before writing again."
 msgstr ""
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "{hidden} more in Extended metrics"
+msgstr ""

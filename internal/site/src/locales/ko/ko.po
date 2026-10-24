@@ -3177,3 +3177,6 @@ msgstr "사용자 설정이 업데이트되었습니다."
 msgid "The server answered, but this panel could not read the result. The change may be in force; check the current state before writing again."
 msgstr ""
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "{hidden} more in Extended metrics"
+msgstr "나머지 {hidden}개는 확장 지표에 있습니다"

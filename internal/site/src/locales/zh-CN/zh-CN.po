@@ -3177,3 +3177,6 @@ msgstr "您的用户设置已更新。"
 msgid "The server answered, but this panel could not read the result. The change may be in force; check the current state before writing again."
 msgstr "服务器已响应，但此面板无法读取结果。变更可能已经生效；再次写入前请先确认当前状态。"
 
+#: src/components/routes/system/plus-sheet.tsx
+msgid "{hidden} more in Extended metrics"
+msgstr "另有 {hidden} 项在扩展指标中"

@@ -2656,9 +2656,6 @@ msgstr ""
 msgid "The curve daemon is not running, so it is not driving the fan."
 msgstr ""
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "The curve daemon is running and is driving the fan from the curve on disk."
-msgstr ""
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The curve daemon owns the fan; stop it before setting a duty by hand."
@@ -2672,9 +2669,6 @@ msgstr ""
 msgid "The daemon picks the curve up on its next restart."
 msgstr ""
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "the edited curve"
-msgstr ""
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The fan control device refused the write."
@@ -3150,9 +3144,6 @@ msgstr ""
 msgid "Write this duty to the firmware"
 msgstr ""
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "Written to disk; the curve daemon has not picked it up."
-msgstr ""
 
 #: src/components/routes/settings/layout.tsx
 msgid "YAML Config"
@@ -3228,3 +3219,31 @@ msgstr "{0}% → {1}% → {2}%"
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Curve asks for {0}%, but the fan is running at {1}%."
 msgstr "La courbe demande {0} %, le ventilateur tourne à {1} %."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Idle temperature"
+msgstr "Température de ralenti"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "One of the six duties the daemon can band on"
+msgstr "L'un des six rapports cycliques que le démon peut utiliser en bandes"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Written to disk. The curve daemon reads this file only at start, so restart it for the change to apply."
+msgstr "Écrit sur le disque. Le démon de courbe ne lit ce fichier qu'au démarrage ; redémarrez-le pour appliquer."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The curve daemon is running on the curve it read when it started. A curve written since then is not in force until it restarts."
+msgstr "Le démon de courbe tourne sur la courbe lue à son démarrage. Une courbe écrite depuis n'est pas active avant un redémarrage."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Restart the curve daemon so it re-reads the curve"
+msgstr "Redémarrer le démon de courbe pour qu'il relise la courbe"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The curve on disk is re-read by the daemon."
+msgstr "La courbe sur le disque est relue par le démon."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "No curve was on record, so every field is new."
+msgstr "Aucune courbe n'était enregistrée, donc tous les champs sont nouveaux."

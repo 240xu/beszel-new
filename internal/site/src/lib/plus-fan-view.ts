@@ -15,6 +15,14 @@ export type FanWriteResult = CurveSaveResult | FanModeResult
  *  `plus-fan-duties.drift.test.ts` reads that Go file and fails on any drift. */
 export const FAN_DUTIES = [25, 30, 40, 50, 60, 70, 80, 85, 90, 95, 100] as const
 
+/** The duties the daemon's trim and hysteresis can address as CURVE BANDS.
+ *  Mirrors `curveBandDuty` in agent/plus/curve.go, which Validate enforces for
+ *  L0..L5. Narrower than FAN_DUTIES on purpose: 80/85/90/95/100 are accepted as a
+ *  hand-set duty but cannot be banded, because floor_of and center_of are keyed on
+ *  the duty value and fall through to the emergency edge for anything else.
+ *  `plus-fan-band-duties.drift.test.ts` reads the Go map and fails on drift. */
+export const CURVE_BAND_DUTIES = [25, 30, 40, 50, 60, 70] as const
+
 /** The server publishes the label for a duty it read, so the panel never rebuilds
  *  one: a re-tuned firmware table must not be contradicted from the number. */
 export function fanLevelLabel(state: FanState): string {
@@ -45,8 +53,12 @@ export type FanWrite =
 	| { kind: "level"; level: number }
 	| { kind: "mode"; mode: FanMode }
 	| { kind: "curve"; curve: FanCurve }
+	/** Ask the daemon to re-read the curve file. Not a mode: the fan is not left
+	 *  in a different state, the process is just restarted so a curve that already
+	 *  reached the disk becomes behaviour. */
+	| { kind: "restart" }
 
-/** The three writes this panel can make, each carrying the confirm flag. */
+/** The four writes this panel can make, each carrying the confirm flag. */
 export async function issueFanWrite(write: FanWrite): Promise<FanWriteResult> {
 	if (write.kind === "level") {
 		const w = levelWrite(write.level)
@@ -55,6 +67,9 @@ export async function issueFanWrite(write: FanWrite): Promise<FanWriteResult> {
 	if (write.kind === "mode") {
 		const w = modeWrite(write.mode)
 		return await setFanMode(w.mode, w.confirm)
+	}
+	if (write.kind === "restart") {
+		return await setFanMode("restart", true)
 	}
 	const w = curveWrite(write.curve)
 	return saveCurve(w, w.confirm)

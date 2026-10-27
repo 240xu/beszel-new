@@ -437,7 +437,10 @@ test("the two refusals that send an operator after different problems stay apart
 })
 
 test("a write nothing is running is never rendered with wording that says it is running", () => {
-	const pending = sentence("the curve daemon has not picked it up")
+	// The copy names the mechanism now: pfand reads its file once at start, so the
+	// only honest sentence about a written-but-unread curve is that it needs a
+	// restart. It must not borrow "in force" or "running now" from the applied arm.
+	const pending = sentence("reads this file only at start")
 	expect(pending).not.toMatch(/in force|running now|生效|已生效/i)
 	// The reverse, or the pair proves nothing.
 	expect(sentence("the fan is running this now")).toMatch(/in force|running/i)

@@ -31,6 +31,7 @@ import { UNKNOWN, fmtCelsius } from "@/lib/plus-metrics"
 import { getFanState } from "@/lib/plus-api"
 import {
 	FAN_DUTIES,
+	CURVE_BAND_DUTIES,
 	curveBands,
 	curvePath,
 	curveX,
@@ -52,8 +53,13 @@ import type { FanCurve, FanMode, FanState } from "@/types"
 function outcomeCopy() {
 	const OUTCOME_TEXT: Record<FanOutcomeKind, string> & { appliedDuty: string } = {
 		applied: t`In force — the fan is running this now.`,
-		pending_restart: t`Written to disk; the curve daemon has not picked it up.`,
-		daemon_running: t`The curve daemon is running and is driving the fan from the curve on disk.`,
+		pending_restart: t`Written to disk. The curve daemon reads this file only at start, so restart it for the change to apply.`,
+		// "from the curve on disk" was false the moment a curve was written: pfand
+		// sources its file once at start, so a process that is running holds the
+		// curve it read then, and the file on disk may already be a newer one that
+		// no daemon has seen. Saying "on disk" turned a pending change into an
+		// apparent success, on a panel whose whole job is not to do that.
+		daemon_running: t`The curve daemon is running on the curve it read when it started. A curve written since then is not in force until it restarts.`,
 		daemon_stopped: t`The curve daemon is not running, so it is not driving the fan.`,
 		appliedDuty: t`Applied Duty`,
 	}
@@ -95,7 +101,13 @@ function refusalCopy() {
 }
 
 const CURVE_FIELDS: Array<{ key: keyof FanCurve; group: "temperature" | "duty"; locked?: boolean }> = [
-	{ key: "idle", group: "duty" },
+	// `idle` is the bottom TEMPERATURE edge, not a duty. WantFor compares it to
+	// tempC (`case tempC <= c.Idle: return c.L0`) and Validate places it first in
+	// the strictly-increasing temperature chain IDLE < T1 < ... < EMERG. Listing
+	// it under "duty" put a percent box with a 0..100 maximum next to an operator
+	// who needed to type a temperature, and the daemon would have run whatever
+	// number landed there as degrees.
+	{ key: "idle", group: "temperature" },
 	{ key: "l0", group: "duty" },
 	{ key: "t1", group: "temperature" },
 	{ key: "l1", group: "duty" },
@@ -127,6 +139,9 @@ function armedCopy() {
 		level: t`Write this duty to the firmware`,
 		mode: t`Change the curve daemon's state`,
 		curve: t`Write this curve to the disk`,
+		// Restating the consequence is the point: the fan does not stop, but for a
+		// moment the daemon is not the process that was driving it.
+		restart: t`Restart the curve daemon so it re-reads the curve`,
 	}
 
 	return ARMED_TITLE
@@ -240,10 +255,67 @@ function useFanWrite(onSettled: (settled: FanWriteSettled, write: FanWrite) => v
 	return { busy, run }
 }
 
-function ArmedTarget({ write }: { write: FanWrite }) {
+/** The curve fields in the order the daemon writes them, so a diff reads like the
+ *  file rather than like a JS object. */
+const CURVE_ORDER: Array<keyof FanCurve> = [
+	"idle",
+	"l0",
+	"t1",
+	"l1",
+	"t2",
+	"l2",
+	"t3",
+	"l3",
+	"t4",
+	"l4",
+	"t5",
+	"l5",
+	"emerg",
+	"e",
+	"emerg_rel",
+	"cap",
+	"trim",
+	"gain",
+	"hyst",
+	"dwell",
+	"dead",
+	"iv",
+]
+
+/** What is about to be written.
+ *
+ *  A curve used to say only "the edited curve", so an operator asked to confirm a
+ *  hardware write could not see which of the twelve fields they had changed, or
+ *  whether the change was the one they meant. It now lists every field with the
+ *  value being replaced, and marks the ones that actually move. Read-only rows are
+ *  greyed, because a write sends all 22 fields whatever the form showed. */
+function ArmedTarget({ write, before }: { write: FanWrite; before: FanCurve | null }) {
 	if (write.kind === "level") return <>{`${write.level}%`}</>
-	if (write.kind === "mode") return <>{write.mode === "auto" ? t`Return to the curve` : t`Take manual control`}</>
-	return <>{t`the edited curve`}</>
+	if (write.kind === "mode") return <>{write.mode === "auto" ? t`Return to the curve` : write.mode === "restart" ? t`Restart the curve daemon` : t`Take manual control`}</>
+	if (write.kind === "restart") return <>{t`The curve on disk is re-read by the daemon.`}</>
+
+	const next = write.curve
+	return (
+		<div className="space-y-2">
+			<dl className="grid grid-cols-2 gap-x-4 gap-y-0.5 font-mono text-xs tabular-nums sm:grid-cols-3">
+				{CURVE_ORDER.map((key) => {
+					const changed = before !== null && before[key] !== next[key]
+					return (
+						<div key={String(key)} className="flex items-baseline justify-between gap-2">
+							<dt className={cn("uppercase", changed ? "text-foreground" : "text-muted-foreground")}>{String(key)}</dt>
+							<dd className={cn(changed ? "font-semibold text-foreground" : "text-muted-foreground")}>
+								{changed && before !== null ? `${before[key]} → ` : ""}
+								{next[key]}
+							</dd>
+						</div>
+					)
+				})}
+			</dl>
+			{before === null && (
+				<p className="text-xs text-muted-foreground">{t`No curve was on record, so every field is new.`}</p>
+			)}
+		</div>
+	)
 }
 
 function StatusChip({ tone, children }: { tone: keyof typeof CHIP_TONE; children: ReactNode }) {
@@ -316,7 +388,13 @@ function ReadProblem({ stale, onRetry }: { stale: boolean; onRetry: () => void }
 	}, [onRetry])
 	return (
 		<div
-			role="alert"
+			// "Stale" is a standing condition, not an interruption: the panel is
+			// showing the last reading and the poll will retry in ten seconds. An
+			// assertive live region re-announces on every error -> ready -> error
+			// flap, so a flaky sensor would talk over the operator indefinitely.
+			// Only a state with no reading behind it is worth interrupting for.
+			role={stale ? "status" : "alert"}
+			aria-live={stale ? "polite" : undefined}
 			className={cn(
 				"flex flex-col gap-3 rounded-md p-4 sm:flex-row sm:items-center sm:justify-between",
 				stale ? STATUS_TONE.warning : STATUS_TONE.danger
@@ -578,9 +656,14 @@ function CurveEditor({
 
 	const field = (key: keyof FanCurve, locked: boolean) => {
 		const name = String(key)
-		const temperature = key.startsWith("t")
+		// `idle` is an edge like t1..t5, so it takes the Celsius treatment. Deriving
+		// this from the leading "t" alone is what put a "%" suffix on a temperature.
+		const temperature = key.startsWith("t") || key === "idle"
+		// The band duties are the L0..L5 fields; `idle` is a temperature edge and
+		// every other non-temperature key (emerg, e, cap, ...) is not in this list.
+		const banded = !temperature && String(key).startsWith("l")
 		const unit = temperature ? "°C" : "%"
-		const displayed = key === "idle" ? t`Idle` : `${temperature ? t`Temperature` : t`Duty`} ${name.toUpperCase()}`
+		const displayed = key === "idle" ? t`Idle temperature` : `${temperature ? t`Temperature` : t`Duty`} ${name.toUpperCase()}`
 		const id = `fan-curve-${name}`
 		return (
 			<div key={name} className="flex flex-col gap-1.5">
@@ -595,23 +678,64 @@ function CurveEditor({
 						</span>
 					)}
 				</div>
-				<div className="relative">
-					<Input
-						id={id}
-						type="number"
-						inputMode="numeric"
-						min={0}
-						max={temperature ? 120 : 100}
+				{banded ? (
+					// L0..L5 are a closed set, not a range: Validate refuses any duty
+					// outside curveBandDuty because floor_of and center_of are keyed on
+					// the value. Offering a number box meant the operator could type 33,
+					// submit twelve fields, and only then be told the host would not run
+					// it. The choice is made here instead.
+					<Select
+						value={String(curve[key])}
 						disabled={locked}
-						value={curve[key]}
-						className="pe-10 font-mono tabular-nums"
-						onChange={(e) => onChange({ ...curve, [key]: Number(e.target.value) })}
-					/>
-					<span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs text-muted-foreground">
-						{unit}
-					</span>
-				</div>
-				<span className="text-xs tabular-nums text-muted-foreground">{`0–${temperature ? 120 : 100} ${unit}`}</span>
+						onValueChange={(value) => onChange({ ...curve, [key]: Number(value) })}
+					>
+						<SelectTrigger id={id} aria-describedby={`${id}-hint`} className="font-mono tabular-nums">
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							{CURVE_BAND_DUTIES.map((duty) => (
+								<SelectItem key={duty} value={String(duty)}>
+									{duty}%
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				) : (
+					<div className="relative">
+						<Input
+							id={id}
+							type="number"
+							inputMode="numeric"
+							min={0}
+							max={temperature ? 120 : 100}
+							disabled={locked}
+							value={curve[key]}
+							aria-describedby={`${id}-hint`}
+							className="pe-10 font-mono tabular-nums"
+							onChange={(e) => {
+								// A cleared box is not a zero. Number("") is 0, so the old
+								// one-liner silently turned an empty field into a real value
+								// the moment it was emptied, and a curve with a zero edge is
+								// one the daemon refuses. Leave the stored value alone until
+								// there is a number to store.
+								const next = e.target.value.trim()
+								if (next === "") return
+								const parsed = Number(next)
+								if (!Number.isFinite(parsed)) return
+								onChange({ ...curve, [key]: parsed })
+							}}
+						/>
+						<span
+							aria-hidden="true"
+							className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs text-muted-foreground"
+						>
+							{unit}
+						</span>
+					</div>
+				)}
+				<span id={`${id}-hint`} className="text-xs tabular-nums text-muted-foreground">
+					{banded ? t`One of the six duties the daemon can band on` : `0–${temperature ? 120 : 100} ${unit}`}
+				</span>
 				{locked && <span className="text-xs text-warning-text">{LOCK_REASON}</span>}
 			</div>
 		)
@@ -976,11 +1100,14 @@ function WriteFeedback({
 
 function ArmedDialog({
 	write,
+	before,
 	busy,
 	onFire,
 	onCancel,
 }: {
 	write: FanWrite
+	/** The curve currently on record, for the diff. Null when none was readable. */
+	before: FanCurve | null
 	busy: boolean
 	onFire: () => void
 	onCancel: () => void
@@ -996,7 +1123,7 @@ function ArmedDialog({
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 				<div className="rounded-md border border-border bg-muted/40 p-3 font-mono text-sm tabular-nums">
-					<ArmedTarget write={write} />
+					<ArmedTarget write={write} before={before} />
 				</div>
 				<AlertDialogFooter>
 					<AlertDialogCancel autoFocus disabled={busy} onClick={onCancel}>
@@ -1202,7 +1329,7 @@ export function PlusFanTab(_props: { grid: boolean; dataEmpty: boolean }) {
 								refusal={refusal}
 								retryWrite={retryWrite}
 								onRetry={setArmed}
-								onRestart={() => setArmed(modeIntent("auto"))}
+								onRestart={() => setArmed({ kind: "restart" })}
 							/>
 						</div>
 
@@ -1214,6 +1341,7 @@ export function PlusFanTab(_props: { grid: boolean; dataEmpty: boolean }) {
 			{armed && (
 				<ArmedDialog
 					write={armed}
+					before={state?.curve ?? null}
 					busy={written.busy}
 					onFire={() => written.run(armed)}
 					onCancel={() => setArmed(null)}
@@ -1330,7 +1458,7 @@ export function PlusFanCurveTab(_props: { grid: boolean; dataEmpty: boolean }) {
 								refusal={refusal}
 								retryWrite={retryWrite}
 								onRetry={setArmed}
-								onRestart={() => setArmed(modeIntent("auto"))}
+								onRestart={() => setArmed({ kind: "restart" })}
 							/>
 						</div>
 					</>
@@ -1340,6 +1468,7 @@ export function PlusFanCurveTab(_props: { grid: boolean; dataEmpty: boolean }) {
 			{armed && (
 				<ArmedDialog
 					write={armed}
+					before={state?.curve ?? null}
 					busy={written.busy}
 					onFire={() => written.run(armed)}
 					onCancel={() => setArmed(null)}

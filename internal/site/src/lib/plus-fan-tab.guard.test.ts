@@ -79,7 +79,11 @@ test("a pending write leaves the operator an outlet, and the outlet takes the co
 	const source = await read(TAB)
 	expect(occurrences(source, /outcome\.needsRestart\s*&&/)).not.toEqual([])
 	expect(occurrences(source, /Restart the curve daemon/)).not.toEqual([])
-	expect(occurrences(source, /onRestart=\{\(\) => setArmed\(modeIntent\("auto"\)\)\}/)).not.toEqual([])
+	// The outlet used to be mode "auto", which maps to `systemctl start` — a no-op
+	// on a running unit, so the button did nothing in exactly the case it existed
+	// for. It must now ask for a restart.
+	expect(occurrences(source, /onRestart=\{\(\) => setArmed\(\{ kind: "restart" \}\)\}/)).not.toEqual([])
+	expect(occurrences(source, /onRestart=\{\(\) => setArmed\(modeIntent\("auto"\)\)\}/)).toEqual([])
 })
 
 test("a daemon change that succeeded and one that failed both reach a sentence", async () => {
@@ -325,4 +329,48 @@ test("the drawn curve is a labelled step outline, not a ramp", async () => {
 	expect(occurrences(plot, /role="img"/)).not.toEqual([])
 	expect(occurrences(plot, /aria-label=\{label\}/)).not.toEqual([])
 	expect(occurrences(plot, /<title>\{label\}<\/title>/)).not.toEqual([])
+})
+
+// `idle` is the bottom TEMPERATURE edge, not a duty. WantFor compares it against
+// tempC (`case tempC <= c.Idle: return c.L0`) and Validate orders it first in the
+// strictly-increasing chain IDLE < T1 < ... < EMERG. The editor derived "is this
+// Celsius" from `key.startsWith("t")`, which is false for `idle`, so it rendered a
+// percent box with a 0..100 maximum for a field that wants degrees. An operator
+// typing 45 into it would have set the idle edge to 45 degrees while the panel
+// said 45 percent.
+test("the idle edge is edited as a temperature, not a duty", async () => {
+	const source = await read(TAB)
+
+	// In the field table it must sit in the temperature group.
+	const fields = source.slice(source.indexOf("const CURVE_FIELDS"), source.indexOf("const CURVE_CARRIED"))
+	expect(occurrences(fields, /key: "idle", group: "temperature"/)).not.toEqual([])
+	expect(occurrences(fields, /key: "idle", group: "duty"/)).toEqual([])
+
+	// And the unit predicate must treat it as Celsius.
+	expect(occurrences(source, /key\.startsWith\("t"\) \|\| key === "idle"/)).not.toEqual([])
+})
+
+// Number("") is 0, so the original one-liner turned a cleared curve field into a
+// real zero the moment the operator emptied the box. Zero is refused for L0
+// ("must be at least the floor below which the firmware stops the fan") and breaks
+// the strictly-increasing edge chain, so the draft became unwritable while the
+// panel still showed an empty field.
+test("clearing a curve field does not silently store a zero", async () => {
+	const source = await read(TAB)
+	// CurveEditor is the last of the three components, so it runs to the end.
+	const editor = source.slice(source.indexOf("function CurveEditor"))
+	expect(occurrences(editor, /Number\(e\.target\.value\)\)/)).toEqual([])
+	expect(occurrences(editor, /if \(next === ""\) return/)).not.toEqual([])
+	expect(occurrences(editor, /Number\.isFinite\(parsed\)/)).not.toEqual([])
+})
+
+// "Stale" means the panel is still showing a real last reading while the poll
+// retries. Marking that as an assertive alert makes a flaky sensor interrupt a
+// screen-reader operator on every error -> ready -> error flap. Only the state
+// with no reading behind it earns role="alert".
+test("a stale read is announced politely, not as an interruption", async () => {
+	const source = await read(TAB)
+	const problem = source.slice(source.indexOf("function ReadProblem"), source.indexOf("function PanelHeader"))
+	expect(occurrences(problem, /role=\{stale \? "status" : "alert"\}/)).not.toEqual([])
+	expect(occurrences(problem, /aria-live=\{stale \? "polite" : undefined\}/)).not.toEqual([])
 })

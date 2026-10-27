@@ -460,14 +460,33 @@ func TestAutoModeIsTheRestartOutlet(t *testing.T) {
 	assert.Equal(t, []string{"start", "stop"}, h.rig.actions)
 }
 
-func TestModeRejectsAModeThatIsNotAutoOrManual(t *testing.T) {
+func TestModeRejectsAModeThatIsNotAutoManualOrRestart(t *testing.T) {
 	h := newFanHarness(t)
-	for _, mode := range []string{"off", "", "AUTO", "restart"} {
+	for _, mode := range []string{"off", "", "AUTO", "restarted", "Restart"} {
 		rec := h.do(t, "admin", http.MethodPost, "/api/plus/fan/mode",
 			map[string]any{"mode": mode, "confirm": true})
 		assert.Equal(t, http.StatusBadRequest, rec.Code, "mode %q", mode)
 	}
 	assert.Empty(t, h.rig.actions, "an unrecognised mode must not be turned into a systemctl argument")
+}
+
+// TestRestartModeActuallyRestarts: `start` on an already-running unit returns 0
+// without touching the process, so it could never make a curve that reached the
+// disk become behaviour. The panel's "restart the curve daemon" button used auto
+// and was therefore a no-op exactly in the common case. This pins the verb.
+func TestRestartModeActuallyRestarts(t *testing.T) {
+	h := newFanHarness(t, withDaemonUp)
+
+	rec := h.do(t, "admin", http.MethodPost, "/api/plus/fan/mode",
+		map[string]any{"mode": "restart", "confirm": true})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Equal(t, []string{"restart"}, h.rig.actions,
+		"a restart must reach systemctl as restart, not as start")
+
+	// The daemon is still up afterwards, so the fan stays with it and the thermal
+	// floor must not take over.
+	assert.True(t, h.rig.pfandUp)
+	assert.False(t, h.guard.ThermalFloorArmed())
 }
 
 // TestModeReportsAFailedDaemonChangeWithoutItsOutput: systemctl prints unit

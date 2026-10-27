@@ -88,7 +88,7 @@ func TestFanRefusalsEitherCarryACodeOrAreNamedAsCodeLess(t *testing.T) {
 		{"level is absent", nil, "/api/plus/fan/level", nil,
 			`{"confirm":true}`, http.StatusBadRequest, ""},
 		{"mode body is not JSON", nil, "/api/plus/fan/mode", nil, `{"mode":"auto","confirm":true`, http.StatusBadRequest, ""},
-		{"mode is not auto or manual", nil, "/api/plus/fan/mode", map[string]any{"mode": "restart", "confirm": true}, "",
+		{"mode is not one of the three", nil, "/api/plus/fan/mode", map[string]any{"mode": "resume", "confirm": true}, "",
 			http.StatusBadRequest, ""},
 
 		// ---- the confirmation gate ----
@@ -207,7 +207,7 @@ func TestTheRestartOutletIsNotACodeLessRefusal(t *testing.T) {
 // does not support.
 func TestACodeLessRefusalSaysNothingAboutTheFan(t *testing.T) {
 	h := newFanHarness(t)
-	for _, raw := range []string{`{"confirm":true}`, `{"mode":"restart","confirm":true}`, `not json`} {
+	for _, raw := range []string{`{"confirm":true}`, `{"mode":"resume","confirm":true}`, `not json`} {
 		path := "/api/plus/fan/level"
 		if strings.Contains(raw, "mode") {
 			path = "/api/plus/fan/mode"

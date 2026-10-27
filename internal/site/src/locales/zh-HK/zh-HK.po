@@ -2656,9 +2656,6 @@ msgstr ""
 msgid "The curve daemon is not running, so it is not driving the fan."
 msgstr ""
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "The curve daemon is running and is driving the fan from the curve on disk."
-msgstr ""
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The curve daemon owns the fan; stop it before setting a duty by hand."
@@ -2672,9 +2669,6 @@ msgstr ""
 msgid "The daemon picks the curve up on its next restart."
 msgstr "常駐程式會在下次重新啟動時載入該曲線。"
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "the edited curve"
-msgstr ""
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The fan control device refused the write."
@@ -3150,9 +3144,6 @@ msgstr ""
 msgid "Write this duty to the firmware"
 msgstr ""
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "Written to disk; the curve daemon has not picked it up."
-msgstr ""
 
 #: src/components/routes/settings/layout.tsx
 msgid "YAML Config"
@@ -3244,3 +3235,31 @@ msgstr "{0}% → {1}% → {2}%"
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Curve asks for {0}%, but the fan is running at {1}%."
 msgstr "曲線要求 {0}%，但風扇正以 {1}% 運行。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Idle temperature"
+msgstr "怠速溫度"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "One of the six duties the daemon can band on"
+msgstr "daemon 可以分檔的六個佔空比之一"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Written to disk. The curve daemon reads this file only at start, so restart it for the change to apply."
+msgstr "已寫入磁碟。曲線守護進程只在啟動時讀取此檔案，需重啟後生效。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The curve daemon is running on the curve it read when it started. A curve written since then is not in force until it restarts."
+msgstr "曲線守護進程正在執行它啟動時讀取的曲線。此後寫入的曲線在重啟前不會生效。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Restart the curve daemon so it re-reads the curve"
+msgstr "重啟曲線守護進程以重新讀取曲線"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The curve on disk is re-read by the daemon."
+msgstr "磁碟上的曲線將被守護進程重新讀取。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "No curve was on record, so every field is new."
+msgstr "沒有記錄的曲線，因此所有欄位都是新的。"

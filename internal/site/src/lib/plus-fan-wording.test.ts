@@ -142,10 +142,15 @@ test("a duty is written as a percentage, so a zero would read 0% rather than a m
 	// The other half of the previous rule: a clean list does not stop a label
 	// that special-cases a zero into a mode name.
 	const source = read(TAB)
-	const item = source.match(/<SelectItem[^>]*>([\s\S]*?)<\/SelectItem>/)?.[1] ?? ""
-	expect(item).not.toBe("")
-	expect(item).toMatch(/`\$\{duty\}%`/)
-	expect(item).not.toMatch(/auto|自动|\?/)
+	// Every duty picker must print a percent, and none may special-case a zero into
+	// a mode name. There is more than one such picker now (the manual duty ladder
+	// and the L0..L5 band editor), so the rule is checked over all of them.
+	const items = [...source.matchAll(/<SelectItem[^>]*>([\s\S]*?)<\/SelectItem>/g)].map((m) => m[1] ?? "")
+	expect(items.length).toBeGreaterThan(0)
+	for (const item of items) {
+		expect(item).toMatch(/duty\}%/)
+		expect(item).not.toMatch(/auto|自动|\?/)
+	}
 	expect(occurrences(source, /FAN_DUTIES\.map\(/)).not.toEqual([])
 })
 

@@ -41,7 +41,7 @@ jobs:
       # linter, the catalog compiler and the bundle are all node tools now. 22 is the
       # current LTS and is comfortably inside what vite supports.
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -116,7 +116,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm

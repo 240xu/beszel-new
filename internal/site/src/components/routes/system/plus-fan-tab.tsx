@@ -2,6 +2,7 @@ import { t } from "@lingui/core/macro"
 import { useStore } from "@nanostores/react"
 import {
 	AlertOctagonIcon,
+	ChevronRightIcon,
 	AlertTriangleIcon,
 	CheckCircle2Icon,
 	InfoIcon,
@@ -363,16 +364,6 @@ function StatusBar({
 	)
 }
 
-function ReadoutCell({ title, value, detail }: { title: ReactNode; value: ReactNode; detail?: ReactNode }) {
-	return (
-		<div className="rounded-lg border border-border bg-muted/30 p-4">
-			<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
-			<p className="mt-2 font-mono text-2xl font-semibold tabular-nums text-foreground">{value}</p>
-			{detail && <div className="mt-2 text-xs text-muted-foreground">{detail}</div>}
-		</div>
-	)
-}
-
 function ReadProblem({ stale, onRetry }: { stale: boolean; onRetry: () => void }) {
 	// Retrying unmounts this alert, and the browser drops focus to <body> when the
 	// focused button disappears. A keyboard user then has to tab from the top of the
@@ -535,18 +526,18 @@ function CurvePlot({
 			<svg
 				viewBox={`0 0 ${PLOT.w} ${PLOT.h}`}
 				preserveAspectRatio="xMidYMid meet"
-				className="block h-auto w-full max-w-[25rem]"
+				className="block h-auto w-full max-w-2xl"
 				role="img"
 				aria-label={label}
 			>
 				<title>{label}</title>
-				<line x1="0" y1="0" x2={PLOT.w} y2="0" className="stroke-border" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+				<line x1="0" y1="0" x2={PLOT.w} y2="0" className="stroke-border-strong" strokeWidth="1" vectorEffect="non-scaling-stroke" />
 				<line
 					x1="0"
 					y1={PLOT.h}
 					x2={PLOT.w}
 					y2={PLOT.h}
-					className="stroke-border"
+					className="stroke-border-strong"
 					strokeWidth="1"
 					vectorEffect="non-scaling-stroke"
 				/>
@@ -560,7 +551,7 @@ function CurvePlot({
 							y1="0"
 							x2={bx}
 							y2={PLOT.h}
-							className="stroke-border/60"
+							className="stroke-border-strong/70"
 							strokeWidth="1"
 							strokeDasharray="2 4"
 							vectorEffect="non-scaling-stroke"
@@ -612,15 +603,30 @@ function CurvePlot({
 					</>
 				)}
 			</svg>
+			{/* Two columns, not one row pinned to the card's edges: at 1280 the old
+			    justify-between put the temperature line and the duty line ~1000px
+			    apart, so the two halves of the same fact were no longer comparable.
+			    The release edge is named here because the plot only draws the entry
+			    edge, and an operator reading a latch needs both. */}
 			<figcaption className="mt-2 space-y-1 text-xs text-muted-foreground">
-				<div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-					<span className="font-mono tabular-nums">
-						{curve.idle}°C idle · {curve.t5}°C last band · {curve.emerg}°C emergency
-					</span>
-					<span className="font-mono tabular-nums">
-						{t`${curve.l0}% → ${curve.l5}% → ${curve.e}%`}
-					</span>
-				</div>
+				<dl className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
+					<div>
+						<dt className="sr-only">{t`Temperature edges`}</dt>
+						<dd className="font-mono tabular-nums">
+							{curve.idle}°C idle · {curve.t5}°C last band
+						</dd>
+					</div>
+					<div>
+						<dt className="sr-only">{t`Emergency latch`}</dt>
+						<dd className="font-mono tabular-nums">
+							{t`${curve.emerg}°C latch · releases below ${curve.emerg_rel}°C`}
+						</dd>
+					</div>
+					<div>
+						<dt className="sr-only">{t`Duties`}</dt>
+						<dd className="font-mono tabular-nums">{t`${curve.l0}% → ${curve.l5}% → ${curve.e}%`}</dd>
+					</div>
+				</dl>
 				{point ? (
 					<p className="font-mono tabular-nums text-foreground">
 						{point.nextEdgeC === null
@@ -755,23 +761,35 @@ function CurveEditor({
 	return (
 		<div className="flex flex-col gap-5">
 			<details className="group rounded-md border border-border">
-				<summary className="flex cursor-pointer items-center gap-x-2 px-3 py-2.5 text-sm">
+				{/* `display:flex` on a summary suppresses the native ::marker, so the
+				    fold had no open/closed affordance at all and read as a static
+				    bordered row. An explicit chevron puts it back, and the focus ring is
+				    stated here rather than inherited: the global outline token measures
+					1.82:1 on the card in light mode, under the 3:1 a focus indicator needs. */}
+				<summary className="group flex cursor-pointer items-center gap-x-2 rounded-md px-3 py-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+					<ChevronRightIcon
+						aria-hidden="true"
+						className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90 motion-reduce:transition-none"
+					/>
 					<span className="shrink-0 font-medium">{t`Edit curve`}</span>
 					{dirty && (
 						<>
-							<span
-								className="size-2 shrink-0 rounded-full bg-warning sm:hidden"
-								role="img"
-								aria-label={t`Unsaved changes`}
-							/>
-							<span className="hidden shrink-0 rounded-sm bg-warning-muted px-1.5 py-0.5 text-xs text-warning-text sm:inline">
+							{/* Below sm this was a bare 8px hue dot at 2.63:1 — colour alone,
+							    and under contrast. The word is the signal; it costs one
+							    wrapping line and survives greyscale. */}
+							<span className="shrink-0 rounded-sm bg-warning-muted px-1.5 py-0.5 text-xs text-warning-text">
 								{t`Unsaved changes`}
 							</span>
 						</>
 					)}
-					<span className="ms-auto hidden shrink-0 items-center gap-1 text-xs text-muted-foreground sm:inline-flex">
+					{/* The lock note used to be `hidden sm:inline-flex`, so a phone
+					    operator never learned the full-speed backstop is fixed. Shortened
+					    rather than restored in full: at 280px the long form pushed the row
+					    into four lines. */}
+					<span className="ms-auto inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
 						<LockIcon className="size-3" aria-hidden="true" />
-						{t`Full-speed backstop fixed`}
+						<span className="hidden sm:inline">{t`Full-speed backstop fixed`}</span>
+						<span className="sm:hidden">{t`Backstop fixed`}</span>
 					</span>
 				</summary>
 				<div className="border-t border-border p-3">
@@ -1250,40 +1268,51 @@ export function PlusFanTab(_props: { grid: boolean; dataEmpty: boolean }) {
 								</Button>
 							</output>
 						)}
-						<div className="grid gap-3 sm:grid-cols-3">
-							<ReadoutCell
-								title={OUTCOME_TEXT.appliedDuty}
-								value={fanLevelLabel(state)}
-								detail={
-									!state.level_read && (
-										<span className="flex flex-wrap items-center gap-2">
-											{t`The current duty could not be read; the fan's present duty is unknown.`}
-											<Button size="sm" variant="ghost" onClick={retry}>
-												{t`Retry`}
-											</Button>
+						{/* One reading leads. The panel used to draw three equal-weight cells
+						    on one baseline, so the largest type in it was 24px against 14px
+						    body and nothing told the eye where to land first. Duty and the
+						    temperature it responds to are the same fact, so they share the
+						    lead; the daemon's state is context and sits under it. */}
+						<div className="flex flex-col gap-4">
+							<div className="min-w-0">
+								<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+									{OUTCOME_TEXT.appliedDuty}
+								</p>
+								<div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+									<span className="font-mono text-4xl font-semibold leading-none tabular-nums text-foreground">
+										{fanLevelLabel(state)}
+									</span>
+									{/* The lead is duty AT a package temperature, and `Package`
+									    here means the CPU package, not a software package. Keeping
+									    the context is what stops the two colliding in the catalog. */}
+									<span className="text-sm text-muted-foreground">
+										{t({ message: "Package", context: "CPU package" })}{" "}
+										{state.pkg_temp_read ? t`at ${fmtCelsius(state.pkg_temp_c)}` : t`temperature unknown`}
+									</span>
+								</div>
+								{(!state.level_read || !state.pkg_temp_read) && (
+									<div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+										<span>
+											{!state.level_read
+												? t`The current duty could not be read; the fan's present duty is unknown.`
+												: t`The package temperature could not be read.`}
 										</span>
-									)
-								}
-							/>
-							<ReadoutCell
-								title={t({ message: "Package", context: "CPU package" })}
-								value={state.pkg_temp_read ? fmtCelsius(state.pkg_temp_c) : UNKNOWN}
-								detail={
-									!state.pkg_temp_read && (
-										<span className="flex flex-wrap items-center gap-2">
-											{t`The package temperature could not be read.`}
-											<Button size="sm" variant="ghost" onClick={retry}>
-												{t`Retry`}
-											</Button>
-										</span>
-									)
-								}
-							/>
-							<ReadoutCell
-								title={t`Mode`}
-								value={state.pfand_active ? t`Curve running` : t`Curve stopped`}
-								detail={state.pfand_active ? OUTCOME_TEXT.daemon_running : OUTCOME_TEXT.daemon_stopped}
-							/>
+										<Button size="sm" variant="ghost" onClick={retry}>
+											{t`Retry`}
+										</Button>
+									</div>
+								)}
+							</div>
+
+							<div className="flex flex-col gap-1 border-t border-border pt-3">
+								<p className="flex items-center gap-2 text-sm font-medium">
+									<StatusGlyph tone={state.pfand_active ? "success" : "warning"} />
+									{state.pfand_active ? t`Curve running` : t`Curve stopped`}
+								</p>
+								<p className="text-xs text-muted-foreground">
+									{state.pfand_active ? OUTCOME_TEXT.daemon_running : OUTCOME_TEXT.daemon_stopped}
+								</p>
+							</div>
 						</div>
 
 						<div className="flex flex-col gap-4 border-t border-border pt-5">

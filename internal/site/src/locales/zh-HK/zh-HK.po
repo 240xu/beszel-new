@@ -3188,9 +3188,6 @@ msgstr "伺服器已回應，但此面板無法讀取結果。變更可能已經
 msgid "{hidden} more in Extended metrics"
 msgstr "另有 {hidden} 項在擴展指標中"
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "Curve"
-msgstr "曲線"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Full-speed backstop fixed"
@@ -3263,3 +3260,31 @@ msgstr "磁碟上的曲線將被守護進程重新讀取。"
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "No curve was on record, so every field is new."
 msgstr "沒有記錄的曲線，因此所有欄位都是新的。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Backstop fixed"
+msgstr "後備值已固定"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Temperature edges"
+msgstr "溫度邊界"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Emergency latch"
+msgstr "緊急鎖定"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Duties"
+msgstr "佔空比"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "{0}°C latch · releases below {1}°C"
+msgstr "{0}°C 鎖定 · 低於 {1}°C 釋放"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "at {0}"
+msgstr "於 {0}"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "temperature unknown"
+msgstr "溫度未知"

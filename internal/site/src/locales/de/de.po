@@ -3172,9 +3172,6 @@ msgstr ""
 msgid "{hidden} more in Extended metrics"
 msgstr "weitere {hidden} in Erweiterte Metriken"
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "Curve"
-msgstr "Kurve"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Full-speed backstop fixed"
@@ -3247,3 +3244,31 @@ msgstr "Die Kurve auf der Platte wird vom Daemon neu gelesen."
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "No curve was on record, so every field is new."
 msgstr "Es war keine Kurve hinterlegt, also ist jedes Feld neu."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Backstop fixed"
+msgstr "Backstop fest"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Temperature edges"
+msgstr "Temperaturgrenzen"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Emergency latch"
+msgstr "Notfall-Verriegelung"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Duties"
+msgstr "Tastgrade"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "{0}°C latch · releases below {1}°C"
+msgstr "{0}°C Verriegelung · löst unter {1}°C"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "at {0}"
+msgstr "bei {0}"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "temperature unknown"
+msgstr "Temperatur unbekannt"

@@ -248,8 +248,12 @@ test("the offline and refusal lines reach a reader as alerts, not as silent text
 
 test("a duty that could not be read says so where the reading is shown", async () => {
 	const source = await read(TAB)
-	expect(occurrences(source, /!state\.level_read\s*&&/)).not.toEqual([])
+	// The lead reading now reports either failed read from one block, so the guard
+	// pins the predicate and the two sentences rather than the old `&&` shape.
+	expect(occurrences(source, /!state\.level_read \|\| !state\.pkg_temp_read/)).not.toEqual([])
+	expect(occurrences(source, /!state\.level_read\b/)).not.toEqual([])
 	expect(occurrences(source, /could not be read; the fan's present duty is unknown/)).not.toEqual([])
+	expect(occurrences(source, /The package temperature could not be read\./)).not.toEqual([])
 })
 
 // An "unreadable answer" banner says the write may be in force. A later successful

@@ -3172,9 +3172,6 @@ msgstr ""
 msgid "{hidden} more in Extended metrics"
 msgstr "ещё {hidden} в Расширенных метриках"
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "Curve"
-msgstr "Кривая"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Full-speed backstop fixed"
@@ -3247,3 +3244,31 @@ msgstr "Демон перечитает кривую с диска."
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "No curve was on record, so every field is new."
 msgstr "Кривая не была записана, поэтому все поля новые."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Backstop fixed"
+msgstr "Ограничитель зафиксирован"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Temperature edges"
+msgstr "Границы температур"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Emergency latch"
+msgstr "Аварийная защёлка"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Duties"
+msgstr "Скважности"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "{0}°C latch · releases below {1}°C"
+msgstr "Защёлка при {0}°C · снимается ниже {1}°C"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "at {0}"
+msgstr "при {0}"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "temperature unknown"
+msgstr "температура неизвестна"

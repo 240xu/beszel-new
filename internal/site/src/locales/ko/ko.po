@@ -3172,9 +3172,6 @@ msgstr ""
 msgid "{hidden} more in Extended metrics"
 msgstr "나머지 {hidden}개는 확장 지표에 있습니다"
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "Curve"
-msgstr "커브"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Full-speed backstop fixed"
@@ -3247,3 +3244,31 @@ msgstr "디스크의 커브를 데몬이 다시 읽습니다."
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "No curve was on record, so every field is new."
 msgstr "기록된 커브가 없어 모든 필드가 새 값입니다."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Backstop fixed"
+msgstr "백스톱 고정됨"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Temperature edges"
+msgstr "온도 경계"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Emergency latch"
+msgstr "비상 래치"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Duties"
+msgstr "듀티"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "{0}°C latch · releases below {1}°C"
+msgstr "{0}°C에서 래치 · {1}°C 미만에서 해제"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "at {0}"
+msgstr "{0}에서"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "temperature unknown"
+msgstr "온도 알 수 없음"

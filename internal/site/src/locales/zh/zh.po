@@ -2656,9 +2656,6 @@ msgstr "曲线守护进程正在控制风扇。请先切换到手动模式，再
 msgid "The curve daemon is not running, so it is not driving the fan."
 msgstr "曲线守护进程没有运行，因此并未驱动风扇。"
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "The curve daemon is running and is driving the fan from the curve on disk."
-msgstr "曲线守护进程正在运行，并按磁盘上的曲线驱动风扇。"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The curve daemon owns the fan; stop it before setting a duty by hand."
@@ -2672,9 +2669,6 @@ msgstr "曲线未通过校验，在写入任何内容之前就已被拒绝。"
 msgid "The daemon picks the curve up on its next restart."
 msgstr "守护进程将在下次重启时读取该曲线。"
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "the edited curve"
-msgstr "编辑后的曲线"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The fan control device refused the write."
@@ -3150,9 +3144,6 @@ msgstr "将此曲线写入磁盘"
 msgid "Write this duty to the firmware"
 msgstr "将此占空比写入固件"
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "Written to disk; the curve daemon has not picked it up."
-msgstr "已写入磁盘；曲线守护进程尚未读取它。"
 
 #: src/components/routes/settings/layout.tsx
 msgid "YAML Config"
@@ -3228,3 +3219,31 @@ msgstr "{0}% → {1}% → {2}%"
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Curve asks for {0}%, but the fan is running at {1}%."
 msgstr "曲线要求 {0}%，但风扇正以 {1}% 运行。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Idle temperature"
+msgstr "怠速温度"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "One of the six duties the daemon can band on"
+msgstr "daemon 可以分档的六个占空比之一"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Written to disk. The curve daemon reads this file only at start, so restart it for the change to apply."
+msgstr "已写入磁盘。曲线守护进程只在启动时读取此文件，需重启后生效。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The curve daemon is running on the curve it read when it started. A curve written since then is not in force until it restarts."
+msgstr "曲线守护进程正在运行它启动时读取的曲线。此后写入的曲线在重启前不会生效。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Restart the curve daemon so it re-reads the curve"
+msgstr "重启曲线守护进程以重新读取曲线"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The curve on disk is re-read by the daemon."
+msgstr "磁盘上的曲线将被守护进程重新读取。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "No curve was on record, so every field is new."
+msgstr "没有记录的曲线，因此所有字段都是新的。"

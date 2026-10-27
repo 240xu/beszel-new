@@ -2651,9 +2651,6 @@ msgstr "The curve daemon is in control. Switch to manual before setting a duty b
 msgid "The curve daemon is not running, so it is not driving the fan."
 msgstr "The curve daemon is not running, so it is not driving the fan."
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "The curve daemon is running and is driving the fan from the curve on disk."
-msgstr "The curve daemon is running and is driving the fan from the curve on disk."
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The curve daemon owns the fan; stop it before setting a duty by hand."
@@ -2667,9 +2664,6 @@ msgstr "The curve failed validation and was rejected before anything was written
 msgid "The daemon picks the curve up on its next restart."
 msgstr "The daemon picks the curve up on its next restart."
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "the edited curve"
-msgstr "the edited curve"
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The fan control device refused the write."
@@ -3145,9 +3139,6 @@ msgstr "Write this curve to the disk"
 msgid "Write this duty to the firmware"
 msgstr "Write this duty to the firmware"
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "Written to disk; the curve daemon has not picked it up."
-msgstr "Written to disk; the curve daemon has not picked it up."
 
 #: src/components/routes/settings/layout.tsx
 msgid "YAML Config"
@@ -3223,3 +3214,31 @@ msgstr "{0}% → {1}% → {2}%"
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Curve asks for {0}%, but the fan is running at {1}%."
 msgstr "Curve asks for {0}%, but the fan is running at {1}%."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Idle temperature"
+msgstr "Idle temperature"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "One of the six duties the daemon can band on"
+msgstr "One of the six duties the daemon can band on"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Written to disk. The curve daemon reads this file only at start, so restart it for the change to apply."
+msgstr "Written to disk. The curve daemon reads this file only at start, so restart it for the change to apply."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The curve daemon is running on the curve it read when it started. A curve written since then is not in force until it restarts."
+msgstr "The curve daemon is running on the curve it read when it started. A curve written since then is not in force until it restarts."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Restart the curve daemon so it re-reads the curve"
+msgstr "Restart the curve daemon so it re-reads the curve"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The curve on disk is re-read by the daemon."
+msgstr "The curve on disk is re-read by the daemon."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "No curve was on record, so every field is new."
+msgstr "No curve was on record, so every field is new."

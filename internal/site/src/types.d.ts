@@ -875,7 +875,12 @@ export interface FanCurve {
 	iv: number
 }
 
-export type FanMode = "auto" | "manual"
+/** What the mode route accepts. `restart` is not a mode the fan is left in: the
+ *  daemon keeps running, it just re-reads the curve file it sourced at start.
+ *  A curve write lands on disk before any daemon reads it, and `start` on an
+ *  already-running unit is a no-op, so this is the only verb that makes a new
+ *  curve take effect without stopping the fan first. */
+export type FanMode = "auto" | "manual" | "restart"
 
 /** Bypasses the guard: a failed daemon restart answers with a code-less 500. */
 export interface FanModeResult {

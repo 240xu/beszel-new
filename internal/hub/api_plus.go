@@ -349,8 +349,16 @@ func (fc *fanRoutes) mode(e *core.RequestEvent) error {
 		action = "stop"
 	case "auto":
 		action = "start"
+	case "restart":
+		// A curve reaches the disk before any daemon reads it, and the daemon
+		// sources its file once at start, so a running pfand keeps executing the
+		// OLD curve until it is restarted. `start` cannot do that: on an active
+		// unit systemctl returns 0 without touching the process, which made the
+		// panel's "restart the curve daemon" button a no-op exactly in the common
+		// case and then render a success claim the machine did not honour.
+		action = "restart"
 	default:
-		return e.BadRequestError("mode must be auto or manual", nil)
+		return e.BadRequestError("mode must be auto, manual or restart", nil)
 	}
 	if err := fc.pfand(action); err != nil {
 		slog.Error("fan mode change failed", "mode", req.Mode, "err", err)

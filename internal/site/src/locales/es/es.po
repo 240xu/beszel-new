@@ -3272,3 +3272,19 @@ msgstr "a {0}"
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "temperature unknown"
 msgstr "temperatura desconocida"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Discard unsaved changes?"
+msgstr "¿Descartar los cambios sin guardar?"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Closing the editor now throws away every field you changed. Nothing has been written to disk."
+msgstr "Cerrar el editor ahora descarta todos los campos que cambiaste. Todavía no se ha escrito nada en el disco."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Every field is written, including the ones this form does not offer. The daemon reads the file once at start."
+msgstr "Se escriben todos los campos, incluidos los que este formulario no ofrece. El demonio lee el archivo una vez al arrancar."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Keep editing"
+msgstr "Seguir editando"

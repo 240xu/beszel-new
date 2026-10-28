@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest"
-import { fireEvent, screen } from "@testing-library/react"
+import { fireEvent, screen, within } from "@testing-library/react"
 import { renderWithI18n } from "./render"
-import { PlusFanTab } from "@/components/routes/system/plus-fan-tab"
+import { PlusFanTab, PlusFanCurveTab } from "@/components/routes/system/plus-fan-tab"
 import { FAN_DUTIES } from "@/lib/plus-fan-view"
 import type { FanState } from "@/types"
 
@@ -130,17 +130,23 @@ describe("the duty control", () => {
 		expect(slider.getAttribute("aria-valuenow")).toBe(String(HIGH))
 	})
 
-	test("is refused while the curve daemon owns the fan, and refuses the keyboard too", async () => {
-		// `pfand_active` means the daemon is driving the fan from the curve. A duty
-		// cannot be set by hand while that holds, so the control must say so and must
-		// not move even if a key arrives.
-		const slider = await renderPanel({ pfand_active: true })
+	test("is not rendered at all while the curve daemon owns the fan", async () => {
+		// `pfand_active` means the daemon is driving the fan from the curve, so a duty
+		// cannot be set by hand. The control used to render disabled — 112px of ladder
+		// and a dead button that could never be operated. It is absent now, and the
+		// mode switch beside it is the one control that applies. Absence is the
+		// assertion: a slider that a screen reader can still land on while nothing it
+		// offers can be done is worse than no slider.
+		getFanState.mockResolvedValue(fanState({ pfand_active: true }))
+		const { container } = renderWithI18n(<PlusFanTab grid={false} dataEmpty={false} />)
+		await screen.findByText("Curve running")
 
-		expect(slider.getAttribute("aria-disabled")).toBe("true")
-		expect(slider.getAttribute("tabindex")).toBe("-1")
-
-		fireEvent.keyDown(slider, { key: "ArrowRight" })
-		expect(slider.getAttribute("aria-valuenow")).toBe("60")
+		expect(screen.queryByRole("slider")).toBeNull()
+		expect(container.querySelector('[role="slider"]')).toBeNull()
+		// The way back to a hand-set duty must still be there.
+		expect(screen.getByRole("button", { name: /Manual/i })).toBeTruthy()
+		// And the panel must say why the control is missing, not just omit it.
+		expect(screen.getByText(/Switch to manual before setting a duty by hand/i)).toBeTruthy()
 	})
 
 	test("is locked while a write is in flight", async () => {
@@ -210,5 +216,79 @@ describe("the duty control in a right-to-left document", () => {
 
 		fireEvent.keyDown(slider, { key: "ArrowRight" })
 		expect(slider.getAttribute("aria-valuenow")).toBe("70")
+	})
+})
+
+const CURVE = {
+	idle: 45,
+	t1: 55, t2: 65, t3: 75, t4: 85, t5: 90,
+	emerg: 95, emerg_rel: 90,
+	l0: 25, l1: 30, l2: 40, l3: 50, l4: 60, l5: 70, e: 100,
+	cap: 100, trim: 0, gain: 1, hyst: 3, dwell: 5, dead: 0, iv: 1,
+}
+
+describe("the curve editor sheet", () => {
+	// The editor moved off the card because twelve numeric fields and a write row
+	// were costing ~330px of a card whose job the rest of the time is to show where
+	// the fan is. These tests pin the two things that move protects: the editor is
+	// reachable, and a stray Escape cannot throw twelve edited fields away.
+	const withCurve = () => fanState({ curve: CURVE, pfand_active: true })
+
+	const openSheet = async () => {
+		getFanState.mockResolvedValue(withCurve())
+		renderWithI18n(<PlusFanCurveTab grid={false} dataEmpty={false} />)
+		fireEvent.click(await screen.findByRole("button", { name: "Edit curve" }))
+		return screen.findByRole("dialog")
+	}
+
+	test("the card no longer holds the fields, and the sheet does", async () => {
+		getFanState.mockResolvedValue(withCurve())
+		renderWithI18n(<PlusFanCurveTab grid={false} dataEmpty={false} />)
+		await screen.findByRole("button", { name: "Edit curve" })
+
+		// Nothing on the card: no write button, no field, no unsaved marker.
+		expect(screen.queryByRole("button", { name: "Write this curve to the disk" })).toBeNull()
+
+		fireEvent.click(screen.getByRole("button", { name: "Edit curve" }))
+		const sheet = await screen.findByRole("dialog")
+
+		// The full write surface is inside the sheet: the fields, and the row that
+		// writes them once a field actually changes.
+		expect(within(sheet).getByLabelText("Idle temperature")).toBeTruthy()
+		expect(within(sheet).getByText(/Every field is written/)).toBeTruthy()
+		expect(within(sheet).queryByRole("button", { name: "Write this curve to the disk" })).toBeNull()
+	})
+
+	test("closing with a dirty draft asks before discarding", async () => {
+		getFanState.mockResolvedValue(withCurve())
+		renderWithI18n(<PlusFanCurveTab grid={false} dataEmpty={false} />)
+		fireEvent.click(await screen.findByRole("button", { name: "Edit curve" }))
+		await screen.findByRole("dialog")
+
+		// Change one field so the draft is real.
+		const idle = screen.getByLabelText("Idle temperature")
+		fireEvent.change(idle, { target: { value: "50" } })
+
+		// Escape is the gesture that would silently lose the edit.
+		fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" })
+
+		const confirm = await screen.findByRole("alertdialog")
+		expect(within(confirm).getByText("Discard unsaved changes?")).toBeTruthy()
+
+		// "Keep editing" leaves the sheet and the draft in place.
+		fireEvent.click(within(confirm).getByRole("button", { name: "Keep editing" }))
+		expect(screen.queryByRole("alertdialog")).toBeNull()
+		expect(screen.getByRole("dialog")).toBeTruthy()
+		expect((screen.getByLabelText("Idle temperature") as HTMLInputElement).value).toBe("50")
+	})
+
+	test("a clean sheet closes without asking", async () => {
+		getFanState.mockResolvedValue(withCurve())
+		renderWithI18n(<PlusFanCurveTab grid={false} dataEmpty={false} />)
+		fireEvent.click(await screen.findByRole("button", { name: "Edit curve" }))
+		await screen.findByRole("dialog")
+
+		fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" })
+		expect(screen.queryByRole("alertdialog")).toBeNull()
 	})
 })

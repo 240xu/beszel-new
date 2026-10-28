@@ -3288,3 +3288,19 @@ msgstr "於 {0}"
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "temperature unknown"
 msgstr "溫度未知"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Discard unsaved changes?"
+msgstr "捨棄未儲存的變更？"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Closing the editor now throws away every field you changed. Nothing has been written to disk."
+msgstr "現在關閉編輯器會捨棄你改過的每一個欄位。磁碟上還沒有寫入任何內容。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Every field is written, including the ones this form does not offer. The daemon reads the file once at start."
+msgstr "所有欄位都會被寫入，包括本表單沒有提供的那些。daemon 只在啟動時讀取一次檔案。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Keep editing"
+msgstr "繼續編輯"

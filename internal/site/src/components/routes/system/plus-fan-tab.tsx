@@ -26,6 +26,8 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { $router } from "@/components/router"
 import { $allSystemsById } from "@/lib/stores"
 import { UNKNOWN, fmtCelsius } from "@/lib/plus-metrics"
@@ -464,10 +466,27 @@ function RegressLine({ state }: { state: FanState }) {
 			</p>
 		)
 	}
+	// `none` is the normal state: no hand-set duty is on record. It used to print a
+	// full sentence about that on every render, which cost 80px on a phone to say
+	// nothing happened. The fact still matters though — a duty set before the agent
+	// restarted would be driving the fan with nothing here to show it — so it stays
+	// reachable behind an icon that costs one line of height instead of four.
 	return (
-		<p className="text-sm text-muted-foreground">
-			{t`No hand-set duty is on record. One set before an agent restarted would still be driving the fan, and this panel cannot see it.`}
-		</p>
+		<Tooltip>
+			<TooltipTrigger asChild>
+				<Button
+					size="icon"
+					variant="ghost"
+					className="size-6 text-muted-foreground"
+					aria-label={t`No hand-set duty is on record. One set before an agent restarted would still be driving the fan, and this panel cannot see it.`}
+				>
+					<InfoIcon className="size-3.5" aria-hidden="true" />
+				</Button>
+			</TooltipTrigger>
+			<TooltipContent className="max-w-80">
+				{t`No hand-set duty is on record. One set before an agent restarted would still be driving the fan, and this panel cannot see it.`}
+			</TooltipContent>
+		</Tooltip>
 	)
 }
 
@@ -486,8 +505,15 @@ function RegressLine({ state }: { state: FanState }) {
  *  because a marker that disagrees with the reported duty means a mis-mapped
  *  sensor or a fan that is not following the curve.
  *
- *  Geometry is a 100x40 box (5:2), which is also the summary glyph's 80x32, so
- *  one viewBox serves both sizes with nothing to letterbox. */
+ *  Geometry is a 100x40 box. The aspect is deliberately NOT preserved: this is a
+ *  step function, so every segment is horizontal or vertical and stretching cannot
+ *  invent a slope the firmware never produces — it only changes how steep a jump
+ *  looks, which is the one thing a step chart does not measure. Preserving the
+ *  aspect was worse in practice: `max-w-2xl` capped the drawing at 672x269 in a
+ *  1183px card (43% dead width) while pinning 269px of height, and on a 320px
+ *  screen the same rule collapsed it to 184x74, too short to read a band edge
+ *  against. Every stroke is non-scaling, so line weights stay honest either way.
+ *  A fixed height now holds at every width. */
 const PLOT = { w: 100, h: 40 }
 
 function CurvePlot({
@@ -525,8 +551,8 @@ function CurvePlot({
 		<figure className="min-w-0 rounded-md border border-border p-3">
 			<svg
 				viewBox={`0 0 ${PLOT.w} ${PLOT.h}`}
-				preserveAspectRatio="xMidYMid meet"
-				className="block h-auto w-full max-w-2xl"
+				preserveAspectRatio="none"
+				className="block h-24 w-full sm:h-28"
 				role="img"
 				aria-label={label}
 			>
@@ -825,6 +851,149 @@ function CurveEditor({
 				</div>
 			</details>
 		</div>
+	)
+}
+
+/** The curve editor, its write row and its write feedback, in a sheet.
+ *
+ *  Why a sheet and not the card: twelve numeric fields, a write rule and a
+ *  feedback block are the part of this panel an operator touches for a few
+ *  minutes a year. They were occupying ~330px of a card whose job the rest of the
+ *  time is to answer "where is the fan right now". The card keeps the plot and the
+ *  operating point; the edit surface is one deliberate step away.
+ *
+ *  Closing with an unsaved draft asks first. The sheet is a modal the operator
+ *  leaves by pressing Escape or clicking the overlay, which is exactly the kind of
+ *  gesture that would otherwise throw away twelve edited fields silently. */
+function EditCurveSheet({
+	curve,
+	draft,
+	onChange,
+	onDiscard,
+	busy,
+	outcome,
+	offline,
+	unreadable,
+	refusal,
+	retryWrite,
+	onWrite,
+	onRetry,
+	onRestart,
+}: {
+	curve: FanCurve
+	draft: FanCurve | null
+	onChange: (curve: FanCurve) => void
+	/** Clear the draft and go back to the curve on record. */
+	onDiscard: () => void
+	busy: boolean
+	outcome: FanWriteOutcome | null
+	offline: boolean
+	unreadable: boolean
+	refusal: { key: FanRefusalKey; detail?: string } | null
+	retryWrite: FanWrite | null
+	onWrite: () => void
+	onRetry: (write: FanWrite) => void
+	onRestart: () => void
+}) {
+	const [open, setOpen] = useState(false)
+	const [confirmDiscard, setConfirmDiscard] = useState(false)
+	const dirty = draft !== null
+
+	const requestClose = (next: boolean) => {
+		if (next) {
+			setOpen(true)
+			return
+		}
+		if (dirty) {
+			setConfirmDiscard(true)
+			return
+		}
+		setOpen(false)
+	}
+
+	return (
+		<>
+			<Button className="shrink-0" size="sm" variant="outline" onClick={() => setOpen(true)}>
+				{t`Edit curve`}
+			</Button>
+			<Sheet open={open} onOpenChange={requestClose}>
+				<SheetContent className="h-full w-full overflow-y-auto bg-popover p-4 shadow-xl sm:max-w-lg sm:p-6">
+					<SheetHeader className="gap-1 p-0 pe-10 text-start">
+						<SheetTitle className="text-xl">{t`Edit curve`}</SheetTitle>
+						<SheetDescription>
+							{t`Every field is written, including the ones this form does not offer. The daemon reads the file once at start.`}
+						</SheetDescription>
+					</SheetHeader>
+
+					<div className="mt-5 space-y-5">
+						<CurveEditor curve={curve} onChange={onChange} dirty={dirty} />
+
+						{dirty && (
+							<div className="flex flex-col gap-3 border-t border-border pt-5">
+								<p className="text-sm text-muted-foreground">
+									{t`The daemon picks the curve up on its next restart.`}
+								</p>
+								<div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+									<Button
+										className="w-full sm:w-auto"
+										size="sm"
+										variant="outline"
+										disabled={busy}
+										onClick={onDiscard}
+									>
+										{t`Discard changes`}
+									</Button>
+									<Button
+										className="w-full sm:w-auto"
+										size="sm"
+										variant="destructive"
+										disabled={busy}
+										onClick={onWrite}
+									>
+										{t`Write this curve to the disk`}
+									</Button>
+								</div>
+							</div>
+						)}
+
+						<WriteFeedback
+							outcome={outcome}
+							offline={offline}
+							unreadable={unreadable}
+							refusal={refusal}
+							retryWrite={retryWrite}
+							onRetry={onRetry}
+							onRestart={onRestart}
+						/>
+					</div>
+				</SheetContent>
+			</Sheet>
+
+			{confirmDiscard && (
+				<AlertDialog open onOpenChange={(next) => !next && setConfirmDiscard(false)}>
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<AlertDialogTitle>{t`Discard unsaved changes?`}</AlertDialogTitle>
+							<AlertDialogDescription>
+								{t`Closing the editor now throws away every field you changed. Nothing has been written to disk.`}
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						<AlertDialogFooter>
+							<AlertDialogCancel>{t`Keep editing`}</AlertDialogCancel>
+							<AlertDialogAction
+								onClick={() => {
+									onDiscard()
+									setConfirmDiscard(false)
+									setOpen(false)
+								}}
+							>
+								{t`Discard changes`}
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
+			)}
+		</>
 	)
 }
 
@@ -1330,24 +1499,33 @@ export function PlusFanTab(_props: { grid: boolean; dataEmpty: boolean }) {
 								)}
 							</div>
 
-							<DutyLadder
-								appliedName={OUTCOME_TEXT.appliedDuty}
-								appliedLabel={fanLevelLabel(state)}
-								appliedLevel={state.level_read ? state.level : null}
-								target={targetDuty}
-								disabled={!manual || written.busy}
-								onChange={setTargetDuty}
-							/>
+							{/* The ladder and its write button exist only when they can be used.
+							    With pfand in control every control here was rendered disabled —
+							    a 112px ladder, a 36px button and a 8px gap that could not be
+							    operated, on every view of a card whose job is the reading above.
+							    Manual mode still gets the full control surface. */}
+							{manual && (
+								<>
+									<DutyLadder
+										appliedName={OUTCOME_TEXT.appliedDuty}
+										appliedLabel={fanLevelLabel(state)}
+										appliedLevel={state.level_read ? state.level : null}
+										target={targetDuty}
+										disabled={written.busy}
+										onChange={setTargetDuty}
+									/>
 
-							<div className="flex justify-end">
-								<Button
-									className="w-full sm:w-auto"
-									disabled={!manual || written.busy}
-									onClick={() => setArmed({ kind: "level", level: targetDuty })}
-								>
-									{t`Write this duty to the firmware`}
-								</Button>
-							</div>
+									<div className="flex justify-end">
+										<Button
+											className="w-full sm:w-auto"
+											disabled={written.busy}
+											onClick={() => setArmed({ kind: "level", level: targetDuty })}
+										>
+											{t`Write this duty to the firmware`}
+										</Button>
+									</div>
+								</>
+							)}
 						</div>
 
 						<div className="space-y-3">
@@ -1449,43 +1627,32 @@ export function PlusFanCurveTab(_props: { grid: boolean; dataEmpty: boolean }) {
 							appliedLevel={state?.level_read ? state.level : null}
 							active={state?.pfand_active === true}
 						/>
-						<CurveEditor curve={curve} onChange={setDraft} dirty={draft !== null} />
 
-						{draft !== null && <p className="text-xs text-muted-foreground">{t`Unsaved changes`}</p>}
-
-						<div className="flex flex-col gap-3 border-t border-border pt-5">
-							<p className="text-sm text-muted-foreground">{t`The daemon picks the curve up on its next restart.`}</p>
-							<div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-								{draft !== null && (
-									<Button
-										className="w-full sm:w-auto"
-										size="sm"
-										variant="outline"
-										disabled={written.busy}
-										onClick={() => setDraft(null)}
-									>
-										{t`Discard changes`}
-									</Button>
+						{/* The editor, its write row and its feedback live behind one button.
+						    They are the only part of this card that matters for a few minutes
+						    a year, and they cost ~330px of a panel that is otherwise a status
+						    read. The card keeps the plot, the live operating point and the
+						    accessible state; opening the sheet is one deliberate step. */}
+						<div className="flex flex-wrap items-center justify-between gap-2">
+							<div className="min-w-0">
+								{draft !== null ? (
+									<p className="text-xs text-warning-text">{t`Unsaved changes`}</p>
+								) : (
+									<p className="text-xs text-muted-foreground">{t`The daemon picks the curve up on its next restart.`}</p>
 								)}
-								<Button
-									className="w-full sm:w-auto"
-									size="sm"
-									variant="destructive"
-									disabled={written.busy || draft === null}
-									onClick={() => setArmed({ kind: "curve", curve })}
-								>
-									{t`Write this curve to the disk`}
-								</Button>
 							</div>
-						</div>
-
-						<div className="space-y-3">
-							<WriteFeedback
+							<EditCurveSheet
+								curve={curve}
+								draft={draft}
+								onChange={setDraft}
+								onDiscard={() => setDraft(null)}
+								busy={written.busy}
 								outcome={outcome}
 								offline={offline}
 								unreadable={unreadable}
 								refusal={refusal}
 								retryWrite={retryWrite}
+								onWrite={() => setArmed({ kind: "curve", curve })}
 								onRetry={setArmed}
 								onRestart={() => setArmed({ kind: "restart" })}
 							/>

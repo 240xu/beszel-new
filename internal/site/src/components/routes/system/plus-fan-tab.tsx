@@ -1343,6 +1343,12 @@ function useFanHost() {
 }
 
 export function PlusFanTab(_props: { grid: boolean; dataEmpty: boolean }) {
+	// One component, one poller. These were two cards side by side in the same
+	// grid row, each calling `useFanState()` on its own 10s timer: two requests per
+	// interval, and no guarantee that the two panels agreed about `stale`. They
+	// also printed the same two numbers twice -- the fan card's lead reading and the
+	// curve's operating point are the same fact, one stated and one plotted.
+	const [draft, setDraft] = useState<FanCurve | null>(null)
 	const [armed, setArmed] = useState<FanWrite | null>(null)
 	const [outcome, setOutcome] = useState<FanWriteOutcome | null>(null)
 	const [refusal, setRefusal] = useState<{ key: FanRefusalKey; detail?: string } | null>(null)
@@ -1364,16 +1370,22 @@ export function PlusFanTab(_props: { grid: boolean; dataEmpty: boolean }) {
 		applySettled(settled, setOutcome, setRefusal, setOffline, setUnreadable)
 		setArmed(null)
 		setRetryWrite(settled.ok ? null : write)
-		if (settled.ok) retry()
+		if (settled.ok) {
+			// Only a curve write settles a curve draft. Clearing it on a duty write
+			// would throw away unsaved curve edits the operator never submitted.
+			if (write.kind === "curve") setDraft(null)
+			retry()
+		}
 	})
 
 	const { OUTCOME_BADGE, OUTCOME_TEXT } = outcomeCopy()
 	const manual = state ? !state.pfand_active : false
+	const curve = draft ?? state?.curve ?? null
 
 	return (
 		<Card className="col-span-full min-w-0 p-5 sm:p-6">
 			<PanelHeader
-				title={t`Fan Level`}
+				title={t`Fan`}
 				host={host}
 				description={t`Duty written to the firmware. Nothing writes it back afterwards: the firmware reads zero as zero percent, so returning the fan to its curve is yours to do.`}
 				right={
@@ -1437,12 +1449,11 @@ export function PlusFanTab(_props: { grid: boolean; dataEmpty: boolean }) {
 								</Button>
 							</output>
 						)}
-						{/* One reading leads. The panel used to draw three equal-weight cells
-						    on one baseline, so the largest type in it was 24px against 14px
-						    body and nothing told the eye where to land first. Duty and the
-						    temperature it responds to are the same fact, so they share the
-						    lead; the daemon's state is context and sits under it. */}
-						<div className="flex flex-col gap-4">
+						{/* One reading leads, and the daemon's state sits on the same line
+						    rather than in a block of its own. The duty and the temperature it
+						    responds to are one fact; the curve below is that fact drawn, with
+						    the live operating point on it. */}
+						<div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
 							<div className="min-w-0">
 								<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
 									{OUTCOME_TEXT.appliedDuty}
@@ -1473,18 +1484,61 @@ export function PlusFanTab(_props: { grid: boolean; dataEmpty: boolean }) {
 								)}
 							</div>
 
-							<div className="flex flex-col gap-1 border-t border-border pt-3">
-								<p className="flex items-center gap-2 text-sm font-medium">
-									<StatusGlyph tone={state.pfand_active ? "success" : "warning"} />
-									{state.pfand_active ? t`Curve running` : t`Curve stopped`}
-								</p>
-								<p className="text-xs text-muted-foreground">
-									{state.pfand_active ? OUTCOME_TEXT.daemon_running : OUTCOME_TEXT.daemon_stopped}
-								</p>
-							</div>
+							<p className="flex shrink-0 items-center gap-2 text-sm font-medium">
+								<StatusGlyph tone={state.pfand_active ? "success" : "warning"} />
+								{state.pfand_active ? t`Curve running` : t`Curve stopped`}
+							</p>
 						</div>
 
-						<div className="flex flex-col gap-4 border-t border-border pt-5">
+						{curve ? (
+							<>
+								<CurvePlot
+									curve={curve}
+									tempC={state.pkg_temp_read ? state.pkg_temp_c : null}
+									appliedLevel={state.level_read ? state.level : null}
+									active={state.pfand_active === true}
+								/>
+								<div className="flex flex-wrap items-center justify-between gap-2">
+									<div className="min-w-0">
+										{draft !== null ? (
+											<p className="text-xs text-warning-text">{t`Unsaved changes`}</p>
+										) : (
+											<p className="text-xs text-muted-foreground">{t`The daemon picks the curve up on its next restart.`}</p>
+										)}
+									</div>
+									<EditCurveSheet
+										curve={curve}
+										draft={draft}
+										onChange={setDraft}
+										onDiscard={() => setDraft(null)}
+										busy={written.busy}
+										outcome={outcome}
+										offline={offline}
+										unreadable={unreadable}
+										refusal={refusal}
+										retryWrite={retryWrite}
+										onWrite={() => setArmed({ kind: "curve", curve })}
+										onRetry={setArmed}
+										onRestart={() => setArmed({ kind: "restart" })}
+									/>
+								</div>
+							</>
+						) : (
+							<div role="alert" className={cn("flex flex-col gap-3 rounded-md p-4", STATUS_TONE.warning)}>
+								<p className="flex items-center gap-2 text-sm font-semibold">
+									<StatusGlyph tone="warning" />
+									{t`No curve on record.`}
+								</p>
+								<p className="text-sm opacity-90">
+									{t`The daemon has no curve to follow. A duty can still be set by hand below.`}
+								</p>
+								<Button className="w-full sm:w-auto" size="sm" variant="outline" onClick={retry}>
+									{t`Retry`}
+								</Button>
+							</div>
+						)}
+
+						<div className="flex flex-col gap-4 border-t border-border pt-4">
 							<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 								<ModeSwitch
 									manual={manual}
@@ -1541,122 +1595,6 @@ export function PlusFanTab(_props: { grid: boolean; dataEmpty: boolean }) {
 						</div>
 
 						<RegressLine state={state} />
-					</>
-				)}
-			</div>
-
-			{armed && (
-				<ArmedDialog
-					write={armed}
-					before={state?.curve ?? null}
-					busy={written.busy}
-					onFire={() => written.run(armed)}
-					onCancel={() => setArmed(null)}
-				/>
-			)}
-		</Card>
-	)
-}
-
-export function PlusFanCurveTab(_props: { grid: boolean; dataEmpty: boolean }) {
-	const [draft, setDraft] = useState<FanCurve | null>(null)
-	const [armed, setArmed] = useState<FanWrite | null>(null)
-	const [outcome, setOutcome] = useState<FanWriteOutcome | null>(null)
-	const [refusal, setRefusal] = useState<{ key: FanRefusalKey; detail?: string } | null>(null)
-	const [offline, setOffline] = useState(false)
-	const [unreadable, setUnreadable] = useState(false)
-	const [retryWrite, setRetryWrite] = useState<FanWrite | null>(null)
-
-	const { state, status, retry, lastUpdated } = useFanState()
-	const host = useFanHost()
-	// An unreadable write answer says "the change may be in force". Once a later
-	// read succeeds the panel is no longer guessing, so the warning must go even
-	// though no second write happened. Without this it stayed up until the next
-	// write settled, which is a banner outliving its own claim.
-	useEffect(() => {
-		if (status === "ready") setUnreadable(false)
-	}, [status])
-	const written = useFanWrite((settled, write) => {
-		applySettled(settled, setOutcome, setRefusal, setOffline, setUnreadable)
-		setArmed(null)
-		setRetryWrite(settled.ok ? null : write)
-		if (settled.ok) {
-			setDraft(null)
-			retry()
-		}
-	})
-
-	const curve = draft ?? state?.curve ?? null
-
-	return (
-		<Card className="col-span-full min-w-0 p-5 sm:p-6">
-			<PanelHeader
-				title={t`Temperature Curve`}
-				host={host}
-				description={t`pfand steps the duty by package temperature. Every field is written, including the ones this form does not offer.`}
-				right={
-					<p className="text-xs text-muted-foreground">
-						<span>{t`Updated`}</span>{" "}
-						<span className="font-mono tabular-nums text-foreground">
-							{lastUpdated ? hourWithSeconds(lastUpdated) : UNKNOWN}
-						</span>
-					</p>
-				}
-			/>
-
-			<div className="space-y-5 pt-5">
-				{status === "loading" && !state && <ReadingState />}
-				{status === "error" && !state && <ReadProblem stale={false} onRetry={retry} />}
-				{status === "error" && state && <ReadProblem stale={true} onRetry={retry} />}
-				{state && !curve && (
-					<div role="alert" className={cn("flex flex-col gap-3 rounded-md p-4", STATUS_TONE.warning)}>
-						<p className="flex items-center gap-2 text-sm font-semibold">
-							<StatusGlyph tone="warning" />
-							{t`No curve on record.`}
-						</p>
-						<Button className="w-full sm:w-auto" size="sm" variant="outline" onClick={retry}>
-							{t`Retry`}
-						</Button>
-					</div>
-				)}
-				{curve && (
-					<>
-						<CurvePlot
-							curve={curve}
-							tempC={state?.pkg_temp_read ? state.pkg_temp_c : null}
-							appliedLevel={state?.level_read ? state.level : null}
-							active={state?.pfand_active === true}
-						/>
-
-						{/* The editor, its write row and its feedback live behind one button.
-						    They are the only part of this card that matters for a few minutes
-						    a year, and they cost ~330px of a panel that is otherwise a status
-						    read. The card keeps the plot, the live operating point and the
-						    accessible state; opening the sheet is one deliberate step. */}
-						<div className="flex flex-wrap items-center justify-between gap-2">
-							<div className="min-w-0">
-								{draft !== null ? (
-									<p className="text-xs text-warning-text">{t`Unsaved changes`}</p>
-								) : (
-									<p className="text-xs text-muted-foreground">{t`The daemon picks the curve up on its next restart.`}</p>
-								)}
-							</div>
-							<EditCurveSheet
-								curve={curve}
-								draft={draft}
-								onChange={setDraft}
-								onDiscard={() => setDraft(null)}
-								busy={written.busy}
-								outcome={outcome}
-								offline={offline}
-								unreadable={unreadable}
-								refusal={refusal}
-								retryWrite={retryWrite}
-								onWrite={() => setArmed({ kind: "curve", curve })}
-								onRetry={setArmed}
-								onRestart={() => setArmed({ kind: "restart" })}
-							/>
-						</div>
 					</>
 				)}
 			</div>

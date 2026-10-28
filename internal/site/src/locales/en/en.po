@@ -13,46 +13,37 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-
 #: src/components/token-value.tsx
 msgid "Agent token"
 msgstr "Agent token"
-
 
 #: src/components/token-value.tsx
 msgid "Copy token"
 msgstr "Copy token"
 
-
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Fan writes are latched after repeated failures. The last verified duty is held until the control path recovers."
 msgstr "Fan writes are latched after repeated failures. The last verified duty is held until the control path recovers."
-
 
 #: src/components/token-value.tsx
 msgid "Hide token"
 msgstr "Hide token"
 
-
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Lifetime counters"
 msgstr "Lifetime counters"
-
 
 #: src/components/token-value.tsx
 msgid "Reveal token"
 msgstr "Reveal token"
 
-
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The hub is acting on a reading it could not verify. The emergency duty is held until the sensor recovers."
 msgstr "The hub is acting on a reading it could not verify. The emergency duty is held until the sensor recovers."
 
-
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "This panel and the hub disagree about the request format, so nothing was sent to the fan. Update the hub or reload the page."
 msgstr "This panel and the hub disagree about the request format, so nothing was sent to the fan. Update the hub or reload the page."
-
 
 #: src/components/token-value.tsx
 msgid "Token hidden"
@@ -1229,10 +1220,6 @@ msgstr "Fan control is latched open after repeated failures; nothing was written
 msgid "Fan control is only implemented on Linux."
 msgstr "Fan control is only implemented on Linux."
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "Fan Level"
-msgstr "Fan Level"
-
 #: src/components/routes/system/charts/sensor-charts.tsx
 msgid "Fans"
 msgstr "Fans"
@@ -1989,10 +1976,6 @@ msgstr "Permanent"
 msgid "Persistence"
 msgstr "Persistence"
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "pfand steps the duty by package temperature. Every field is written, including the ones this form does not offer."
-msgstr "pfand steps the duty by package temperature. Every field is written, including the ones this form does not offer."
-
 #: src/components/routes/system/raw-capacity-label.tsx
 msgid "Physical device space. True usable capacity is unknown. Pool disk usage alerts are disabled."
 msgstr "Physical device space. True usable capacity is unknown. Pool disk usage alerts are disabled."
@@ -2607,10 +2590,6 @@ msgstr "Temp"
 msgid "Temperature"
 msgstr "Temperature"
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "Temperature Curve"
-msgstr "Temperature Curve"
-
 #: src/components/routes/settings/general.tsx
 msgid "Temperature unit"
 msgstr "Temperature unit"
@@ -2651,7 +2630,6 @@ msgstr "The curve daemon is in control. Switch to manual before setting a duty b
 msgid "The curve daemon is not running, so it is not driving the fan."
 msgstr "The curve daemon is not running, so it is not driving the fan."
 
-
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The curve daemon owns the fan; stop it before setting a duty by hand."
 msgstr "The curve daemon owns the fan; stop it before setting a duty by hand."
@@ -2663,7 +2641,6 @@ msgstr "The curve failed validation and was rejected before anything was written
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The daemon picks the curve up on its next restart."
 msgstr "The daemon picks the curve up on its next restart."
-
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The fan control device refused the write."
@@ -3126,10 +3103,6 @@ msgid "Write errors"
 msgstr "Write errors"
 
 #: src/components/routes/system/plus-fan-tab.tsx
-#~ msgid "Write this curve"
-#~ msgstr "Write this curve"
-
-#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Write this curve to the disk"
 msgstr "Write this curve to the disk"
@@ -3138,7 +3111,6 @@ msgstr "Write this curve to the disk"
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Write this duty to the firmware"
 msgstr "Write this duty to the firmware"
-
 
 #: src/components/routes/settings/layout.tsx
 msgid "YAML Config"
@@ -3167,17 +3139,13 @@ msgstr "The server answered, but this panel could not read the result. The chang
 msgid "{hidden} more in Extended metrics"
 msgstr "{hidden} more in Extended metrics"
 
-
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Full-speed backstop fixed"
 msgstr "Full-speed backstop fixed"
 
-
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Edit curve"
 msgstr "Edit curve"
-
-
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Fan curve: {0} percent at idle, {1} percent up to {2} degrees, {3} percent from {4} degrees."
@@ -3194,7 +3162,6 @@ msgstr "Temperature unavailable, so no operating point is shown."
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The curve is not driving the fan right now."
 msgstr "The curve is not driving the fan right now."
-
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "{0}°C → emergency duty {1}%"

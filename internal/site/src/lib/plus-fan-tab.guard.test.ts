@@ -205,9 +205,14 @@ test("the panel reads the outcome, not the raw write result", async () => {
 })
 
 test("the armed panel always has a way out", async () => {
+	// One panel now, so one armed dialog. The count dropped from 2 when the fan and
+	// the curve card merged; what must not drop is the escape hatch itself, and
+	// every dialog in the file must still take a cancel callback.
 	const source = await read(TAB)
-	expect(occurrences(source, /onCancel=\{\(\) => setArmed\(null\)\}/).length).toBeGreaterThanOrEqual(2)
+	expect(occurrences(source, /onCancel=\{\(\) => setArmed\(null\)\}/).length).toBeGreaterThanOrEqual(1)
 	expect(occurrences(source, /onCancel:\s*\(\) => void/)).not.toEqual([])
+	// A dirty curve draft opens a second dialog, and that one needs a way out too.
+	expect(occurrences(source, /Keep editing/)).not.toEqual([])
 })
 
 test("no wording that claims a write is running exists outside the two outcome tables", async () => {
@@ -262,7 +267,10 @@ test("a duty that could not be read says so where the reading is shown", async (
 // this asserts alongside the effect's presence.
 test("the unreadable banner is cleared by a successful read", async () => {
 	const source = await read(TAB)
-	expect(occurrences(source, /status === "ready"\) setUnreadable\(false\)/)).toHaveLength(2)
+	// One panel now, so one effect. Two was the count while the fan card and the
+	// curve card each polled on their own timer; merging them is what makes a
+	// stale reading unable to reach only half of the surface.
+	expect(occurrences(source, /status === "ready"\) setUnreadable\(false\)/)).toHaveLength(1)
 	expect(occurrences(source, /status === "ok"\) setUnreadable/)).toEqual([])
 })
 
@@ -377,4 +385,22 @@ test("a stale read is announced politely, not as an interruption", async () => {
 	const problem = source.slice(source.indexOf("function ReadProblem"), source.indexOf("function PanelHeader"))
 	expect(occurrences(problem, /role=\{stale \? "status" : "alert"\}/)).not.toEqual([])
 	expect(occurrences(problem, /aria-live=\{stale \? "polite" : undefined\}/)).not.toEqual([])
+})
+
+// The two fan cards each called `useFanState()` on their own 10s timer. That was
+// two requests per interval for one server-side reading, and no guarantee the two
+// panels agreed about `stale` -- one could show a fresh duty while the other showed
+// the stale banner for the same poll. They are one component now, so there is
+// exactly one poller and one source of truth. A second `useFanState()` reappearing
+// here is a regression even if it looks harmless.
+test("the fan surface polls once, not once per card", async () => {
+	const source = await read(TAB)
+	// `= useFanState()` and not the bare name: the comment above the merged
+	// component names the hook while explaining why there used to be two.
+	expect(occurrences(source, /= useFanState\(\)/)).toHaveLength(1)
+	expect(occurrences(source, /= useFanWrite\(/)).toHaveLength(1)
+	// One Card, one PanelHeader: the merged surface must not have kept a second
+	// header to introduce the same subject twice.
+	expect(occurrences(source, /<Card className="col-span-full/)).toHaveLength(1)
+	expect(occurrences(source, /<PanelHeader/)).toHaveLength(1)
 })

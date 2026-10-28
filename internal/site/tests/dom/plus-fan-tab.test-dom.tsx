@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest"
 import { fireEvent, screen, within } from "@testing-library/react"
 import { renderWithI18n } from "./render"
-import { PlusFanTab, PlusFanCurveTab } from "@/components/routes/system/plus-fan-tab"
+import { PlusFanTab } from "@/components/routes/system/plus-fan-tab"
 import { FAN_DUTIES } from "@/lib/plus-fan-view"
 import type { FanState } from "@/types"
 
@@ -236,14 +236,14 @@ describe("the curve editor sheet", () => {
 
 	const openSheet = async () => {
 		getFanState.mockResolvedValue(withCurve())
-		renderWithI18n(<PlusFanCurveTab grid={false} dataEmpty={false} />)
+		renderWithI18n(<PlusFanTab grid={false} dataEmpty={false} />)
 		fireEvent.click(await screen.findByRole("button", { name: "Edit curve" }))
 		return screen.findByRole("dialog")
 	}
 
 	test("the card no longer holds the fields, and the sheet does", async () => {
 		getFanState.mockResolvedValue(withCurve())
-		renderWithI18n(<PlusFanCurveTab grid={false} dataEmpty={false} />)
+		renderWithI18n(<PlusFanTab grid={false} dataEmpty={false} />)
 		await screen.findByRole("button", { name: "Edit curve" })
 
 		// Nothing on the card: no write button, no field, no unsaved marker.
@@ -261,7 +261,7 @@ describe("the curve editor sheet", () => {
 
 	test("closing with a dirty draft asks before discarding", async () => {
 		getFanState.mockResolvedValue(withCurve())
-		renderWithI18n(<PlusFanCurveTab grid={false} dataEmpty={false} />)
+		renderWithI18n(<PlusFanTab grid={false} dataEmpty={false} />)
 		fireEvent.click(await screen.findByRole("button", { name: "Edit curve" }))
 		await screen.findByRole("dialog")
 
@@ -284,7 +284,7 @@ describe("the curve editor sheet", () => {
 
 	test("a clean sheet closes without asking", async () => {
 		getFanState.mockResolvedValue(withCurve())
-		renderWithI18n(<PlusFanCurveTab grid={false} dataEmpty={false} />)
+		renderWithI18n(<PlusFanTab grid={false} dataEmpty={false} />)
 		fireEvent.click(await screen.findByRole("button", { name: "Edit curve" }))
 		await screen.findByRole("dialog")
 

@@ -18,21 +18,17 @@ msgstr ""
 "X-Crowdin-File: /main/internal/site/src/locales/en/en.po\n"
 "X-Crowdin-File-ID: 32\n"
 
-
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Fan writes are latched after repeated failures. The last verified duty is held until the control path recovers."
 msgstr ""
-
 
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Lifetime counters"
 msgstr ""
 
-
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The hub is acting on a reading it could not verify. The emergency duty is held until the sensor recovers."
 msgstr ""
-
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "This panel and the hub disagree about the request format, so nothing was sent to the fan. Update the hub or reload the page."
@@ -1234,10 +1230,6 @@ msgstr ""
 msgid "Fan control is only implemented on Linux."
 msgstr ""
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "Fan Level"
-msgstr ""
-
 #: src/components/routes/system/charts/sensor-charts.tsx
 msgid "Fans"
 msgstr ""
@@ -1999,10 +1991,6 @@ msgstr ""
 msgid "Persistence"
 msgstr ""
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "pfand steps the duty by package temperature. Every field is written, including the ones this form does not offer."
-msgstr ""
-
 #: src/components/routes/system/raw-capacity-label.tsx
 msgid "Physical device space. True usable capacity is unknown. Pool disk usage alerts are disabled."
 msgstr ""
@@ -2625,10 +2613,6 @@ msgstr ""
 msgid "Temperature"
 msgstr "Temperatură"
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "Temperature Curve"
-msgstr ""
-
 #: src/components/routes/settings/general.tsx
 msgid "Temperature unit"
 msgstr "Unitate temperatură"
@@ -2669,7 +2653,6 @@ msgstr ""
 msgid "The curve daemon is not running, so it is not driving the fan."
 msgstr ""
 
-
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The curve daemon owns the fan; stop it before setting a duty by hand."
 msgstr ""
@@ -2681,7 +2664,6 @@ msgstr ""
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The daemon picks the curve up on its next restart."
 msgstr ""
-
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The fan control device refused the write."
@@ -3157,7 +3139,6 @@ msgstr ""
 msgid "Write this duty to the firmware"
 msgstr ""
 
-
 #: src/components/routes/settings/layout.tsx
 msgid "YAML Config"
 msgstr ""
@@ -3185,17 +3166,13 @@ msgstr ""
 msgid "{hidden} more in Extended metrics"
 msgstr ""
 
-
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Full-speed backstop fixed"
 msgstr ""
 
-
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Edit curve"
 msgstr ""
-
-
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Fan curve: {0} percent at idle, {1} percent up to {2} degrees, {3} percent from {4} degrees."
@@ -3212,7 +3189,6 @@ msgstr "Temperature unavailable, so no operating point is shown."
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The curve is not driving the fan right now."
 msgstr "The curve is not driving the fan right now."
-
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "{0}°C → emergency duty {1}%"

@@ -29,7 +29,6 @@ import { ContainerIcon, CpuIcon, HardDriveIcon, NetworkIcon, PackageIcon, Termin
 import { GpuIcon } from "../ui/icons"
 
 const PlusFanTab = lazy(() => import("./system/plus-fan-tab").then((m) => ({ default: m.PlusFanTab })))
-const PlusFanCurveTab = lazy(() => import("./system/plus-fan-tab").then((m) => ({ default: m.PlusFanCurveTab })))
 const SystemdTable = lazy(() => import("../systemd-table/systemd-table"))
 const ContainersTable = lazy(() => import("../containers-table/containers-table"))
 
@@ -167,7 +166,6 @@ export default memo(function SystemDetail({ id }: { id: string }) {
 						<div className="grid gap-4 xl:col-span-2 xl:gap-5">
 							<Suspense fallback={null}>
 								<PlusFanTab grid={grid} dataEmpty={dataEmpty} />
-								<PlusFanCurveTab grid={grid} dataEmpty={dataEmpty} />
 							</Suspense>
 						</div>
 					)}
@@ -265,7 +263,6 @@ export default memo(function SystemDetail({ id }: { id: string }) {
 							<div className="grid gap-4 xl:col-span-2 xl:gap-5">
 								<Suspense fallback={null}>
 									<PlusFanTab grid={grid} dataEmpty={dataEmpty} />
-									<PlusFanCurveTab grid={grid} dataEmpty={dataEmpty} />
 								</Suspense>
 							</div>
 						)}

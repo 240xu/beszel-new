@@ -18,46 +18,37 @@ msgstr ""
 "X-Crowdin-File: /main/internal/site/src/locales/en/en.po\n"
 "X-Crowdin-File-ID: 32\n"
 
-
 #: src/components/token-value.tsx
 msgid "Agent token"
 msgstr "代理程式權杖"
-
 
 #: src/components/token-value.tsx
 msgid "Copy token"
 msgstr "複製權杖"
 
-
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Fan writes are latched after repeated failures. The last verified duty is held until the control path recovers."
 msgstr "風扇寫入在連續失敗後已鎖定。在控制路徑恢復前，會持續保持最後一次已驗證的檔位。"
-
 
 #: src/components/token-value.tsx
 msgid "Hide token"
 msgstr "隱藏權杖"
 
-
 #: src/components/routes/system/plus-sheet.tsx
 msgid "Lifetime counters"
 msgstr "累计计数"
-
 
 #: src/components/token-value.tsx
 msgid "Reveal token"
 msgstr "顯示權杖"
 
-
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The hub is acting on a reading it could not verify. The emergency duty is held until the sensor recovers."
 msgstr "中樞正在依據一項無法驗證的讀數動作。中樞正在依據一項無法驗證的讀數動作。在感測器恢復前，會持續保持緊急檔位。"
 
-
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "This panel and the hub disagree about the request format, so nothing was sent to the fan. Update the hub or reload the page."
 msgstr "面板與中樞對請求格式的理解不一致，因此沒有向風扇送出任何指令。請更新中樞或重新載入頁面。"
-
 
 #: src/components/token-value.tsx
 msgid "Token hidden"
@@ -1234,10 +1225,6 @@ msgstr "風扇控制因反覆失敗已被鎖定斷開；本次沒有寫入任何
 msgid "Fan control is only implemented on Linux."
 msgstr "风扇控制仅在 Linux 上实现。"
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "Fan Level"
-msgstr "风扇档位"
-
 #: src/components/routes/system/charts/sensor-charts.tsx
 msgid "Fans"
 msgstr "風扇"
@@ -1994,10 +1981,6 @@ msgstr "永久"
 msgid "Persistence"
 msgstr "持久性"
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "pfand steps the duty by package temperature. Every field is written, including the ones this form does not offer."
-msgstr "pfand 依据封装温度分档调节占空比。所有字段都会被写入，包括本表单未提供的那些。"
-
 #: src/components/routes/system/raw-capacity-label.tsx
 msgid "Physical device space. True usable capacity is unknown. Pool disk usage alerts are disabled."
 msgstr "實體裝置空間。真實可用容量未知。儲存池磁碟使用率警報已停用。"
@@ -2612,10 +2595,6 @@ msgstr "溫度"
 msgid "Temperature"
 msgstr "溫度"
 
-#: src/components/routes/system/plus-fan-tab.tsx
-msgid "Temperature Curve"
-msgstr "温度曲线"
-
 #: src/components/routes/settings/general.tsx
 msgid "Temperature unit"
 msgstr "溫度單位"
@@ -2656,7 +2635,6 @@ msgstr "曲线守护进程正在控制风扇。请先切换到手动模式，再
 msgid "The curve daemon is not running, so it is not driving the fan."
 msgstr "曲线守护进程没有运行，因此并未驱动风扇。"
 
-
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The curve daemon owns the fan; stop it before setting a duty by hand."
 msgstr "风扇归曲线守护进程所有；请先停止它，再手动设置占空比。"
@@ -2668,7 +2646,6 @@ msgstr "曲线未通过校验，在写入任何内容之前就已被拒绝。"
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The daemon picks the curve up on its next restart."
 msgstr "守护进程将在下次重启时读取该曲线。"
-
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The fan control device refused the write."
@@ -3131,10 +3108,6 @@ msgid "Write errors"
 msgstr "寫入錯誤"
 
 #: src/components/routes/system/plus-fan-tab.tsx
-#~ msgid "Write this curve"
-#~ msgstr "写入此曲线"
-
-#: src/components/routes/system/plus-fan-tab.tsx
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Write this curve to the disk"
 msgstr "将此曲线写入磁盘"
@@ -3143,7 +3116,6 @@ msgstr "将此曲线写入磁盘"
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Write this duty to the firmware"
 msgstr "将此占空比写入固件"
-
 
 #: src/components/routes/settings/layout.tsx
 msgid "YAML Config"
@@ -3172,17 +3144,13 @@ msgstr "伺服器已回應，但此面板無法讀取結果。變更可能已經
 msgid "{hidden} more in Extended metrics"
 msgstr "另有 {hidden} 项在扩展指标中"
 
-
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Full-speed backstop fixed"
 msgstr "全速后备值已固定"
 
-
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Edit curve"
 msgstr "编辑曲线"
-
-
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Fan curve: {0} percent at idle, {1} percent up to {2} degrees, {3} percent from {4} degrees."
@@ -3199,7 +3167,6 @@ msgstr "温度不可读，因此不显示工作点。"
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "The curve is not driving the fan right now."
 msgstr "曲线当前未在驱动风扇。"
-
 
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "{0}°C → emergency duty {1}%"

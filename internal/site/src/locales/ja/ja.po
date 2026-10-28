@@ -3272,3 +3272,19 @@ msgstr "{0} 時"
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "temperature unknown"
 msgstr "温度不明"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Discard unsaved changes?"
+msgstr "未保存の変更を破棄しますか？"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Closing the editor now throws away every field you changed. Nothing has been written to disk."
+msgstr "ここでエディタを閉じると、変更したすべてのフィールドが失われます。ディスクにはまだ何も書き込まれていません。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Every field is written, including the ones this form does not offer. The daemon reads the file once at start."
+msgstr "このフォームにないものも含め、すべてのフィールドが書き込まれます。デーモンは起動時に一度だけファイルを読みます。"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Keep editing"
+msgstr "編集を続ける"

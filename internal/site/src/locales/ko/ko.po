@@ -3272,3 +3272,19 @@ msgstr "{0}에서"
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "temperature unknown"
 msgstr "온도 알 수 없음"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Discard unsaved changes?"
+msgstr "저장되지 않은 변경을 버릴까요?"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Closing the editor now throws away every field you changed. Nothing has been written to disk."
+msgstr "지금 편집기를 닫으면 변경한 모든 필드가 사라집니다. 디스크에는 아직 아무것도 기록되지 않았습니다."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Every field is written, including the ones this form does not offer. The daemon reads the file once at start."
+msgstr "이 양식에 없는 필드도 포함해 모든 필드가 기록됩니다. 데몬은 시작할 때 파일을 한 번만 읽습니다."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Keep editing"
+msgstr "계속 편집"

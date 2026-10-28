@@ -3272,3 +3272,19 @@ msgstr "при {0}"
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "temperature unknown"
 msgstr "температура неизвестна"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Discard unsaved changes?"
+msgstr "Отменить несохранённые изменения?"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Closing the editor now throws away every field you changed. Nothing has been written to disk."
+msgstr "Закрытие редактора сейчас отбросит все изменённые поля. На диск ещё ничего не записано."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Every field is written, including the ones this form does not offer. The daemon reads the file once at start."
+msgstr "Записываются все поля, включая те, которых нет в этой форме. Демон читает файл один раз при запуске."
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "Keep editing"
+msgstr "Продолжить редактирование"

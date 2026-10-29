@@ -1449,139 +1449,156 @@ export function PlusFanTab(_props: { grid: boolean; dataEmpty: boolean }) {
 								</Button>
 							</output>
 						)}
-						{/* One reading leads, and the daemon's state sits on the same line
-						    rather than in a block of its own. The duty and the temperature it
-						    responds to are one fact; the curve below is that fact drawn, with
-						    the live operating point on it. */}
-						<div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-							<div className="min-w-0">
-								<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-									{OUTCOME_TEXT.appliedDuty}
-								</p>
-								<div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-									<span className="font-mono text-4xl font-semibold leading-none tabular-nums text-foreground">
-										{fanLevelLabel(state)}
-									</span>
-									{/* The lead is duty AT a package temperature, and `Package`
-									    here means the CPU package, not a software package. Keeping
-									    the context is what stops the two colliding in the catalog. */}
-									<span className="text-sm text-muted-foreground">
-										{t({ message: "Package", context: "CPU package" })}{" "}
-										{state.pkg_temp_read ? t`at ${fmtCelsius(state.pkg_temp_c)}` : t`temperature unknown`}
-									</span>
-								</div>
-								{(!state.level_read || !state.pkg_temp_read) && (
-									<div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-										<span>
-											{!state.level_read
-												? t`The current duty could not be read; the fan's present duty is unknown.`
-												: t`The package temperature could not be read.`}
+						{/* Two columns above `md`, stacked below it. `lg` was one breakpoint
+						    too late: at 768px each half still gets 671px, which is wider than
+						    the plot needs, and the 768-1023 band is exactly the
+						    tablet-landscape case where a stacked column costs a scroll for
+						    no benefit.
+						    The left half is the actuator: what duty is running, and how to
+						    change it. The right half is the policy: the curve that would be
+						    running it, drawn. They answer different questions and an operator
+						    arrives with one of them, so they sit side by side instead of
+						    stacking into a column that is twice as tall as it needs to be.
+						    Below `md` the duty wins the first screen: it is the number most
+						    visits come for, and the curve is context for it. */}
+						<div className="grid gap-6 md:grid-cols-2 md:items-start">
+							{/* ---------- Left: the actuator ---------- */}
+							<div className="flex min-w-0 flex-col gap-4">
+								<div className="min-w-0">
+									<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+										{OUTCOME_TEXT.appliedDuty}
+									</p>
+									<div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+										<span className="font-mono text-4xl font-semibold leading-none tabular-nums text-foreground">
+											{fanLevelLabel(state)}
 										</span>
-										<Button size="sm" variant="ghost" onClick={retry}>
+										{/* The lead is duty AT a package temperature, and `Package`
+										    here means the CPU package, not a software package. Keeping
+										    the context is what stops the two colliding in the catalog. */}
+										<span className="text-sm text-muted-foreground">
+											{t({ message: "Package", context: "CPU package" })}{" "}
+											{state.pkg_temp_read ? t`at ${fmtCelsius(state.pkg_temp_c)}` : t`temperature unknown`}
+										</span>
+									</div>
+									<p className="mt-2 flex items-center gap-2 text-sm font-medium">
+										<StatusGlyph tone={state.pfand_active ? "success" : "warning"} />
+										{state.pfand_active ? t`Curve running` : t`Curve stopped`}
+									</p>
+									{(!state.level_read || !state.pkg_temp_read) && (
+										<div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+											<span>
+												{!state.level_read
+													? t`The current duty could not be read; the fan's present duty is unknown.`
+													: t`The package temperature could not be read.`}
+											</span>
+											<Button size="sm" variant="ghost" onClick={retry}>
+												{t`Retry`}
+											</Button>
+										</div>
+									)}
+								</div>
+
+								<div className="flex flex-col gap-4 border-t border-border pt-4">
+									<div className="flex flex-col gap-3">
+										<ModeSwitch
+											manual={manual}
+											busy={written.busy}
+											onAuto={() => manual && setArmed(modeIntent("auto"))}
+											onManual={() => !manual && setArmed(modeIntent("manual"))}
+										/>
+										{!manual && (
+											<p className="text-xs text-muted-foreground">
+												{t`The curve daemon is in control. Switch to manual before setting a duty by hand.`}
+											</p>
+										)}
+									</div>
+
+									{/* The ladder and its write button exist only when they can be
+									    used. With pfand in control every control here was rendered
+									    disabled — a 112px ladder, a 36px button and an 8px gap that
+									    could not be operated, on every view of a card whose job is
+									    the reading above. Manual mode still gets the full surface. */}
+									{manual && (
+										<>
+											<DutyLadder
+												appliedName={OUTCOME_TEXT.appliedDuty}
+												appliedLabel={fanLevelLabel(state)}
+												appliedLevel={state.level_read ? state.level : null}
+												target={targetDuty}
+												disabled={written.busy}
+												onChange={setTargetDuty}
+											/>
+
+											<div className="flex justify-end">
+												<Button
+													className="w-full sm:w-auto"
+													disabled={written.busy}
+													onClick={() => setArmed({ kind: "level", level: targetDuty })}
+												>
+													{t`Write this duty to the firmware`}
+												</Button>
+											</div>
+										</>
+									)}
+								</div>
+
+								<RegressLine state={state} />
+							</div>
+
+							{/* ---------- Right: the policy ---------- */}
+							<div className="flex min-w-0 flex-col gap-3">
+								{curve ? (
+									<>
+										<CurvePlot
+											curve={curve}
+											tempC={state.pkg_temp_read ? state.pkg_temp_c : null}
+											appliedLevel={state.level_read ? state.level : null}
+											active={state.pfand_active === true}
+										/>
+										<div className="flex flex-wrap items-center justify-between gap-2">
+											<div className="min-w-0">
+												{draft !== null ? (
+													<p className="text-xs text-warning-text">{t`Unsaved changes`}</p>
+												) : (
+													<p className="text-xs text-muted-foreground">{t`The daemon picks the curve up on its next restart.`}</p>
+												)}
+											</div>
+											<EditCurveSheet
+												curve={curve}
+												draft={draft}
+												onChange={setDraft}
+												onDiscard={() => setDraft(null)}
+												busy={written.busy}
+												outcome={outcome}
+												offline={offline}
+												unreadable={unreadable}
+												refusal={refusal}
+												retryWrite={retryWrite}
+												onWrite={() => setArmed({ kind: "curve", curve })}
+												onRetry={setArmed}
+												onRestart={() => setArmed({ kind: "restart" })}
+											/>
+										</div>
+									</>
+								) : (
+									<div role="alert" className={cn("flex flex-col gap-3 rounded-md p-4", STATUS_TONE.warning)}>
+										<p className="flex items-center gap-2 text-sm font-semibold">
+											<StatusGlyph tone="warning" />
+											{t`No curve on record.`}
+										</p>
+										<p className="text-sm opacity-90">
+											{t`The daemon has no curve to follow. A duty can still be set by hand.`}
+										</p>
+										<Button className="w-full sm:w-auto" size="sm" variant="outline" onClick={retry}>
 											{t`Retry`}
 										</Button>
 									</div>
 								)}
 							</div>
-
-							<p className="flex shrink-0 items-center gap-2 text-sm font-medium">
-								<StatusGlyph tone={state.pfand_active ? "success" : "warning"} />
-								{state.pfand_active ? t`Curve running` : t`Curve stopped`}
-							</p>
 						</div>
 
-						{curve ? (
-							<>
-								<CurvePlot
-									curve={curve}
-									tempC={state.pkg_temp_read ? state.pkg_temp_c : null}
-									appliedLevel={state.level_read ? state.level : null}
-									active={state.pfand_active === true}
-								/>
-								<div className="flex flex-wrap items-center justify-between gap-2">
-									<div className="min-w-0">
-										{draft !== null ? (
-											<p className="text-xs text-warning-text">{t`Unsaved changes`}</p>
-										) : (
-											<p className="text-xs text-muted-foreground">{t`The daemon picks the curve up on its next restart.`}</p>
-										)}
-									</div>
-									<EditCurveSheet
-										curve={curve}
-										draft={draft}
-										onChange={setDraft}
-										onDiscard={() => setDraft(null)}
-										busy={written.busy}
-										outcome={outcome}
-										offline={offline}
-										unreadable={unreadable}
-										refusal={refusal}
-										retryWrite={retryWrite}
-										onWrite={() => setArmed({ kind: "curve", curve })}
-										onRetry={setArmed}
-										onRestart={() => setArmed({ kind: "restart" })}
-									/>
-								</div>
-							</>
-						) : (
-							<div role="alert" className={cn("flex flex-col gap-3 rounded-md p-4", STATUS_TONE.warning)}>
-								<p className="flex items-center gap-2 text-sm font-semibold">
-									<StatusGlyph tone="warning" />
-									{t`No curve on record.`}
-								</p>
-								<p className="text-sm opacity-90">
-									{t`The daemon has no curve to follow. A duty can still be set by hand below.`}
-								</p>
-								<Button className="w-full sm:w-auto" size="sm" variant="outline" onClick={retry}>
-									{t`Retry`}
-								</Button>
-							</div>
-						)}
-
-						<div className="flex flex-col gap-4 border-t border-border pt-4">
-							<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-								<ModeSwitch
-									manual={manual}
-									busy={written.busy}
-									onAuto={() => manual && setArmed(modeIntent("auto"))}
-									onManual={() => !manual && setArmed(modeIntent("manual"))}
-								/>
-								{!manual && (
-									<p className="text-xs text-muted-foreground">
-										{t`The curve daemon is in control. Switch to manual before setting a duty by hand.`}
-									</p>
-								)}
-							</div>
-
-							{/* The ladder and its write button exist only when they can be used.
-							    With pfand in control every control here was rendered disabled —
-							    a 112px ladder, a 36px button and a 8px gap that could not be
-							    operated, on every view of a card whose job is the reading above.
-							    Manual mode still gets the full control surface. */}
-							{manual && (
-								<>
-									<DutyLadder
-										appliedName={OUTCOME_TEXT.appliedDuty}
-										appliedLabel={fanLevelLabel(state)}
-										appliedLevel={state.level_read ? state.level : null}
-										target={targetDuty}
-										disabled={written.busy}
-										onChange={setTargetDuty}
-									/>
-
-									<div className="flex justify-end">
-										<Button
-											className="w-full sm:w-auto"
-											disabled={written.busy}
-											onClick={() => setArmed({ kind: "level", level: targetDuty })}
-										>
-											{t`Write this duty to the firmware`}
-										</Button>
-									</div>
-								</>
-							)}
-						</div>
-
+						{/* Write feedback spans the full width: a banner about a write that
+						    failed belongs to the whole panel, not to the half that started it. */}
 						<div className="space-y-3">
 							<WriteFeedback
 								outcome={outcome}
@@ -1593,8 +1610,6 @@ export function PlusFanTab(_props: { grid: boolean; dataEmpty: boolean }) {
 								onRestart={() => setArmed({ kind: "restart" })}
 							/>
 						</div>
-
-						<RegressLine state={state} />
 					</>
 				)}
 			</div>

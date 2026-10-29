@@ -3255,3 +3255,7 @@ msgstr "Todos os campos são gravados, inclusive os que este formulário não of
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Keep editing"
 msgstr "Continuar editando"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The daemon has no curve to follow. A duty can still be set by hand."
+msgstr "O daemon não tem nenhuma curva a seguir. Ainda é possível definir um ciclo de trabalho manualmente."

@@ -3255,3 +3255,7 @@ msgstr "所有字段都会被写入，包括本表单没有提供的那些。dae
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Keep editing"
 msgstr "继续编辑"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The daemon has no curve to follow. A duty can still be set by hand."
+msgstr "守护进程没有曲线可循。仍可手动设置占空比。"

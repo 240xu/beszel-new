@@ -3255,3 +3255,7 @@ msgstr "Se escriben todos los campos, incluidos los que este formulario no ofrec
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Keep editing"
 msgstr "Seguir editando"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The daemon has no curve to follow. A duty can still be set by hand."
+msgstr "El demonio no tiene ninguna curva que seguir. Aun así se puede fijar un ciclo de trabajo a mano."

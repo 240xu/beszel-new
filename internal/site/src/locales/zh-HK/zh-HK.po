@@ -3271,3 +3271,7 @@ msgstr "所有欄位都會被寫入，包括本表單沒有提供的那些。dae
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Keep editing"
 msgstr "繼續編輯"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The daemon has no curve to follow. A duty can still be set by hand."
+msgstr "守護程序沒有曲線可循。仍可手動設定占空比。"

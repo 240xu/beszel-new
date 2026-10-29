@@ -3255,3 +3255,7 @@ msgstr "Записываются все поля, включая те, кото�
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Keep editing"
 msgstr "Продолжить редактирование"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The daemon has no curve to follow. A duty can still be set by hand."
+msgstr "У демона нет кривой, которой можно следовать. Скважность по-прежнему можно задать вручную."

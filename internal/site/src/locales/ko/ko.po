@@ -3255,3 +3255,7 @@ msgstr "이 양식에 없는 필드도 포함해 모든 필드가 기록됩니�
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Keep editing"
 msgstr "계속 편집"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The daemon has no curve to follow. A duty can still be set by hand."
+msgstr "데몬에 따를 커브가 없습니다. 듀티는 수동으로도 설정할 수 있습니다."

@@ -3277,3 +3277,7 @@ msgstr "Every field is written, including the ones this form does not offer. The
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Keep editing"
 msgstr "Keep editing"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The daemon has no curve to follow. A duty can still be set by hand."
+msgstr "The daemon has no curve to follow. A duty can still be set by hand."

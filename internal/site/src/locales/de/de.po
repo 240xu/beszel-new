@@ -3255,3 +3255,7 @@ msgstr "Jedes Feld wird geschrieben, auch die, die dieses Formular nicht anbiete
 #: src/components/routes/system/plus-fan-tab.tsx
 msgid "Keep editing"
 msgstr "Weiter bearbeiten"
+
+#: src/components/routes/system/plus-fan-tab.tsx
+msgid "The daemon has no curve to follow. A duty can still be set by hand."
+msgstr "Der Daemon hat keine Kurve, der er folgen kann. Eine Einschaltdauer lässt sich weiterhin von Hand setzen."

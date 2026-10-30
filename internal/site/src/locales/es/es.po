@@ -3181,10 +3181,6 @@ msgid "{0}% → {1}% → {2}%"
 msgstr "{0}% → {1}% → {2}%"
 
 #: src/components/routes/system/plus-fan-tab.tsx
-msgid "Curve asks for {0}%, but the fan is running at {1}%."
-msgstr "La curva pide {0}%, el ventilador gira al {1}%."
-
-#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Idle temperature"
 msgstr "Temperatura de reposo"
 

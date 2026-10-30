@@ -519,13 +519,10 @@ const PLOT = { w: 100, h: 40 }
 function CurvePlot({
 	curve,
 	tempC,
-	appliedLevel,
 	active,
 }: {
 	curve: FanCurve
 	tempC: number | null
-	/** The duty the panel last read from the server, or null when unreadable. */
-	appliedLevel: number | null
 	/** Whether pfand is driving the fan from this curve right now. */
 	active: boolean
 }) {
@@ -542,10 +539,18 @@ function CurvePlot({
 	const emergencyX = curveX(curve, curve.emerg)
 	const pointX = point ? curveX(curve, point.tempC) : 0
 
-	// Disagreement between what the curve asks and what the hub reports is worth naming:
-	// in auto with no regress pending they should agree, and when they do not the
-	// cause is outside this panel (manual mode, a held band, a stuck write).
-	const disagreement = point && appliedLevel !== null && point.dutyPct !== appliedLevel
+	// There is no "the curve asks X but the fan is at Y" line, on purpose.
+	//
+	// pfand applies the curve through its own trim, gain, hysteresis (HYST, in
+	// degrees) and a minimum dwell (DWELL, in seconds). A fan one band behind its
+	// instantaneous target is therefore the daemon doing what it was configured to
+	// do, and this panel reads no pfand internal state, so it cannot tell that apart
+	// from a fan that is genuinely stuck. The two numbers are already on screen --
+	// the lead reading above and the operating point on this plot -- so the only
+	// thing that sentence contributed was a verdict. It carried it in the warning
+	// colour, it fired on every band crossing on any host with a dwell, and the
+	// verdict was wrong. Removed rather than reworded: a neutral restatement of two
+	// visible numbers is still a line of height for no information.
 
 	return (
 		<figure className="min-w-0 rounded-md border border-border p-3">
@@ -663,11 +668,7 @@ function CurvePlot({
 					<p>{t`Temperature unavailable, so no operating point is shown.`}</p>
 				)}
 				{!active && <p>{t`The curve is not driving the fan right now.`}</p>}
-				{disagreement && (
-					<p className="text-warning-text">
-						{t`Curve asks for ${point.dutyPct}%, but the fan is running at ${appliedLevel ?? 0}%.`}
-					</p>
-				)}
+
 			</figcaption>
 		</figure>
 	)
@@ -1552,7 +1553,6 @@ export function PlusFanTab(_props: { grid: boolean; dataEmpty: boolean }) {
 										<CurvePlot
 											curve={curve}
 											tempC={state.pkg_temp_read ? state.pkg_temp_c : null}
-											appliedLevel={state.level_read ? state.level : null}
 											active={state.pfand_active === true}
 										/>
 										<div className="flex flex-wrap items-center justify-between gap-2">

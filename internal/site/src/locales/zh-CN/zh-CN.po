@@ -3181,10 +3181,6 @@ msgid "{0}% → {1}% → {2}%"
 msgstr "{0}% → {1}% → {2}%"
 
 #: src/components/routes/system/plus-fan-tab.tsx
-msgid "Curve asks for {0}%, but the fan is running at {1}%."
-msgstr "曲线要求 {0}%，但风扇正以 {1}% 运行。"
-
-#: src/components/routes/system/plus-fan-tab.tsx
 msgid "Idle temperature"
 msgstr "怠速温度"
 
